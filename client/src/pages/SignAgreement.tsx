@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FileCheck,
@@ -11,6 +11,8 @@ import {
   Loader2,
   Crown,
   Printer,
+  PenLine,
+  RotateCcw,
 } from 'lucide-react';
 import { api } from '../api/client';
 import {
@@ -54,6 +56,13 @@ export const SignAgreement: React.FC = () => {
   // User ID from query param or system
   const queryUserId = searchParams.get('userId') || searchParams.get('user') || '';
 
+  // Canvas ref & Interactive Signature States
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [signatureMode, setSignatureMode] = useState<'draw' | 'type'>('draw');
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [hasDrawn, setHasDrawn] = useState(false);
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+
   const fetchEnquiry = async () => {
     if (!id) return;
     try {
@@ -95,6 +104,14 @@ export const SignAgreement: React.FC = () => {
         const initialSigner = raw.primaryContactName || raw.coupleName || '';
         setSignatoryName(initialSigner);
 
+        // Check for stored signature in localStorage
+        const codeKey = raw.code || `ENQ-${String(raw.id).slice(0, 8)}`;
+        const storedSig = localStorage.getItem(`rk_sig_${codeKey}`);
+        if (storedSig && storedSig.startsWith('data:image')) {
+          setSignatureDataUrl(storedSig);
+          setHasDrawn(true);
+        }
+
         if (agreementSt === 'Signed on Mobile') {
           setSignedSuccess(true);
         }
@@ -112,18 +129,82 @@ export const SignAgreement: React.FC = () => {
 
   const displayUserId = queryUserId || (enquiry ? `USR-${enquiry.code.replace('ENQ-', '')}` : 'USR-2026-CLIENT');
 
+  // Canvas Drawing Handlers
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    ctx.beginPath();
+    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+    setIsDrawing(true);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    ctx.lineTo(clientX - rect.left, clientY - rect.top);
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    setHasDrawn(true);
+  };
+
+  const stopDrawing = () => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      setSignatureDataUrl(canvas.toDataURL('image/png'));
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    draw(e);
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasDrawn(false);
+    setSignatureDataUrl(null);
+  };
+
   const handleSign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!enquiry || !termsAccepted || !signatoryName.trim()) return;
 
     try {
       setSigning(true);
+
+      // Persist signature representation
+      if (signatureMode === 'draw' && signatureDataUrl) {
+        localStorage.setItem(`rk_sig_${enquiry.code}`, signatureDataUrl);
+      } else {
+        localStorage.setItem(`rk_sig_${enquiry.code}`, 'typed');
+      }
+
       const res = await api.patch(`/enquiries/${enquiry.id}/status`, {
         agreementStatus: 'Signed on Mobile',
         status: 'Consultation Booked',
         signatoryName: signatoryName.trim(),
         userId: displayUserId,
-        notes: `Signed digitally via mobile magic link by ${signatoryName.trim()} (User ID: ${displayUserId}).`,
+        notes: `Signed digitally via mobile magic link by ${signatoryName.trim()} (User ID: ${displayUserId})${signatureMode === 'draw' && hasDrawn ? ' with drawn electronic signature' : ''}.`,
       });
 
       if (res.success) {
@@ -131,11 +212,11 @@ export const SignAgreement: React.FC = () => {
         setEnquiry((prev) =>
           prev
             ? {
-                ...prev,
-                agreementStatus: 'Signed on Mobile',
-                primaryContactName: signatoryName.trim(),
-                agreementSignedAt: new Date().toISOString(),
-              }
+              ...prev,
+              agreementStatus: 'Signed on Mobile',
+              primaryContactName: signatoryName.trim(),
+              agreementSignedAt: new Date().toISOString(),
+            }
             : null
         );
       }
@@ -346,9 +427,19 @@ export const SignAgreement: React.FC = () => {
                       </span>
                     </div>
 
-                    {/* Embedded User's Signature in Royal Cursive Style */}
-                    <div className="font-serif italic text-2xl sm:text-3xl font-bold text-slate-900 pt-1 tracking-wide border-b-2 border-slate-800 pb-1 font-['Playfair_Display',Georgia,serif]">
-                      {effectiveSignatory}
+                    {/* Embedded User's Signature: Drawn Canvas Image OR Royal Cursive Script */}
+                    <div className="border-b-2 border-slate-800 pb-1 pt-1 min-h-[48px] flex items-center">
+                      {signatureDataUrl ? (
+                        <img
+                          src={signatureDataUrl}
+                          alt={`Signature of ${effectiveSignatory}`}
+                          className="h-12 sm:h-14 max-w-full object-contain filter contrast-125"
+                        />
+                      ) : (
+                        <div className="font-serif italic text-2xl sm:text-3xl font-bold text-slate-900 tracking-wide font-['Playfair_Display',Georgia,serif]">
+                          {effectiveSignatory}
+                        </div>
+                      )}
                     </div>
                     <div className="text-xs font-semibold text-slate-900">
                       {effectiveSignatory}
@@ -422,16 +513,92 @@ export const SignAgreement: React.FC = () => {
                   </p>
                 </div>
 
-                {signatoryName.trim() && (
-                  <div className="p-3 bg-white border border-slate-200 rounded text-center">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                      Live Signature Preview (Embedded on Contract)
-                    </span>
-                    <div className="font-serif italic text-2xl font-bold text-slate-900 font-['Playfair_Display',Georgia,serif]">
-                      {signatoryName}
+                {/* Interactive Signature Input: Draw on Canvas or Type */}
+                <div className="space-y-3 bg-white p-3.5 rounded-lg border border-slate-200 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <PenLine className="w-3.5 h-3.5 text-[#714B67]" />
+                      <span>Electronic Signature Input</span>
+                    </Label>
+                    <div className="inline-flex rounded-md border border-slate-200 p-0.5 bg-slate-50 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => setSignatureMode('draw')}
+                        className={`px-2.5 py-0.5 rounded font-medium transition cursor-pointer ${
+                          signatureMode === 'draw'
+                            ? 'bg-white text-slate-900 font-bold shadow-xs'
+                            : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                      >
+                        Draw Signature
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSignatureMode('type')}
+                        className={`px-2.5 py-0.5 rounded font-medium transition cursor-pointer ${
+                          signatureMode === 'type'
+                            ? 'bg-white text-slate-900 font-bold shadow-xs'
+                            : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                      >
+                        Type Signature
+                      </button>
                     </div>
                   </div>
-                )}
+
+                  {signatureMode === 'draw' ? (
+                    <div className="space-y-2">
+                      <div className="relative border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 overflow-hidden">
+                        <canvas
+                          ref={canvasRef}
+                          width={600}
+                          height={130}
+                          onMouseDown={startDrawing}
+                          onMouseMove={draw}
+                          onMouseUp={stopDrawing}
+                          onMouseLeave={stopDrawing}
+                          onTouchStart={startDrawing}
+                          onTouchMove={handleTouchMove}
+                          onTouchEnd={stopDrawing}
+                          className="w-full h-28 touch-none cursor-crosshair bg-white"
+                        />
+                        {!hasDrawn && (
+                          <div className="absolute inset-0 pointer-events-none flex items-center justify-center text-slate-400 text-xs gap-1.5">
+                            <PenLine className="w-4 h-4 opacity-40 text-slate-400" />
+                            <span>Draw your electronic signature with mouse or touch here</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-400">
+                          Sign smoothly inside the box to embed directly onto the agreement.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={clearCanvas}
+                          className="text-slate-500 hover:text-red-600 font-semibold flex items-center gap-1 cursor-pointer transition"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>Clear Pad</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 text-center">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                          Live Cursive Signature Script
+                        </span>
+                        <div className="font-serif italic text-2xl sm:text-3xl font-bold text-slate-900 font-['Playfair_Display',Georgia,serif]">
+                          {signatoryName.trim() || 'Your Signature Here'}
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Your entered legal name will be embedded as an official digital script signature.
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 <div className="flex items-start gap-2 pt-1">
                   <input
