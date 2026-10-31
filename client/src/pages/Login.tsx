@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ArrowRight, 
+import {
+  ArrowRight,
   AlertCircle,
   Building2,
   CreditCard,
@@ -17,7 +17,6 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
-  CardFooter,
   Button,
   Input,
   Label,
@@ -60,7 +59,7 @@ const DEMO_ROLES: { role: UserRole; title: string; subtitle: string; icon: typeo
 export const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login, quickLogin, loading, error, clearError } = useAuthStore();
-  
+
   const [selectedRole, setSelectedRole] = useState<UserRole>('FOUNDER');
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [email, setEmail] = useState('');
@@ -74,7 +73,7 @@ export const Login: React.FC = () => {
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
-    
+
     let success = false;
     if (isDemoMode) {
       success = await quickLogin(selectedRole);
@@ -177,14 +176,12 @@ export const Login: React.FC = () => {
                     setIsDemoMode((prev) => !prev);
                     clearError();
                   }}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                    isDemoMode ? 'bg-[#714B67]' : 'bg-slate-300'
-                  }`}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${isDemoMode ? 'bg-[#714B67]' : 'bg-slate-300'
+                    }`}
                 >
                   <span
-                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                      isDemoMode ? 'translate-x-4' : 'translate-x-0'
-                    }`}
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${isDemoMode ? 'translate-x-4' : 'translate-x-0'
+                      }`}
                   />
                 </button>
               </div>
@@ -203,11 +200,10 @@ export const Login: React.FC = () => {
                         <div
                           key={r.role}
                           onClick={() => handleSelectRole(r.role)}
-                          className={`p-2.5 rounded border text-left cursor-pointer transition flex items-start gap-2.5 ${
-                            isSelected
-                              ? 'bg-purple-50/70 border-[#714B67] ring-1 ring-[#714B67]'
-                              : 'bg-white border-slate-200 hover:bg-slate-50'
-                          }`}
+                          className={`p-2.5 rounded border text-left cursor-pointer transition flex items-start gap-2.5 ${isSelected
+                            ? 'bg-purple-50/70 border-[#714B67] ring-1 ring-[#714B67]'
+                            : 'bg-white border-slate-200 hover:bg-slate-50'
+                            }`}
                         >
                           <div className="p-1 rounded bg-slate-100 border border-slate-200 text-slate-700 shrink-0 mt-0.5">
                             <Icon className="w-3.5 h-3.5" />
@@ -243,18 +239,12 @@ export const Login: React.FC = () => {
                 {loading
                   ? 'Authenticating...'
                   : isDemoMode
-                  ? `Sign In as ${selectedRoleObj?.title.split('&')[0].trim()}`
-                  : 'Sign In'}
+                    ? `Sign In as ${selectedRoleObj?.title.split('&')[0].trim()}`
+                    : 'Sign In'}
                 <ArrowRight className="w-3.5 h-3.5 ml-2" />
               </Button>
             </form>
           </CardContent>
-
-          <CardFooter className="p-3 bg-slate-50/70 border-t border-slate-100 text-center justify-center">
-            <span className="text-[11px] text-slate-500 font-mono">
-              Role-Gated Fastify Authentication
-            </span>
-          </CardFooter>
         </Card>
       </div>
     </div>

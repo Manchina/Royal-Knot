@@ -22,8 +22,10 @@ CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     full_name VARCHAR(120) NOT NULL,
     email VARCHAR(120) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL DEFAULT 'password123',
     phone VARCHAR(20) NOT NULL,
     role VARCHAR(40) NOT NULL, -- 'SUPER_ADMIN', 'FOUNDER', 'LEAD_PLANNER', 'COORDINATOR', 'FINANCE_MANAGER', 'CLIENT'
+    title VARCHAR(120),
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -65,7 +67,31 @@ CREATE TABLE IF NOT EXISTS weddings (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Table 5: Wedding Events (Sub-Ceremonies)
+-- Table 5: Inbound Enquiries (Scene 1: Lead Capture & Digital Agreement)
+CREATE TABLE IF NOT EXISTS enquiries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code VARCHAR(30) UNIQUE NOT NULL, -- e.g. 'ENQ-2026-101'
+    couple_name VARCHAR(150) NOT NULL,
+    primary_contact_name VARCHAR(120),
+    phone VARCHAR(20) NOT NULL,
+    email VARCHAR(120),
+    channel VARCHAR(40) NOT NULL DEFAULT 'Website Consultation', -- 'Website Consultation', 'WhatsApp', 'Instagram DM', 'Phone Call'
+    city_preference VARCHAR(60) NOT NULL, -- 'Jaipur', 'Udaipur'
+    dates_rough VARCHAR(100) NOT NULL, -- 'Dec 2026', 'Winter 2026'
+    guest_count INT NOT NULL DEFAULT 400,
+    theme VARCHAR(100),
+    budget_max NUMERIC(14, 2),
+    package_preference VARCHAR(60) DEFAULT 'FULL_SERVICE',
+    agreement_status VARCHAR(40) DEFAULT 'Drafting Agreement', -- 'Drafting Agreement', 'Sent - Pending Signature', 'Signed on Mobile'
+    agreement_signed_at TIMESTAMPTZ,
+    status VARCHAR(40) DEFAULT 'Initial Discovery', -- 'Initial Discovery', 'Consultation Booked', 'Agreement Awaited', 'Converted to Wedding'
+    wedding_id UUID REFERENCES weddings(id) ON DELETE SET NULL,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Table 6: Wedding Events (Sub-Ceremonies)
 CREATE TABLE IF NOT EXISTS wedding_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     wedding_id UUID NOT NULL REFERENCES weddings(id) ON DELETE CASCADE,

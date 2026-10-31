@@ -12,17 +12,23 @@ import {
   Menu,
   X,
   LogOut,
-  Layers
+  Layers,
+  ChevronDown
 } from 'lucide-react';
 import { useAuthStore, type UserRole } from '../store/useAuthStore';
+import { useWeddingStore } from '../store/useWeddingStore';
 import {
   Avatar,
   AvatarFallback,
-  Button,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
 } from './ui';
 
 export const Layout: React.FC = () => {
   const { user, logout } = useAuthStore();
+  const { weddings, selectedWeddingId, setSelectedWeddingId } = useWeddingStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -183,21 +189,43 @@ export const Layout: React.FC = () => {
       {/* Main App Workspace Canvas */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* Top Utility Bar */}
-        <header className="h-10 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shrink-0 shadow-2xs z-10">
-          <div className="flex items-center gap-2">
+        <header className="h-10 bg-white border-b border-slate-200 px-3 sm:px-6 flex items-center justify-between shrink-0 shadow-2xs z-10">
+          <div className="flex items-center gap-2.5 min-w-0">
             <button
               onClick={() => setMobileMenuOpen(true)}
               className="md:hidden p-1 rounded hover:bg-slate-100 text-slate-600"
             >
               <Menu className="w-4 h-4" />
             </button>
-            <span className="font-bold text-xs text-slate-800 tracking-tight">
+            <span className="font-bold text-xs text-slate-800 tracking-tight shrink-0">
               {currentModule}
             </span>
+
+            <div className="h-3.5 w-px bg-slate-200 shrink-0 hidden sm:block" />
+
+            {/* Global Wedding Context Filter */}
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider shrink-0 hidden lg:inline">
+                Project:
+              </span>
+              <select
+                value={selectedWeddingId}
+                onChange={(e) => setSelectedWeddingId(e.target.value)}
+                className="h-6 text-[11px] font-semibold bg-slate-50 border border-slate-200 rounded px-2 text-slate-700 hover:bg-white focus:outline-none focus:ring-1 focus:ring-[#714B67] cursor-pointer max-w-[190px] sm:max-w-[260px] truncate"
+                title="Active Wedding Filter"
+              >
+                <option value="ALL">All Weddings (Agency View)</option>
+                {weddings.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.code} • {w.couple}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Top Right: Season Tracker & User Profile with Sign Out */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 shrink-0">
             <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-mono border border-slate-200">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
               <span>Season 2026: 25 Projects Active</span>
@@ -205,32 +233,46 @@ export const Layout: React.FC = () => {
 
             <div className="h-4 w-px bg-slate-200 hidden sm:block" />
 
-            <div className="flex items-center gap-2">
-              <Avatar className="h-6 w-6 rounded">
-                <AvatarFallback className="bg-[#714B67] text-white text-[10px] font-bold">
-                  {roleInitials}
-                </AvatarFallback>
-              </Avatar>
-              <div className="hidden md:block text-left leading-tight">
-                <div className="font-bold text-xs text-slate-800 leading-none">
-                  {user?.full_name || 'Staff User'}
+            {/* Unified User Profile & Sign Out Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-slate-100 transition cursor-pointer text-left focus:outline-none focus:ring-1 focus:ring-[#714B67] group"
+                  title="Account details & Sign Out"
+                >
+                  <Avatar className="h-6.5 w-6.5 rounded shadow-2xs">
+                    <AvatarFallback className="bg-[#714B67] text-white text-[10px] font-bold">
+                      {roleInitials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="hidden md:block text-left leading-tight">
+                    <div className="font-bold text-xs text-slate-800 leading-none flex items-center gap-1">
+                      <span>{user?.full_name || 'Staff User'}</span>
+                      <ChevronDown className="w-3 h-3 text-slate-400 group-hover:text-slate-600 transition" />
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-medium leading-none mt-0.5">
+                      {roleLabels[activeRole]}
+                    </div>
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52 bg-white border border-slate-200 shadow-lg p-1.5 rounded-lg z-50">
+                <div className="px-2.5 py-2 border-b border-slate-100 mb-1">
+                  <p className="text-xs font-bold text-slate-900 leading-none">{user?.full_name || 'Staff User'}</p>
+                  <p className="text-[10px] text-slate-500 mt-1 font-mono truncate">{user?.email || 'Logged in'}</p>
+                  <div className="mt-1.5 inline-block px-1.5 py-0.5 rounded text-[9px] font-bold font-mono bg-rose-50 text-[#FF385C]">
+                    {roleLabels[activeRole]}
+                  </div>
                 </div>
-                <div className="text-[10px] text-slate-500 font-medium leading-none mt-0.5">
-                  {roleLabels[activeRole]}
-                </div>
-              </div>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleLogout}
-                title="Sign Out"
-                className="h-7 px-2 text-xs text-slate-600 hover:text-rose-600 hover:bg-rose-50 ml-1 gap-1.5 cursor-pointer"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Sign Out</span>
-              </Button>
-            </div>
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-rose-600 font-semibold rounded hover:bg-rose-50 cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign Out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 

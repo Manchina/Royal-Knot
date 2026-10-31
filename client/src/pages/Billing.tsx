@@ -31,9 +31,11 @@ import {
   SelectContent,
   SelectItem,
 } from '../components/ui';
+import { useWeddingStore } from '../store/useWeddingStore';
 
 interface ExtraCharge {
   id: string;
+  weddingId?: string;
   category: string;
   description: string;
   qty: number;
@@ -56,7 +58,11 @@ interface VendorBill {
 }
 
 export const Billing: React.FC = () => {
+  const { weddings, selectedWeddingId } = useWeddingStore();
   const [modalOpen, setModalOpen] = useState(false);
+  const [selectedExtraWeddingId, setSelectedExtraWeddingId] = useState<string>(
+    selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'
+  );
   const [desc, setDesc] = useState('');
   const [qty, setQty] = useState('50');
   const [unitPrice, setUnitPrice] = useState('2100');
@@ -150,8 +156,16 @@ export const Billing: React.FC = () => {
       {/* Odoo Control Panel */}
       <div className="bg-white border border-slate-200 rounded p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div>
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-            Invoicing & Vendor Settlements
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              Invoicing & Vendor Settlements
+            </span>
+            <span className="text-slate-300">•</span>
+            <span className="text-[11px] font-mono font-bold text-[#714B67]">
+              {selectedWeddingId === 'ALL'
+                ? 'All 25 Season Weddings'
+                : `${selectedWeddingId} • ${weddings.find((w) => w.id === selectedWeddingId)?.couple}`}
+            </span>
           </div>
           <h1 className="text-lg font-bold text-slate-900 tracking-tight">
             Billing & Extra Charges Reconciliation
@@ -306,6 +320,22 @@ export const Billing: React.FC = () => {
           </DialogHeader>
 
           <form onSubmit={handleAddExtra} className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="extra_wedding">Related Wedding Project</Label>
+              <select
+                id="extra_wedding"
+                value={selectedExtraWeddingId}
+                onChange={(e) => setSelectedExtraWeddingId(e.target.value)}
+                className="w-full h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
+              >
+                {weddings.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.code}: {w.couple} ({w.city})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="space-y-1">
               <Label htmlFor="vendor_name">Vendor Account</Label>
               <Select

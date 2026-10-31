@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { 
-  Plus, 
-  User, 
+import {
+  Plus,
+  User,
   CreditCard,
   Search,
   Check
@@ -34,9 +34,11 @@ import {
   SelectContent,
   SelectItem,
 } from '../components/ui';
+import { useWeddingStore } from '../store/useWeddingStore';
 
 interface Task {
   id: string;
+  weddingId: string;
   title: string;
   category: 'FINANCE' | 'VENUE' | 'VENDORS' | 'DESIGN' | 'PERMITS' | 'DAY_OF';
   owner: string;
@@ -46,29 +48,39 @@ interface Task {
 }
 
 export const Tasks: React.FC = () => {
+  const { weddings, selectedWeddingId } = useWeddingStore();
   const [activeStageFilter, setActiveStageFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [modalOpen, setModalOpen] = useState<boolean>(false);
 
   // New task form state
+  const [newTaskWeddingId, setNewTaskWeddingId] = useState<string>(
+    selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'
+  );
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState<Task['category']>('VENUE');
   const [newOwner, setNewOwner] = useState('Devika Sharma');
   const [newDays, setNewDays] = useState('20 Days');
 
   const [tasks, setTasks] = useState<Task[]>([
-    { id: 'TSK-01', title: 'Collect Booking Deposit (20%)', category: 'FINANCE', owner: 'Finance Team', stage: 'DONE', stagePayment: 'Stage 1: Booking Deposit', daysBefore: '90 Days' },
-    { id: 'TSK-02', title: 'Lock Palace Venue Contract & Heritage Permits', category: 'VENUE', owner: 'Devika Sharma', stage: 'DONE', daysBefore: '75 Days' },
-    { id: 'TSK-03', title: 'Issue Catering RFQ for 400 Guests', category: 'VENDORS', owner: 'Devika Sharma', stage: 'DONE', daysBefore: '60 Days' },
-    { id: 'TSK-04', title: 'Award Catering Contract & Sign SLA', category: 'VENDORS', owner: 'Devika Sharma', stage: 'DONE', daysBefore: '50 Days' },
-    { id: 'TSK-05', title: 'Collect Pre-Wedding Advance Payment (50%)', category: 'FINANCE', owner: 'Finance Team', stage: 'IN_PROGRESS', stagePayment: 'Stage 2: Advance (1 Mo Before)', daysBefore: '30 Days' },
-    { id: 'TSK-06', title: 'Finalize Mehendi Floral Concept & Folk Dancers', category: 'DESIGN', owner: 'Aarav Mehta', stage: 'IN_PROGRESS', daysBefore: '25 Days' },
-    { id: 'TSK-07', title: 'Sangeet Stage Lighting Truss & DJ Tech Rider', category: 'DESIGN', owner: 'Karan Verma', stage: 'IN_PROGRESS', daysBefore: '20 Days' },
-    { id: 'TSK-08', title: 'Royal Elephant & Drummers Baraat Route Clearance', category: 'PERMITS', owner: 'Karan Verma', stage: 'TO_PLAN', daysBefore: '15 Days' },
-    { id: 'TSK-09', title: 'Mandap Structural & Fire Safety Certification', category: 'VENUE', owner: 'Aarav Mehta', stage: 'TO_PLAN', daysBefore: '10 Days' },
-    { id: 'TSK-10', title: 'Minute-by-Minute Run Sheet Distribution to Family', category: 'DAY_OF', owner: 'Priya Joshi', stage: 'TO_PLAN', daysBefore: '5 Days' },
-    { id: 'TSK-11', title: 'Post-Event Banquet Headcount Audit (+ Extras)', category: 'FINANCE', owner: 'Finance Team', stage: 'TO_PLAN', stagePayment: 'Stage 3: Final Settlement', daysBefore: '+1 Day' },
-    { id: 'TSK-12', title: 'Disburse Final Vendor Balance Payments', category: 'FINANCE', owner: 'Finance Team', stage: 'TO_PLAN', daysBefore: '+3 Days' },
+    { id: 'TSK-01', weddingId: 'RW-2026-001', title: 'Collect Booking Deposit (20%)', category: 'FINANCE', owner: 'Finance Team', stage: 'DONE', stagePayment: 'Stage 1: Booking Deposit', daysBefore: '90 Days' },
+    { id: 'TSK-02', weddingId: 'RW-2026-001', title: 'Lock Palace Venue Contract & Heritage Permits', category: 'VENUE', owner: 'Devika Sharma', stage: 'DONE', daysBefore: '75 Days' },
+    { id: 'TSK-03', weddingId: 'RW-2026-001', title: 'Issue Catering RFQ for 400 Guests', category: 'VENDORS', owner: 'Devika Sharma', stage: 'DONE', daysBefore: '60 Days' },
+    { id: 'TSK-04', weddingId: 'RW-2026-001', title: 'Award Catering Contract & Sign SLA', category: 'VENDORS', owner: 'Devika Sharma', stage: 'DONE', daysBefore: '50 Days' },
+    { id: 'TSK-05', weddingId: 'RW-2026-001', title: 'Collect Pre-Wedding Advance Payment (50%)', category: 'FINANCE', owner: 'Finance Team', stage: 'IN_PROGRESS', stagePayment: 'Stage 2: Advance (1 Mo Before)', daysBefore: '30 Days' },
+    { id: 'TSK-06', weddingId: 'RW-2026-001', title: 'Finalize Mehendi Floral Concept & Folk Dancers', category: 'DESIGN', owner: 'Aarav Mehta', stage: 'IN_PROGRESS', daysBefore: '25 Days' },
+    { id: 'TSK-07', weddingId: 'RW-2026-001', title: 'Sangeet Stage Lighting Truss & DJ Tech Rider', category: 'DESIGN', owner: 'Karan Verma', stage: 'IN_PROGRESS', daysBefore: '20 Days' },
+    { id: 'TSK-08', weddingId: 'RW-2026-001', title: 'Royal Elephant & Drummers Baraat Route Clearance', category: 'PERMITS', owner: 'Karan Verma', stage: 'TO_PLAN', daysBefore: '15 Days' },
+    { id: 'TSK-09', weddingId: 'RW-2026-001', title: 'Mandap Structural & Fire Safety Certification', category: 'VENUE', owner: 'Aarav Mehta', stage: 'TO_PLAN', daysBefore: '10 Days' },
+    { id: 'TSK-10', weddingId: 'RW-2026-001', title: 'Minute-by-Minute Run Sheet Distribution to Family', category: 'DAY_OF', owner: 'Priya Joshi', stage: 'TO_PLAN', daysBefore: '5 Days' },
+    { id: 'TSK-11', weddingId: 'RW-2026-001', title: 'Post-Event Banquet Headcount Audit (+ Extras)', category: 'FINANCE', owner: 'Finance Team', stage: 'TO_PLAN', stagePayment: 'Stage 3: Final Settlement', daysBefore: '+1 Day' },
+    { id: 'TSK-12', weddingId: 'RW-2026-001', title: 'Disburse Final Vendor Balance Payments', category: 'FINANCE', owner: 'Finance Team', stage: 'TO_PLAN', daysBefore: '+3 Days' },
+    // Tasks for Wedding 2 (Jaipur Heritage)
+    { id: 'TSK-13', weddingId: 'RW-2026-002', title: 'Sign Rambagh Palace Lawn Booking Contract', category: 'VENUE', owner: 'Devika Sharma', stage: 'DONE', daysBefore: '80 Days' },
+    { id: 'TSK-14', weddingId: 'RW-2026-002', title: 'Review 3 Caterers Side-by-Side Tasting Notes', category: 'VENDORS', owner: 'Devika Sharma', stage: 'IN_PROGRESS', daysBefore: '45 Days' },
+    { id: 'TSK-15', weddingId: 'RW-2026-002', title: 'Collect Pre-Wedding Advance Payment (50%)', category: 'FINANCE', owner: 'Finance Team', stage: 'TO_PLAN', stagePayment: 'Stage 2: Advance', daysBefore: '30 Days' },
+    // Tasks for Wedding 3 (Fortress Chic)
+    { id: 'TSK-16', weddingId: 'RW-2026-003', title: 'Alila Fort Bishangarh Day-of Logistics & Check-in Desk', category: 'DAY_OF', owner: 'Karan Verma', stage: 'TO_PLAN', daysBefore: '20 Days' },
   ]);
 
   const toggleTaskStatus = (id: string) => {
@@ -90,6 +102,7 @@ export const Tasks: React.FC = () => {
 
     const newTask: Task = {
       id: `TSK-${String(tasks.length + 1).padStart(2, '0')}`,
+      weddingId: newTaskWeddingId,
       title: newTitle,
       category: newCategory,
       owner: newOwner,
@@ -103,21 +116,30 @@ export const Tasks: React.FC = () => {
   };
 
   const filtered = tasks.filter((t) => {
+    const matchesWedding = selectedWeddingId === 'ALL' || t.weddingId === selectedWeddingId;
     const matchesStage = activeStageFilter === 'ALL' || t.stage === activeStageFilter;
     const matchesSearch =
       t.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.owner.toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.id.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStage && matchesSearch;
+    return matchesWedding && matchesStage && matchesSearch;
   });
+
+  const activeWedding = weddings.find((w) => w.id === selectedWeddingId);
 
   return (
     <div className="space-y-4">
       {/* Odoo Control Panel */}
       <div className="bg-white border border-slate-200 rounded p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div>
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-            Project Task Management
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              Project Task Management
+            </span>
+            <span className="text-slate-300">•</span>
+            <span className="text-[11px] font-mono font-bold text-[#714B67]">
+              {activeWedding ? `${activeWedding.code}: ${activeWedding.couple}` : 'All 25 Weddings'}
+            </span>
           </div>
           <h1 className="text-lg font-bold text-slate-900 tracking-tight">
             Checklists & Stage Milestones
@@ -190,13 +212,12 @@ export const Tasks: React.FC = () => {
                     <TableCell className="text-center py-2.5">
                       <button
                         onClick={() => toggleTaskStatus(t.id)}
-                        className={`w-4 h-4 rounded border flex items-center justify-center transition cursor-pointer mx-auto ${
-                          isDone
-                            ? 'bg-emerald-700 border-emerald-700 text-white'
-                            : isInProgress
+                        className={`w-4 h-4 rounded border flex items-center justify-center transition cursor-pointer mx-auto ${isDone
+                          ? 'bg-emerald-700 border-emerald-700 text-white'
+                          : isInProgress
                             ? 'bg-amber-100 border-amber-500 text-amber-800'
                             : 'border-slate-300 hover:border-slate-500 bg-white'
-                        }`}
+                          }`}
                       >
                         {isDone && <Check className="w-3 h-3" />}
                         {isInProgress && <span className="w-1.5 h-1.5 rounded-full bg-amber-700" />}
@@ -269,6 +290,22 @@ export const Tasks: React.FC = () => {
           </DialogHeader>
 
           <form onSubmit={handleAddTask} className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="task_wedding">Related Wedding Project</Label>
+              <select
+                id="task_wedding"
+                value={newTaskWeddingId}
+                onChange={(e) => setNewTaskWeddingId(e.target.value)}
+                className="w-full h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
+              >
+                {weddings.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.code}: {w.couple} ({w.city})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="space-y-1">
               <Label htmlFor="task_title">Task Description</Label>
               <Input
