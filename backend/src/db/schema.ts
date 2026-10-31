@@ -183,3 +183,45 @@ export const weddingTasks = pgTable('wedding_tasks', {
   completedAt: timestamp('completed_at', { withTimezone: true }),
   notes: text('notes'),
 });
+
+
+// Day-of Run Sheet (Minute-by-Minute Run Sheet)
+export const dayOfRunSheet = pgTable('day_of_run_sheet', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  weddingId: uuid('wedding_id').references(() => weddings.id).notNull(),
+  eventId: uuid('event_id').references(() => weddingEvents.id),
+  timeSlot: time('time_slot').notNull(),
+  activityTitle: varchar('activity_title', { length: 150 }).notNull(),
+  location: varchar('location', { length: 120 }),
+  responsibleUserId: uuid('responsible_user_id').references(() => users.id),
+  notes: text('notes'),
+  sortOrder: integer('sort_order').default(0),
+});
+
+// Day-of Vendor Check-ins (Vendor Arrival Telemetry)
+export const dayOfVendorCheckins = pgTable('day_of_vendor_checkins', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  weddingId: uuid('wedding_id').references(() => weddings.id).notNull(),
+  eventId: uuid('event_id').references(() => weddingEvents.id),
+  vendorId: uuid('vendor_id').references(() => vendors.id).notNull(),
+  scheduledArrivalTime: timestamp('scheduled_arrival_time', { withTimezone: true }).notNull(),
+  actualArrivalTime: timestamp('actual_arrival_time', { withTimezone: true }),
+  status: varchar('status', { length: 30 }).default('SCHEDULED'),
+  delayMinutes: integer('delay_minutes').default(0),
+  staffVerifierId: uuid('staff_verifier_id').references(() => users.id),
+  remarks: text('remarks'),
+});
+
+// Day-of Incidents
+export const dayOfIncidents = pgTable('day_of_incidents', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  weddingId: uuid('wedding_id').references(() => weddings.id).notNull(),
+  eventId: uuid('event_id').references(() => weddingEvents.id),
+  title: varchar('title', { length: 200 }).notNull(),
+  severity: varchar('severity', { length: 20 }).default('MEDIUM'),
+  status: varchar('status', { length: 30 }).default('REPORTED'),
+  assignedTo: uuid('assigned_to').references(() => users.id),
+  resolutionNotes: text('resolution_notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+});
