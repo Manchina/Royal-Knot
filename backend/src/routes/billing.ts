@@ -441,6 +441,47 @@ export async function billingRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // 2.5 GET /api/billing/unbilled-extras - Queue of live unbilled extras across active weddings
+  fastify.get('/unbilled-extras', async (_request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const rows = await db
+        .select({
+          id: weddingExtraCharges.id,
+          weddingId: weddings.id,
+          weddingCode: weddings.code,
+          category: weddingExtraCharges.category,
+          description: weddingExtraCharges.description,
+          quantity: weddingExtraCharges.quantity,
+          unitRate: weddingExtraCharges.unitRate,
+          totalAmount: weddingExtraCharges.totalAmount,
+          isBilledToClient: weddingExtraCharges.isBilledToClient,
+          createdAt: weddingExtraCharges.createdAt,
+        })
+        .from(weddingExtraCharges)
+        .innerJoin(weddings, eq(weddingExtraCharges.weddingId, weddings.id))
+        .orderBy(desc(weddingExtraCharges.createdAt));
+
+      const data = rows.map((r) => ({
+        id: r.id,
+        weddingCode: r.weddingCode,
+        category: r.category,
+        description: r.description,
+        quantity: parseFloat(r.quantity) || 1,
+        unitRate: parseFloat(r.unitRate) || 0,
+        totalAmount: parseFloat(r.totalAmount) || 0,
+        isBilledToClient: !!r.isBilledToClient,
+        status: r.isBilledToClient ? 'BILLED' : 'PENDING_APPROVAL',
+      }));
+
+      return { success: true, count: data.length, data };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      fastify.log.error(`Fetch unbilled extras error: ${msg}`);
+      reply.status(500);
+      return { success: false, error: msg };
+    }
+  });
+
   // 3. GET /api/billing/projects/:id - Full Financial Dossier (Bills, Extras, Invoices, Changelog, Awarded Quotes)
   fastify.get('/projects/:id', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const { id } = request.params;
