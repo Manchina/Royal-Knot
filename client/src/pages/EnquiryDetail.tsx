@@ -19,7 +19,6 @@ import {
   ShieldCheck,
   Link2,
   KeyRound,
-  RefreshCw,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useWeddingStore } from '../store/useWeddingStore';
@@ -612,16 +611,6 @@ export const EnquiryDetail: React.FC = () => {
                   <Eye className="w-3.5 h-3.5 text-slate-500" />
                   <span>Preview Document</span>
                 </button>
-
-                <a
-                  href={`/sign/${enquiry.code}?userId=${clientUserId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center h-8 px-3 rounded border border-[#714B67]/30 bg-[#714B67] hover:bg-[#5a3a52] text-xs text-white font-semibold transition cursor-pointer gap-1.5 shadow-2xs"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Open Signed Agreement ↗</span>
-                </a>
               </div>
             </div>
           </div>
@@ -760,7 +749,7 @@ export const EnquiryDetail: React.FC = () => {
               </div>
             </div>
 
-            {/* Magic Link Field + Copy Button */}
+            {/* Magic Link Field + Copy Button + Go to Sign Icon */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700 block">
                 Mobile Signing URL
@@ -781,50 +770,47 @@ export const EnquiryDetail: React.FC = () => {
                     : 'bg-slate-900 hover:bg-slate-800 text-white'
                     }`}
                 >
-                  {magicLinkCopied ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 mr-1" />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Link2 className="w-3.5 h-3.5 mr-1" />
-                      <span>Copy</span>
-                    </>
-                  )}
+                  {magicLinkCopied ? 'Copied!' : 'Copy'}
                 </Button>
+                <a
+                  href={magicUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-8 w-8 flex items-center justify-center rounded border border-slate-300 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition cursor-pointer shrink-0"
+                  title="Open Signing Page in new tab"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
               </div>
               <p className="text-[11px] text-slate-400">
                 The client opens this URL to review the contract and enter their legal name to sign.
               </p>
+            </div>
 
-              {/* Modal Actions: Open Sign Page, Regenerate URL, Confirm Signed */}
-              <div className="pt-3 border-t border-slate-200 space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={actionLoading}
-                    onClick={handleRegenerateMagicLink}
-                    className="h-8.5 text-xs font-medium border-slate-300 hover:bg-slate-50 text-slate-700 cursor-pointer gap-1.5"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${actionLoading ? 'animate-spin' : ''}`} />
-                    <span>Regenerate Signed URL</span>
-                  </Button>
-                </div>
+            {/* Modal Actions: Regenerate URL and Confirm Signed side by side */}
+            <div className="pt-3 border-t border-slate-200 grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={actionLoading}
+                onClick={handleRegenerateMagicLink}
+                className="h-8.5 text-xs font-medium border-slate-300 hover:bg-slate-50 text-slate-700 cursor-pointer"
+              >
+                {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                <span>Regenerate Signed URL</span>
+              </Button>
 
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={actionLoading}
-                  onClick={handleConfirmSigned}
-                  className="w-full h-8.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer gap-1.5 shadow-2xs"
-                >
-                  {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileCheck className="w-3.5 h-3.5" />}
-                  <span>Confirm Signed (Manual Override)</span>
-                </Button>
-              </div>
+              <Button
+                type="button"
+                size="sm"
+                disabled={actionLoading}
+                onClick={handleConfirmSigned}
+                className="h-8.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-2xs"
+              >
+                {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                <span>Confirm Signed</span>
+              </Button>
             </div>
           </div>
         </DialogContent>
@@ -960,14 +946,6 @@ export const EnquiryDetail: React.FC = () => {
                 <Printer className="w-3.5 h-3.5 text-slate-500" />
                 <span>Print / Full Page</span>
               </a>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => setPreviewDocOpen(false)}
-                className="h-8 text-xs bg-slate-900 text-white hover:bg-slate-800"
-              >
-                Close Preview
-              </Button>
             </div>
           </div>
         </DialogContent>
