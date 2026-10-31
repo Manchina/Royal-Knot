@@ -40,6 +40,10 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
 } from '../components/ui';
 import { api } from '../api/client';
 import { useWeddingStore } from '../store/useWeddingStore';
@@ -93,6 +97,7 @@ export const BillingProjectDetail: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [finaliseModalOpen, setFinaliseModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('milestones');
 
   // Live PostgreSQL Data States
   const [liveProject, setLiveProject] = useState<any>(null);
@@ -282,52 +287,29 @@ export const BillingProjectDetail: React.FC = () => {
           </div>
 
           {/* Action Buttons & Status Badge */}
-          <div className="flex flex-wrap items-center gap-2">
-            {isFinalised ? (
-              <div className="flex items-center gap-2">
-                <div className="text-right bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
-                  <div className="text-[10px] font-bold text-emerald-800 uppercase flex items-center gap-1 justify-end">
-                    <Lock className="w-3 h-3" /> Finalised & Audited
-                  </div>
-                  <div className="text-[10px] text-slate-500">
-                    {finalisedInfo.finalisedDate} by {finalisedInfo.finalisedBy}
-                  </div>
+          {/* Status Badge when Finalised */}
+          {isFinalised && (
+            <div className="flex items-center gap-2">
+              <div className="text-right bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
+                <div className="text-[10px] font-bold text-emerald-800 uppercase flex items-center gap-1 justify-end">
+                  <Lock className="w-3 h-3" /> Finalised & Audited
                 </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => alert(`Exporting formal settlement statement for ${wedding.code}`)}
-                  className="gap-1.5 h-9 text-xs border-slate-200 hover:bg-slate-50"
-                >
-                  <FileText className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Invoice Statement</span>
-                </Button>
+                <div className="text-[10px] text-slate-500">
+                  {finalisedInfo.finalisedDate} by {finalisedInfo.finalisedBy}
+                </div>
               </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setFinaliseModalOpen(true)}
-                  className="gap-1.5 h-9 text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Finalise Settlement</span>
-                </Button>
 
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => setModalOpen(true)}
-                  className="gap-1.5 h-9 text-xs"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Extra Charge</span>
-                </Button>
-              </div>
-            )}
-          </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => alert(`Exporting formal settlement statement for ${wedding.code}`)}
+                className="gap-1.5 h-9 text-xs border-slate-200 hover:bg-slate-50"
+              >
+                <FileText className="w-3.5 h-3.5 text-slate-500" />
+                <span>Invoice Statement</span>
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Executive Financial Ledger KPI Grid */}
@@ -373,8 +355,48 @@ export const BillingProjectDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* Section 1: Staged Client Billing (Scene 5 Milestone Billing) */}
-      <Card className="border border-slate-200 shadow-2xs rounded-xl bg-white overflow-hidden">
+      {/* Tabs Navigation for Commercial & Billing Detail */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-4">
+        <div className="bg-white border border-slate-200 rounded-xl p-1.5 shadow-2xs">
+          <TabsList className="bg-slate-100/90 p-1 border border-slate-200/80 rounded-lg h-auto flex flex-wrap gap-1.5 w-full justify-start">
+            <TabsTrigger
+              value="milestones"
+              className="px-3.5 py-2 text-xs font-semibold gap-2 data-[state=active]:bg-white data-[state=active]:text-[#714B67] data-[state=active]:shadow-2xs rounded-md transition-all cursor-pointer"
+            >
+              <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Staged Client Billing (Milestone Invoices)</span>
+              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                {invoices.length}
+              </span>
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="extras"
+              className="px-3.5 py-2 text-xs font-semibold gap-2 data-[state=active]:bg-white data-[state=active]:text-[#714B67] data-[state=active]:shadow-2xs rounded-md transition-all cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 text-purple-600" />
+              <span>Day-of Additions & Extra Charges Invoiced to Couple (Banquet Overruns)</span>
+              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-[#714B67]">
+                {projectExtras.length}
+              </span>
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="vendor-bills"
+              className="px-3.5 py-2 text-xs font-semibold gap-2 data-[state=active]:bg-white data-[state=active]:text-[#714B67] data-[state=active]:shadow-2xs rounded-md transition-all cursor-pointer"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+              <span>Vendor Bill Two-Way Matching Ledger</span>
+              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                {projectVendorBills.length}
+              </span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* Tab 1: Staged Client Billing (Scene 5 Milestone Billing) */}
+        <TabsContent value="milestones" className="mt-0">
+          <Card className="border border-slate-200 shadow-2xs rounded-xl bg-white overflow-hidden">
         <CardHeader className="p-4 border-b border-slate-200 bg-slate-50/80 flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
@@ -466,9 +488,11 @@ export const BillingProjectDetail: React.FC = () => {
           </Table>
         </CardContent>
       </Card>
+    </TabsContent>
 
-      {/* Section 2: Day-of Additions & Extra Charges Invoiced to Client */}
-      <Card className="border border-slate-200 shadow-2xs rounded-xl bg-white">
+        {/* Tab 2: Day-of Additions & Extra Charges Invoiced to Client */}
+        <TabsContent value="extras" className="mt-0">
+          <Card className="border border-slate-200 shadow-2xs rounded-xl bg-white">
         <CardHeader className="p-4 border-b border-slate-200 bg-slate-50/80 flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-sm font-bold text-slate-900">
@@ -533,9 +557,11 @@ export const BillingProjectDetail: React.FC = () => {
           ))}
         </CardContent>
       </Card>
+    </TabsContent>
 
-      {/* Section 3: Vendor Disbursement Ledger & Two-Way Matching */}
-      <Card className="border border-slate-200 shadow-2xs rounded-xl bg-white">
+        {/* Tab 3: Vendor Disbursement Ledger & Two-Way Matching */}
+        <TabsContent value="vendor-bills" className="mt-0">
+          <Card className="border border-slate-200 shadow-2xs rounded-xl bg-white">
         <CardHeader className="p-4 border-b border-slate-200 bg-slate-50/80">
           <div className="flex items-center justify-between">
             <div>
@@ -631,6 +657,8 @@ export const BillingProjectDetail: React.FC = () => {
           </Table>
         </CardContent>
       </Card>
+    </TabsContent>
+  </Tabs>
 
       {/* Modal: Add Extra Charge */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
