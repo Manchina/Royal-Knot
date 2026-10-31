@@ -225,3 +225,66 @@ export const dayOfIncidents = pgTable('day_of_incidents', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   resolvedAt: timestamp('resolved_at', { withTimezone: true }),
 });
+
+// Scene 5 & 6: Client Invoices (Milestone Billing: 20% Deposit, 50% Advance, 30% Final Settlement)
+export const clientInvoices = pgTable('client_invoices', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  weddingId: uuid('wedding_id').references(() => weddings.id, { onDelete: 'cascade' }).notNull(),
+  invoiceNumber: varchar('invoice_number', { length: 50 }).unique().notNull(),
+  stageKey: varchar('stage_key', { length: 60 }).notNull(),
+  amountDue: numeric('amount_due', { precision: 12, scale: 2 }).notNull(),
+  dueDate: date('due_date').notNull(),
+  status: varchar('status', { length: 30 }).default('UNPAID').notNull(),
+  paidAmount: numeric('paid_amount', { precision: 12, scale: 2 }).default('0.00'),
+  paidAt: timestamp('paid_at', { withTimezone: true }),
+  paymentReference: varchar('payment_reference', { length: 100 }),
+});
+
+// Scene 5: Wedding Extra Charges (Banquet Overruns, DJ Overtime, Change Requests)
+export const weddingExtraCharges = pgTable('wedding_extra_charges', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  weddingId: uuid('wedding_id').references(() => weddings.id, { onDelete: 'cascade' }).notNull(),
+  category: varchar('category', { length: 60 }).notNull(),
+  description: varchar('description', { length: 200 }).notNull(),
+  quantity: numeric('quantity', { precision: 8, scale: 2 }).notNull(),
+  unitRate: numeric('unit_rate', { precision: 10, scale: 2 }).notNull(),
+  totalAmount: numeric('total_amount', { precision: 12, scale: 2 }).notNull(),
+  vendorId: uuid('vendor_id').references(() => vendors.id, { onDelete: 'set null' }),
+  isBilledToClient: boolean('is_billed_to_client').default(false),
+  clientInvoiceId: uuid('client_invoice_id').references(() => clientInvoices.id, { onDelete: 'set null' }),
+  approvedBy: uuid('approved_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
+// Scene 5: Vendor Bills & Disbursements (Two-Way / Three-Way Matching against Awarded Quotes)
+export const vendorBills = pgTable('vendor_bills', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  weddingId: uuid('wedding_id').references(() => weddings.id, { onDelete: 'cascade' }).notNull(),
+  vendorId: uuid('vendor_id').references(() => vendors.id, { onDelete: 'restrict' }).notNull(),
+  awardedQuoteId: uuid('awarded_quote_id').references(() => vendorQuotes.id, { onDelete: 'set null' }),
+  agreedBaseAmount: numeric('agreed_base_amount', { precision: 12, scale: 2 }).notNull(),
+  extraChargesAmount: numeric('extra_charges_amount', { precision: 12, scale: 2 }).default('0.00'),
+  totalPayable: numeric('total_payable', { precision: 12, scale: 2 }).notNull(),
+  advancePaid: numeric('advance_paid', { precision: 12, scale: 2 }).default('0.00'),
+  balanceDue: numeric('balance_due', { precision: 12, scale: 2 }).notNull(),
+  status: varchar('status', { length: 30 }).default('PENDING').notNull(),
+  reconciledBy: uuid('reconciled_by').references(() => users.id, { onDelete: 'set null' }),
+  settledAt: timestamp('settled_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
+// Billing Activity & Settlement Change Logs (Audit Trail)
+export const billingChangeLogs = pgTable('billing_change_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  weddingId: uuid('wedding_id').references(() => weddings.id, { onDelete: 'cascade' }).notNull(),
+  action: varchar('action', { length: 60 }).notNull(),
+  entityType: varchar('entity_type', { length: 40 }).notNull(),
+  entityId: uuid('entity_id'),
+  fromStatus: varchar('from_status', { length: 40 }),
+  toStatus: varchar('to_status', { length: 40 }),
+  amount: numeric('amount', { precision: 12, scale: 2 }),
+  performedBy: varchar('performed_by', { length: 120 }).default('System'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+

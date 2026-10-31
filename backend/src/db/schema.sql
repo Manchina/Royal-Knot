@@ -252,7 +252,8 @@ CREATE TABLE IF NOT EXISTS wedding_extra_charges (
     vendor_id UUID REFERENCES vendors(id) ON DELETE SET NULL,
     is_billed_to_client BOOLEAN DEFAULT FALSE,
     client_invoice_id UUID REFERENCES client_invoices(id) ON DELETE SET NULL,
-    approved_by UUID REFERENCES users(id) ON DELETE SET NULL
+    approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Table 16: Vendor Bills
@@ -268,5 +269,22 @@ CREATE TABLE IF NOT EXISTS vendor_bills (
     balance_due NUMERIC(12, 2) NOT NULL,
     status VARCHAR(30) DEFAULT 'PENDING',
     reconciled_by UUID REFERENCES users(id) ON DELETE SET NULL,
-    settled_at TIMESTAMPTZ
+    settled_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Table 17: Billing Change Logs (Audit Trail)
+CREATE TABLE IF NOT EXISTS billing_change_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    wedding_id UUID NOT NULL REFERENCES weddings(id) ON DELETE CASCADE,
+    action VARCHAR(60) NOT NULL,
+    entity_type VARCHAR(40) NOT NULL,
+    entity_id UUID,
+    from_status VARCHAR(40),
+    to_status VARCHAR(40),
+    amount NUMERIC(12, 2),
+    performed_by VARCHAR(120) DEFAULT 'System',
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+

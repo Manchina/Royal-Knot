@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Search, 
@@ -6,16 +6,24 @@ import {
   ShieldCheck, 
   ArrowRight, 
   CheckCircle2, 
-  History,
-  MapPin,
-  Calendar,
-  Users
+  MapPin, 
+  Users,
+  CreditCard,
+  TrendingUp,
+  Receipt,
+  Building2,
+  DollarSign,
+  LayoutList,
+  LayoutGrid,
+  Check,
+  AlertCircle,
+  FileSpreadsheet
 } from 'lucide-react';
 import {
   Card,
   CardHeader,
-  CardTitle,
   CardContent,
+  CardFooter,
   Button,
   Badge,
   Table,
@@ -25,416 +33,578 @@ import {
   TableRow,
   TableCell,
   Input,
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
 } from '../components/ui';
-import { cn } from '../lib/utils';
 import { api } from '../api/client';
 import { useWeddingStore } from '../store/useWeddingStore';
-import { useBillingStore } from '../store/useBillingStore';
+
+interface ProjectBillingItem {
+  id: string;
+  code: string;
+  couple: string;
+  brideName?: string;
+  groomName?: string;
+  city: string;
+  venue: string;
+  startDate: string;
+  guestCount: number;
+  packageType: string;
+  status: string;
+  isFinalised: boolean;
+  budget: string;
+  rawBudget: number;
+  coordinator: string;
+  baseContract: string;
+  totalExtras: string;
+  rawTotalExtras: number;
+  extrasCount: number;
+  totalInvoiced: string;
+  rawTotalInvoiced: number;
+  vendorCommitments: string;
+  rawVendorCommitments: number;
+  vendorAdvancePaid: string;
+  rawVendorAdvancePaid: number;
+  vendorBalanceDue: string;
+  rawVendorBalanceDue: number;
+  grossMargin: string;
+  billsCount: number;
+}
 
 export const Billing: React.FC = () => {
   const navigate = useNavigate();
-  const { weddings, setSelectedWeddingId } = useWeddingStore();
-  const { extraCharges, finalisedProjects } = useBillingStore();
+  const { setSelectedWeddingId } = useWeddingStore();
 
-  // PeopleFirst tab: 'ongoing' or 'finalised'
-  const [activeTab, setActiveTab] = useState<'ongoing' | 'finalised'>('ongoing');
-  // PeopleFirst status sub-tab filter: 'ALL', 'LIVE_BIG_DAY', 'IN_PLANNING', 'BOOKED', 'FINALISED'
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [projects, setProjects] = useState<ProjectBillingItem[]>([]);
+  const [_loading, setLoading] = useState<boolean>(true);
+  const [activeTab, _setActiveTab] = useState<'ongoing' | 'finalised'>('ongoing');
+  const [stageFilter, setStageFilter] = useState<string>('ALL');
+  const [cityFilter, setCityFilter] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
 
-  // Partition weddings into Ongoing and Finalised
-  const ongoingWeddings = useMemo(
-    () => weddings.filter((w) => !w.isFinalised && w.status !== 'FINALISED' && !finalisedProjects[w.id]),
-    [weddings, finalisedProjects]
-  );
+  const [summary, setSummary] = useState({
+    totalBudget: '₹17.25 Cr',
+    totalInvoiced: '₹17.38 Cr',
+    totalVendorCommitments: '₹13.40 Cr',
+    averageGrossMargin: '23.4%',
+  });
 
-  const finalisedWeddings = useMemo(
-    () => weddings.filter((w) => w.isFinalised || w.status === 'FINALISED' || Boolean(finalisedProjects[w.id])),
-    [weddings, finalisedProjects]
-  );
+  // Fetch live projects from backend API
+  const fetchBillingProjects = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get<{
+        success: boolean;
+        summary?: {
+          totalBudget: string;
+          totalInvoiced: string;
+          totalVendorCommitments: string;
+          averageGrossMargin: string;
+        };
+        data?: {
+          ongoing: ProjectBillingItem[];
+          finalised: ProjectBillingItem[];
+          activeList: ProjectBillingItem[];
+        };
+      }>(`/billing/projects?tab=${activeTab}&status=${stageFilter}&city=${cityFilter}&search=${encodeURIComponent(searchQuery)}`);
 
-  const currentTabWeddings = activeTab === 'ongoing' ? ongoingWeddings : finalisedWeddings;
-
-  // Status sub-tabs breakdown for Ongoing projects matching PeopleFirst standard
-  const ongoingStatusTabs = useMemo(() => {
-    const liveBigDayCount = ongoingWeddings.filter((w) => w.status === 'LIVE_BIG_DAY').length;
-    const inPlanningCount = ongoingWeddings.filter((w) => w.status === 'IN_PLANNING').length;
-    const bookedCount = ongoingWeddings.filter((w) => w.status === 'BOOKED').length;
-
-    return [
-      { id: 'ALL', label: 'All', count: ongoingWeddings.length, dotColor: 'bg-purple-600' },
-      { id: 'LIVE_BIG_DAY', label: 'Live Big Day', count: liveBigDayCount, dotColor: 'bg-rose-500 animate-pulse' },
-      { id: 'IN_PLANNING', label: 'In Planning', count: inPlanningCount, dotColor: 'bg-blue-500' },
-      { id: 'BOOKED', label: 'Booked', count: bookedCount, dotColor: 'bg-emerald-500' },
-    ];
-  }, [ongoingWeddings]);
-
-  // Status sub-tabs breakdown for Finalised projects: All, Finalised, Finalised & Settled
-  const finalisedStatusTabs = useMemo(() => {
-    const finalisedCount = finalisedWeddings.filter((w) => w.status === 'FINALISED').length;
-    const finalisedSettledCount = finalisedWeddings.filter((w) => w.status === 'FINALISED_SETTLED').length;
-
-    return [
-      { id: 'ALL', label: 'All', count: finalisedWeddings.length, dotColor: 'bg-emerald-600' },
-      { id: 'FINALISED', label: 'Finalised', count: finalisedCount, dotColor: 'bg-emerald-500' },
-      { id: 'FINALISED_SETTLED', label: 'Finalised & Settled', count: finalisedSettledCount, dotColor: 'bg-teal-600' },
-    ];
-  }, [finalisedWeddings]);
-
-  const currentStatusTabs = activeTab === 'ongoing' ? ongoingStatusTabs : finalisedStatusTabs;
-
-  // Real-time backend API synchronization for high performance
-  useEffect(() => {
-    const syncBackendProjects = async () => {
-      try {
-        await api.get(
-          `/billing/projects?tab=${activeTab}&status=${statusFilter}&search=${encodeURIComponent(searchQuery)}`
-        );
-      } catch (err) {
-        // Fallback silently to client store
+      if (res?.success && res.data) {
+        const combined = [...(res.data.ongoing || []), ...(res.data.finalised || [])];
+        setProjects(combined);
+        if (res.summary) {
+          setSummary(res.summary);
+        }
       }
-    };
-    syncBackendProjects();
-  }, [activeTab, statusFilter, searchQuery]);
-
-  // Tab switch handler: resets status filter to ALL
-  const handleTabChange = (val: 'ongoing' | 'finalised') => {
-    setActiveTab(val);
-    setStatusFilter('ALL');
+    } catch (err) {
+      console.warn('Failed to load billing projects from API, using fallback store:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Search and status filter
-  const filteredProjects = useMemo(() => {
-    let list = currentTabWeddings;
-    if (statusFilter !== 'ALL') {
-      list = list.filter((w) => w.status === statusFilter);
-    }
-    if (!searchQuery.trim()) return list;
-    const q = searchQuery.toLowerCase();
-    return list.filter(
-      (w) =>
-        w.code.toLowerCase().includes(q) ||
-        w.couple.toLowerCase().includes(q) ||
-        w.venue.toLowerCase().includes(q) ||
-        w.city.toLowerCase().includes(q)
-    );
-  }, [currentTabWeddings, statusFilter, searchQuery]);
+  useEffect(() => {
+    fetchBillingProjects();
+  }, [activeTab, stageFilter, cityFilter, searchQuery]);
 
-  // Navigate to dedicated new project page
-  const handleOpenProjectPage = (projectId: string) => {
+  // Counts for Stage Filter Pills
+  const stageCounts = useMemo(() => {
+    return {
+      ALL: projects.length,
+      LIVE_BIG_DAY: projects.filter((p) => p.status === 'LIVE_BIG_DAY').length,
+      IN_PLANNING: projects.filter((p) => p.status === 'IN_PLANNING').length,
+      BOOKED: projects.filter((p) => p.status === 'BOOKED').length,
+      FINALISED: projects.filter((p) => p.status === 'FINALISED').length,
+      FINALISED_SETTLED: projects.filter((p) => p.status === 'FINALISED_SETTLED').length,
+    };
+  }, [projects]);
+
+  // Filtered List
+  const filteredList = useMemo(() => {
+    return projects.filter((p) => {
+      // Stage check
+      if (stageFilter !== 'ALL' && p.status !== stageFilter) return false;
+
+      // City check
+      if (cityFilter !== 'ALL' && p.city.toLowerCase() !== cityFilter.toLowerCase()) return false;
+
+      // Search check
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matches =
+          p.code.toLowerCase().includes(q) ||
+          p.couple.toLowerCase().includes(q) ||
+          p.venue.toLowerCase().includes(q) ||
+          p.city.toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+
+      return true;
+    });
+  }, [projects, stageFilter, cityFilter, searchQuery]);
+
+  // Helper for status badge
+  const renderStatusBadge = (status: string) => {
+    switch (status) {
+      case 'LIVE_BIG_DAY':
+        return (
+          <Badge className="bg-rose-50 text-rose-700 border border-rose-200 gap-1.5 font-semibold shadow-2xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+            Live Big Day
+          </Badge>
+        );
+      case 'IN_PLANNING':
+        return (
+          <Badge className="bg-blue-50 text-blue-700 border border-blue-200 gap-1.5 font-semibold shadow-2xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+            In Planning
+          </Badge>
+        );
+      case 'BOOKED':
+        return (
+          <Badge className="bg-amber-50 text-amber-700 border border-amber-200 gap-1.5 font-semibold shadow-2xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            Booked
+          </Badge>
+        );
+      case 'FINALISED_SETTLED':
+        return (
+          <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 gap-1.5 font-semibold shadow-2xs">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            Finalised & Settled
+          </Badge>
+        );
+      case 'FINALISED':
+        return (
+          <Badge className="bg-teal-50 text-teal-700 border border-teal-200 gap-1.5 font-semibold shadow-2xs">
+            <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
+            Audit Complete
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="outline" className="text-slate-600">
+            {status}
+          </Badge>
+        );
+    }
+  };
+
+  const handleOpenLedger = (projectId: string) => {
     setSelectedWeddingId(projectId);
     navigate(`/billing/${projectId}`);
   };
 
   return (
-    <div className="space-y-4 pb-8">
-      {/* PeopleFirst Page Header */}
-      <div className="bg-white border border-slate-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+    <div className="space-y-5 pb-10">
+      {/* 1. Header Banner matching Weddings & Enquiries */}
+      <div className="bg-white border border-slate-200 rounded-lg p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Invoicing & Vendor Settlements
+              Financial Registry & Commercial Operations
             </span>
             <span className="text-slate-300">•</span>
             <span className="text-[11px] font-mono font-bold text-[#714B67]">
-              PeopleFirst Standard
+              Odoo Commercial ERP
             </span>
           </div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight mt-0.5">
-            Billing & Extra Charges Reconciliation
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1 flex items-center gap-2.5">
+            <CreditCard className="w-6 h-6 text-[#714B67]" />
+            Billing & Vendor Settlements
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Browse projects by status tab. Select any project row to open its full settlement ledger on a dedicated page.
+          <p className="text-xs text-slate-500 mt-1">
+            Contract revenue, winning RFQ vendor disbursements, audited extra charge overruns, and milestone accounts reconciliation.
           </p>
         </div>
 
-        {/* Global Metric Chips */}
-        <div className="flex items-center gap-2.5">
-          <div className="px-3 py-1.5 rounded-lg bg-purple-50 border border-purple-200/70 text-right">
-            <div className="text-[10px] font-semibold text-purple-700 uppercase tracking-wider">
-              Ongoing Projects
-            </div>
-            <div className="text-sm font-bold text-[#714B67]">
-              {ongoingWeddings.length} Active
-            </div>
-          </div>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchBillingProjects}
+            className="text-xs font-semibold cursor-pointer border-slate-200 hover:bg-slate-50"
+          >
+            <Clock className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
+            Refresh Balances
+          </Button>
 
-          <div className="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200/70 text-right">
-            <div className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wider">
-              Finalised Projects
-            </div>
-            <div className="text-sm font-bold text-emerald-800">
-              {finalisedWeddings.length} Audited
-            </div>
-          </div>
+          {projects.length > 0 && (
+            <Button
+              size="sm"
+              onClick={() => handleOpenLedger(projects[0].id)}
+              className="bg-[#714B67] hover:bg-[#5a3b52] text-white text-xs font-semibold shadow-2xs cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />
+              Open Flagship Ledger ({projects[0].code})
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* PeopleFirst Tab Bar: Ongoing Projects vs Finalised Projects */}
-      <Tabs value={activeTab} onValueChange={(val) => handleTabChange(val as 'ongoing' | 'finalised')} className="w-full gap-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
-          <TabsList className="bg-slate-100/90 p-1 border border-slate-200 rounded-lg h-9.5">
-            <TabsTrigger
-              value="ongoing"
-              className="px-4 py-1.5 text-xs font-semibold gap-2 data-[state=active]:bg-white data-[state=active]:text-[#714B67] data-[state=active]:shadow-xs rounded-md transition-all cursor-pointer"
-            >
-              <Clock className="w-3.5 h-3.5 text-amber-600" />
-              <span>Ongoing Projects</span>
-              <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-purple-100 text-[#714B67]">
-                {ongoingWeddings.length}
-              </span>
-            </TabsTrigger>
-
-            <TabsTrigger
-              value="finalised"
-              className="px-4 py-1.5 text-xs font-semibold gap-2 data-[state=active]:bg-white data-[state=active]:text-[#714B67] data-[state=active]:shadow-xs rounded-md transition-all cursor-pointer"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Finalised Projects</span>
-              <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800">
-                {finalisedWeddings.length}
-              </span>
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Quick Search Bar */}
-          <div className="flex items-center gap-2 flex-1 sm:max-w-xs">
-            <div className="relative w-full">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <Input
-                type="text"
-                placeholder="Search projects by couple, venue..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 pl-8 text-xs bg-slate-50 border-slate-200 w-full"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* PeopleFirst Sub-Tabs: Status Breakdown */}
-        <div className="bg-white border border-slate-200 rounded-lg p-1.5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-2">
-          <div className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar py-0.5">
-            {currentStatusTabs.map((tab) => {
-              const isActive = statusFilter === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setStatusFilter(tab.id)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 shrink-0 border relative',
-                    isActive
-                      ? 'bg-purple-50 text-[#714B67] border-purple-200/80 shadow-2xs'
-                      : 'bg-transparent text-slate-600 border-transparent hover:bg-slate-50 hover:text-slate-900'
-                  )}
-                >
-                  <span className={cn('w-2 h-2 rounded-full shrink-0', tab.dotColor)} />
-                  <span>{tab.label}</span>
-                  <span
-                    className={cn(
-                      'font-mono text-[10px] font-bold px-1.5 py-0.2 rounded-full',
-                      isActive
-                        ? 'bg-purple-200/80 text-[#714B67]'
-                        : 'bg-slate-200/80 text-slate-600'
-                    )}
-                  >
-                    {tab.count}
-                  </span>
-                  {isActive && (
-                    <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-[#714B67] rounded-full" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="hidden sm:flex items-center gap-1.5 px-2 text-[11px] text-slate-500 font-medium">
-            <span>Viewing:</span>
-            <span className="font-semibold text-slate-800">
-              {currentStatusTabs.find((t) => t.id === statusFilter)?.label || 'All'}
-            </span>
-            <span className="text-slate-300">•</span>
-            <span className="font-mono font-bold text-[#714B67]">{filteredProjects.length}</span>
-            <span>{filteredProjects.length === 1 ? 'Project' : 'Projects'}</span>
-          </div>
-        </div>
-
-        {/* Tab Content: Projects in Rows Table */}
-        <TabsContent value={activeTab} className="mt-2 outline-none">
-          <Card className="border border-slate-200 shadow-xs rounded-xl bg-white overflow-hidden">
-            <CardHeader className="p-3.5 border-b border-slate-200 bg-slate-50/70 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <span>{activeTab === 'ongoing' ? 'Ongoing Wedding Projects' : 'Finalised & Audited Projects'}</span>
-                  {statusFilter !== 'ALL' && (
-                    <Badge variant="outline" className="text-[10px] border-purple-200 bg-purple-50 text-[#714B67] font-semibold">
-                      {currentStatusTabs.find((t) => t.id === statusFilter)?.label}
-                    </Badge>
-                  )}
-                </CardTitle>
-                <div className="text-xs text-slate-500">
-                  {activeTab === 'ongoing' 
-                    ? 'Active wedding operations with live day-of overrun additions' 
-                    : 'Settled projects with verified vendor disbursements and locked audit histories'}
-                </div>
+      {/* 2. Executive KPI Cards Ribbon */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border-slate-200 bg-white shadow-2xs">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Managed Budget</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1 font-mono tracking-tight">{summary.totalBudget}</p>
+              <div className="flex items-center gap-1.5 mt-1 text-[11px] text-slate-500">
+                <Building2 className="w-3 h-3 text-slate-400" />
+                <span>Across {projects.length} luxury weddings</span>
               </div>
+            </div>
+            <div className="w-10 h-10 rounded-lg bg-purple-50 text-[#714B67] flex items-center justify-center font-bold">
+              <DollarSign className="w-5 h-5" />
+            </div>
+          </CardContent>
+        </Card>
 
-              <span className="text-xs font-mono text-slate-500 font-semibold">
-                Showing {filteredProjects.length} {filteredProjects.length === 1 ? 'Project' : 'Projects'}
+        <Card className="border-slate-200 bg-white shadow-2xs">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Invoiced to Clients</p>
+              <p className="text-2xl font-bold text-emerald-700 mt-1 font-mono tracking-tight">{summary.totalInvoiced}</p>
+              <div className="flex items-center gap-1.5 mt-1 text-[11px] text-emerald-600 font-medium">
+                <Check className="w-3 h-3" />
+                <span>Milestones + Audited Extras</span>
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+              <Receipt className="w-5 h-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200 bg-white shadow-2xs">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Vendor Commitments</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1 font-mono tracking-tight">{summary.totalVendorCommitments}</p>
+              <div className="flex items-center gap-1.5 mt-1 text-[11px] text-slate-500 font-medium">
+                <CreditCard className="w-3 h-3 text-slate-400" />
+                <span>Agreed POs & Sourced Bills</span>
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+              <CreditCard className="w-5 h-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200 bg-white shadow-2xs">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Realized Gross Margin</p>
+              <p className="text-2xl font-bold text-purple-700 mt-1 font-mono tracking-tight">{summary.averageGrossMargin}</p>
+              <div className="flex items-center gap-1.5 mt-1 text-[11px] text-purple-600 font-medium">
+                <TrendingUp className="w-3 h-3" />
+                <span>Agency Spread & Markup</span>
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-lg bg-purple-50 text-[#714B67] flex items-center justify-center font-bold">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 3. Stage Pills Filter Toolbar (Matching Weddings.tsx & Enquiries.tsx) */}
+      <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200/80 text-xs w-fit">
+        {[
+          { id: 'ALL', label: 'All Projects', count: stageCounts.ALL },
+          { id: 'LIVE_BIG_DAY', label: 'Live Big Day', count: stageCounts.LIVE_BIG_DAY },
+          { id: 'IN_PLANNING', label: 'In Planning', count: stageCounts.IN_PLANNING },
+          { id: 'BOOKED', label: 'Booked', count: stageCounts.BOOKED },
+          { id: 'FINALISED', label: 'Finalised', count: stageCounts.FINALISED },
+          { id: 'FINALISED_SETTLED', label: 'Settled & Closed', count: stageCounts.FINALISED_SETTLED },
+        ].map((tab) => {
+          const isActive = stageFilter === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setStageFilter(tab.id)}
+              className={`px-3 py-1.5 rounded font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                isActive
+                  ? 'bg-white text-slate-900 shadow-2xs font-bold border border-slate-200'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <span>{tab.label}</span>
+              <span
+                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${
+                  isActive ? 'bg-[#714B67] text-white' : 'bg-slate-200 text-slate-700'
+                }`}
+              >
+                {tab.count}
               </span>
-            </CardHeader>
+            </button>
+          );
+        })}
+      </div>
 
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader className="bg-slate-100/80 border-b border-slate-200">
+      {/* 4. Search and Filter Toolbar */}
+      <div className="bg-white border border-slate-200 rounded-lg p-3 flex flex-col md:flex-row items-center justify-between gap-3 shadow-2xs">
+        <div className="flex flex-1 items-center gap-2.5 w-full md:w-auto">
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by code (RW-2026), couple name, venue, or coordinator..."
+              className="pl-9 h-9 text-xs bg-slate-50 border-slate-200 focus:bg-white"
+            />
+          </div>
+
+          <div className="w-40 shrink-0">
+            <Select value={cityFilter} onValueChange={setCityFilter}>
+              <SelectTrigger className="h-9 text-xs border-slate-200 bg-slate-50">
+                <SelectValue placeholder="All Cities" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Destination Cities</SelectItem>
+                <SelectItem value="Udaipur">Udaipur</SelectItem>
+                <SelectItem value="Jaipur">Jaipur</SelectItem>
+                <SelectItem value="Jodhpur">Jodhpur</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* View mode toggle */}
+        <div className="flex items-center gap-1 border border-slate-200 rounded p-0.5 bg-slate-50 self-end md:self-auto shrink-0">
+          <button
+            onClick={() => setViewMode('table')}
+            className={`p-1.5 rounded transition-colors cursor-pointer ${
+              viewMode === 'table' ? 'bg-white text-slate-800 shadow-2xs font-bold' : 'text-slate-400 hover:text-slate-700'
+            }`}
+            title="Table View"
+          >
+            <LayoutList className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setViewMode('cards')}
+            className={`p-1.5 rounded transition-colors cursor-pointer ${
+              viewMode === 'cards' ? 'bg-white text-slate-800 shadow-2xs font-bold' : 'text-slate-400 hover:text-slate-700'
+            }`}
+            title="Card Grid View"
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* 5. Projects Content Display */}
+      {viewMode === 'table' ? (
+        <Card className="border-slate-200 shadow-2xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-slate-50/80">
+                <TableRow className="border-slate-200">
+                  <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Project & Couple</TableHead>
+                  <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">City & Venue</TableHead>
+                  <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Budget (Base)</TableHead>
+                  <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Invoiced Total</TableHead>
+                  <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Vendor Bills</TableHead>
+                  <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Vendor Balance</TableHead>
+                  <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Margin</TableHead>
+                  <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Status</TableHead>
+                  <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right py-3">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredList.length === 0 ? (
                   <TableRow>
-                    <TableHead className="font-bold text-slate-700 text-xs">Project Code</TableHead>
-                    <TableHead className="font-bold text-slate-700 text-xs">Couple & Destination</TableHead>
-                    <TableHead className="font-bold text-slate-700 text-xs">Primary Venue</TableHead>
-                    <TableHead className="font-bold text-slate-700 text-xs">Event Dates</TableHead>
-                    <TableHead className="font-bold text-slate-700 text-xs">Guest Count</TableHead>
-                    <TableHead className="font-bold text-slate-700 text-xs text-right">Base Budget</TableHead>
-                    <TableHead className="font-bold text-slate-700 text-xs text-right">Day-of Extras</TableHead>
-                    <TableHead className="font-bold text-slate-700 text-xs text-center">Status</TableHead>
-                    <TableHead className="font-bold text-slate-700 text-xs text-right">Action</TableHead>
+                    <TableCell colSpan={9} className="text-center py-12 text-slate-400">
+                      <div className="flex flex-col items-center justify-center">
+                        <AlertCircle className="w-8 h-8 text-slate-300 mb-2" />
+                        <p className="text-sm font-semibold text-slate-600">No wedding projects found</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Try adjusting your search criteria or stage filter.</p>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
+                ) : (
+                  filteredList.map((project) => (
+                    <TableRow 
+                      key={project.id}
+                      onClick={() => handleOpenLedger(project.id)}
+                      className="border-slate-100 hover:bg-slate-50/80 cursor-pointer transition-colors group"
+                    >
+                      <TableCell className="py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded bg-[#714B67]/10 text-[#714B67] flex items-center justify-center font-bold text-xs shrink-0 group-hover:scale-105 transition-transform">
+                            {project.code.slice(-3)}
+                          </div>
+                          <div>
+                            <div className="font-bold text-xs text-slate-900 group-hover:text-[#714B67] transition-colors">
+                              {project.couple}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500 font-mono">
+                              <span>{project.code}</span>
+                              <span>•</span>
+                              <span>{project.guestCount} Guests</span>
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
 
-                <TableBody className="divide-y divide-slate-100">
-                  {filteredProjects.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="py-12 text-center text-xs text-slate-500">
-                        No projects match the current filter.
+                      <TableCell className="py-3.5">
+                        <div className="text-xs font-medium text-slate-800">{project.city}</div>
+                        <div className="text-[11px] text-slate-500 truncate max-w-[150px]">{project.venue}</div>
+                      </TableCell>
+
+                      <TableCell className="py-3.5 font-mono text-xs font-semibold text-slate-800">
+                        {project.budget}
+                      </TableCell>
+
+                      <TableCell className="py-3.5">
+                        <div className="font-mono text-xs font-bold text-emerald-700">{project.totalInvoiced}</div>
+                        {project.extrasCount > 0 && (
+                          <div className="text-[10px] text-amber-600 font-medium">
+                            +{project.extrasCount} extra charges
+                          </div>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="py-3.5">
+                        <div className="font-mono text-xs font-medium text-slate-800">{project.vendorCommitments}</div>
+                        <div className="text-[10px] text-slate-500">{project.billsCount} vendor bills</div>
+                      </TableCell>
+
+                      <TableCell className="py-3.5">
+                        <span className={`font-mono text-xs font-bold ${
+                          project.rawVendorBalanceDue === 0 ? 'text-emerald-600' : 'text-slate-800'
+                        }`}>
+                          {project.vendorBalanceDue}
+                        </span>
+                      </TableCell>
+
+                      <TableCell className="py-3.5">
+                        <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-purple-50 text-[#714B67] border border-purple-200/50">
+                          {project.grossMargin}
+                        </span>
+                      </TableCell>
+
+                      <TableCell className="py-3.5">
+                        {renderStatusBadge(project.status)}
+                      </TableCell>
+
+                      <TableCell className="py-3.5 text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenLedger(project.id);
+                          }}
+                          className="text-xs font-bold text-[#714B67] hover:bg-[#714B67]/10 cursor-pointer h-8 px-2.5"
+                        >
+                          View Ledger
+                          <ArrowRight className="w-3.5 h-3.5 ml-1 transition-transform group-hover:translate-x-0.5" />
+                        </Button>
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    filteredProjects.map((p) => {
-                      const pExtras = extraCharges.filter((ext) => ext.weddingId === p.id);
-                      const pTotalExtras = pExtras.reduce((sum, item) => {
-                        const num = parseFloat(item.total.replace(/[^\d.]/g, '')) || 0;
-                        return sum + num;
-                      }, 0);
-                      const hasEdits = pExtras.some((ext) => ext.editHistory && ext.editHistory.length > 0);
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      ) : (
+        /* Card Grid View */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredList.map((project) => (
+            <Card
+              key={project.id}
+              onClick={() => handleOpenLedger(project.id)}
+              className="border-slate-200 bg-white shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+            >
+              <CardHeader className="p-4 border-b border-slate-100 pb-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] font-mono font-bold text-[#714B67] bg-[#714B67]/10 px-1.5 py-0.5 rounded">
+                      {project.code}
+                    </span>
+                    <h3 className="text-sm font-bold text-slate-900 mt-1.5 group-hover:text-[#714B67] transition-colors">
+                      {project.couple}
+                    </h3>
+                  </div>
+                  {renderStatusBadge(project.status)}
+                </div>
 
-                      return (
-                        <TableRow
-                          key={p.id}
-                          onClick={() => handleOpenProjectPage(p.id)}
-                          className="hover:bg-purple-50/50 transition cursor-pointer group"
-                        >
-                          {/* Code */}
-                          <TableCell className="py-3 font-mono font-bold text-xs">
-                            <span className="px-2 py-1 rounded bg-slate-100 text-slate-800 border border-slate-200 group-hover:bg-purple-100 group-hover:text-[#714B67] group-hover:border-purple-200 transition">
-                              {p.code}
-                            </span>
-                          </TableCell>
+                <div className="flex items-center gap-3 text-xs text-slate-500 mt-2 font-medium">
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                    {project.city}
+                  </span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5 text-slate-400" />
+                    {project.guestCount} guests
+                  </span>
+                </div>
+              </CardHeader>
 
-                          {/* Couple */}
-                          <TableCell className="py-3">
-                            <div className="font-bold text-xs text-slate-900 group-hover:text-[#714B67] transition">
-                              {p.couple}
-                            </div>
-                            <div className="text-[11px] text-slate-500 flex items-center gap-1">
-                              <MapPin className="w-3 h-3 text-slate-400" />
-                              <span>{p.city}</span>
-                            </div>
-                          </TableCell>
+              <CardContent className="p-4 space-y-2.5 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Contract Base:</span>
+                  <span className="font-mono font-bold text-slate-800">{project.budget}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Client Invoiced:</span>
+                  <span className="font-mono font-bold text-emerald-700">{project.totalInvoiced}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Vendor Commitments:</span>
+                  <span className="font-mono font-semibold text-slate-800">{project.vendorCommitments}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Outstanding Balance:</span>
+                  <span className="font-mono font-bold text-slate-900">{project.vendorBalanceDue}</span>
+                </div>
+                <div className="flex justify-between items-center pt-1 border-t border-slate-100">
+                  <span className="text-slate-500">Gross Margin:</span>
+                  <span className="font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
+                    {project.grossMargin}
+                  </span>
+                </div>
+              </CardContent>
 
-                          {/* Venue */}
-                          <TableCell className="py-3 text-xs text-slate-700">
-                            {p.venue}
-                          </TableCell>
-
-                          {/* Dates */}
-                          <TableCell className="py-3 text-xs text-slate-600 font-medium">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3 text-slate-400" />
-                              <span>{p.startDate}</span>
-                            </div>
-                          </TableCell>
-
-                          {/* Guests */}
-                          <TableCell className="py-3 text-xs text-slate-600">
-                            <div className="flex items-center gap-1">
-                              <Users className="w-3 h-3 text-slate-400" />
-                              <span>{p.guestCount}</span>
-                            </div>
-                          </TableCell>
-
-                          {/* Budget */}
-                          <TableCell className="py-3 text-right font-mono text-xs font-semibold text-slate-800">
-                            {p.budget}
-                          </TableCell>
-
-                          {/* Extras */}
-                          <TableCell className="py-3 text-right">
-                            {pExtras.length > 0 ? (
-                              <div className="inline-flex flex-col items-end">
-                                <span className="font-mono text-xs font-bold text-[#714B67] bg-purple-100/70 px-2 py-0.5 rounded">
-                                  +{pExtras.length} (₹{(pTotalExtras / 1000).toFixed(0)}k)
-                                </span>
-                                {hasEdits && (
-                                  <span className="text-[9px] font-semibold text-amber-700 flex items-center gap-0.5 mt-0.5">
-                                    <History className="w-2.5 h-2.5" /> Edited
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-[11px] text-slate-400">None</span>
-                            )}
-                          </TableCell>
-
-                          {/* Status */}
-                          <TableCell className="py-3 text-center">
-                            {p.status === 'FINALISED_SETTLED' ? (
-                              <Badge variant="success" className="text-[10px] gap-1 bg-emerald-600 text-white">
-                                <CheckCircle2 className="w-2.5 h-2.5" /> Finalised & Settled
-                              </Badge>
-                            ) : p.isFinalised || p.status === 'FINALISED' || finalisedProjects[p.id] ? (
-                              <Badge variant="success" className="text-[10px] gap-1">
-                                <CheckCircle2 className="w-2.5 h-2.5" /> Finalised
-                              </Badge>
-                            ) : p.status === 'LIVE_BIG_DAY' ? (
-                              <Badge variant="destructive" className="text-[10px] font-bold animate-pulse">
-                                Live Big Day
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-[10px] font-semibold">
-                                {p.status}
-                              </Badge>
-                            )}
-                          </TableCell>
-
-                          {/* Action Button */}
-                          <TableCell className="py-3 text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenProjectPage(p.id);
-                              }}
-                              className="h-7 px-2.5 text-xs text-[#714B67] hover:bg-purple-100 hover:text-[#5C3D54] font-semibold gap-1"
-                            >
-                              <span>View Data</span>
-                              <ArrowRight className="w-3 h-3" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              <CardFooter className="p-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span className="text-slate-500 text-[11px]">
+                  Coordinator: <strong className="text-slate-700">{project.coordinator}</strong>
+                </span>
+                <span className="font-bold text-[#714B67] flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                  Open Ledger <ArrowRight className="w-3 h-3" />
+                </span>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

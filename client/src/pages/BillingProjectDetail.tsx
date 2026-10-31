@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft,
@@ -6,19 +6,23 @@ import {
   CheckCircle2, 
   ShieldCheck, 
   Lock, 
-  TrendingUp, 
   FileText,
   Calendar,
   Users,
   MapPin,
   Clock,
-  DollarSign
+  Receipt,
+  CreditCard,
+  History,
+  Sparkles,
+  Check,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import {
   Card,
   CardHeader,
   CardTitle,
-  CardContent,
   Button,
   Badge,
   Table,
@@ -47,7 +51,6 @@ import {
 } from '../components/ui';
 import { api } from '../api/client';
 import { useWeddingStore } from '../store/useWeddingStore';
-import { useBillingStore } from '../store/useBillingStore';
 
 interface LiveInvoice {
   id: string;
@@ -56,737 +59,1309 @@ interface LiveInvoice {
   stageLabel: string;
   percentage: number;
   amountDue: string;
+  rawAmountDue: number;
   dueDate: string;
   status: 'PAID' | 'UNPAID';
   paidAmount: string;
+  rawPaidAmount: number;
   paidAt?: string;
   paymentReference?: string;
 }
 
 interface LiveVendorBill {
   id: string;
+  vendorId: string;
   vendor: string;
   category: string;
+  contactPerson?: string;
+  phone?: string;
   agreedBase: string;
+  rawAgreedBase: number;
   extras: string;
+  rawExtras: number;
   totalPayable: string;
+  rawTotalPayable: number;
   advancePaid: string;
+  rawAdvancePaid: number;
   balanceDue: string;
-  status: 'RECONCILED_MATCHED' | 'SETTLEMENT_CLEARED' | 'DISPUTED';
+  rawBalanceDue: number;
+  status: 'PENDING' | 'RECONCILED_MATCHED' | 'SETTLEMENT_CLEARED' | 'DISPUTED';
+  awardedQuoteId?: string;
+  settledAt?: string;
 }
 
 interface LiveExtraCharge {
   id: string;
+  dbId?: string;
   category: string;
   description: string;
   qty: number;
   unitPrice: string;
   total: string;
+  rawTotal: number;
   vendor: string;
+  vendorId?: string;
+  isBilledToClient: boolean;
   status: 'ADDED_TO_CLIENT_INVOICE' | 'PENDING_APPROVAL';
   approvedBy: string;
-  lastEditedAt?: string;
+  createdAt?: string;
+}
+
+interface LiveChangelog {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId?: string;
+  fromStatus?: string;
+  toStatus?: string;
+  amount?: string;
+  performedBy: string;
+  notes?: string;
+  createdAt: string;
+}
+
+interface AvailableQuote {
+  quoteId: string;
+  rfqId: string;
+  serviceCategory: string;
+  description: string;
+  vendorId: string;
+  vendorName: string;
+  baseCost: string;
+  formattedCost: string;
+  isBilled: boolean;
 }
 
 export const BillingProjectDetail: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { weddings } = useWeddingStore();
-  const { finalisedProjects } = useBillingStore();
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [finaliseModalOpen, setFinaliseModalOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<string>('milestones');
+  const [_loading, setLoading] = useState<boolean>(true);
+  const [activeTab, setActiveTab] = useState<string>('vendorBills');
+  const [project, setProject] = useState<any>(null);
 
-  // Live PostgreSQL Data States
-  const [liveProject, setLiveProject] = useState<any>(null);
-  const [liveInvoices, setLiveInvoices] = useState<LiveInvoice[]>([]);
-  const [liveExtras, setLiveExtras] = useState<LiveExtraCharge[]>([]);
-  const [liveVendorBills, setLiveVendorBills] = useState<LiveVendorBill[]>([]);
+  // Modals state
+  const [extraModalOpen, setExtraModalOpen] = useState<boolean>(false);
+  const [billModalOpen, setBillModalOpen] = useState<boolean>(false);
+  const [reconcileModalOpen, setReconcileModalOpen] = useState<boolean>(false);
+  const [payInvoiceModalOpen, setPayInvoiceModalOpen] = useState<boolean>(false);
+  const [finaliseModalOpen, setFinaliseModalOpen] = useState<boolean>(false);
 
-  // Extra Charge Form State
-  const [desc, setDesc] = useState('');
-  const [qty, setQty] = useState('60');
-  const [unitPrice, setUnitPrice] = useState('2100');
-  const [vendor, setVendor] = useState('Marwar Heritage Kitchens');
-  const [category, setCategory] = useState('EXTRA_PLATES');
+  // Selected entities for modals
+  const [selectedBill, setSelectedBill] = useState<LiveVendorBill | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<LiveInvoice | null>(null);
 
-  // Fallback target wedding from store
+  // Form states: Extra Charge
+  const [extraCategory, setExtraCategory] = useState('EXTRA_PLATES');
+  const [extraDesc, setExtraDesc] = useState('60 Unexpected Guests turned up at the Grand Durbar Banquet');
+  const [extraQty, setExtraQty] = useState('60');
+  const [extraUnitPrice, setExtraUnitPrice] = useState('2100');
+  const [extraVendor, setExtraVendor] = useState('Marwar Heritage Kitchens');
+  const [submittingExtra, setSubmittingExtra] = useState(false);
+
+  // Form states: New Vendor Bill
+  const [newBillVendorId, setNewBillVendorId] = useState('');
+  const [newBillAgreedBase, setNewBillAgreedBase] = useState('1850000');
+  const [newBillAdvance, setNewBillAdvance] = useState('925000');
+  const [newBillNotes, setNewBillNotes] = useState('Sourced via Procurement Engine');
+  const [submittingBill, setSubmittingBill] = useState(false);
+
+  // Form states: Reconcile / Record Bill Payment
+  const [reconcileAmount, setReconcileAmount] = useState('');
+  const [reconcileRef, setReconcileRef] = useState('HDFC-NEFT-889922');
+  const [reconcileNotes, setReconcileNotes] = useState('Settlement tranche cleared via NEFT');
+  const [submittingReconcile, setSubmittingReconcile] = useState(false);
+
+  // Form states: Pay Invoice
+  const [payAmount, setPayAmount] = useState('');
+  const [payRef, setPayRef] = useState('ICICI-RTGS-774411');
+  const [submittingPay, setSubmittingPay] = useState(false);
+
+  // Form states: Finalise Project
+  const [finaliseNotes, setFinaliseNotes] = useState('All 6 vendor accounts and 3 client milestone invoices fully reconciled and audited.');
+  const [submittingFinalise, setSubmittingFinalise] = useState(false);
+
+  // Fallback wedding from store
   const storeWedding = useMemo(() => {
     return weddings.find((w) => w.id === projectId || w.code === projectId) || weddings[0];
   }, [weddings, projectId]);
 
-  // Fetch live PostgreSQL project details
-  const fetchProjectData = async () => {
-    const idToFetch = projectId || storeWedding.id;
+  // Fetch full live project dossier
+  const fetchProjectDossier = async () => {
+    const idToFetch = projectId || storeWedding?.id || 'RW-2026-001';
     try {
       setLoading(true);
-      const res = await api.get(`/billing/projects/${idToFetch}`);
+      const res = await api.get<{ success: boolean; data: any }>(`/billing/projects/${idToFetch}`);
       if (res?.success && res.data) {
-        setLiveProject(res.data);
-        if (res.data.invoices) setLiveInvoices(res.data.invoices);
-        if (res.data.extraCharges) setLiveExtras(res.data.extraCharges);
-        if (res.data.vendorBills) setLiveVendorBills(res.data.vendorBills);
+        setProject(res.data);
       }
     } catch (err) {
-      console.warn('Fallback to local store:', err);
+      console.warn('Failed to fetch live project billing dossier:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchProjectData();
+    fetchProjectDossier();
   }, [projectId]);
 
-  // Combined Active Project View
-  const wedding = liveProject || {
-    id: storeWedding.id,
-    code: storeWedding.code,
-    couple: storeWedding.couple,
-    city: storeWedding.city,
-    venue: storeWedding.venue,
-    startDate: storeWedding.startDate,
-    guestCount: storeWedding.guestCount,
-    packageType: storeWedding.packageType,
-    status: storeWedding.status,
-    budget: storeWedding.budget,
-    coordinator: storeWedding.coordinator,
-    baseContract: storeWedding.budget,
-    totalExtras: (storeWedding as any).totalExtras || '₹0',
-    totalInvoiced: (storeWedding as any).totalInvoiced || storeWedding.budget,
-    vendorAdvancePaid: (storeWedding as any).vendorAdvancePaid || '₹0',
-    vendorBalanceDue: (storeWedding as any).vendorBalanceDue || '₹0',
-    grossMargin: (storeWedding as any).grossMargin || '0.0%',
+  // Data helpers
+  const vendorBills: LiveVendorBill[] = project?.vendorBills || [];
+  const extraCharges: LiveExtraCharge[] = project?.extraCharges || [];
+  const invoices: LiveInvoice[] = project?.invoices || [];
+  const availableQuotes: AvailableQuote[] = project?.availableQuotes || [];
+  const changelog: LiveChangelog[] = project?.changelog || [];
+
+  // Sync Winning Quotes Action
+  const handleSyncAwardedQuotes = async () => {
+    const idToFetch = projectId || project?.id;
+    try {
+      setLoading(true);
+      const res = await api.post<{ success: boolean; message: string; syncedCount: number }>(
+        `/billing/projects/${idToFetch}/sync-awarded-quotes`,
+        {}
+      );
+      if (res?.success) {
+        await fetchProjectDossier();
+      }
+    } catch (err) {
+      console.error('Error syncing quotes:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const isFinalised = Boolean(
-    wedding.isFinalised ||
-    wedding.status === 'FINALISED' ||
-    wedding.status === 'FINALISED_SETTLED' ||
-    finalisedProjects[wedding.id]
-  );
-
-  const finalisedInfo = {
-    finalisedDate: wedding.finalisedDate || 'Settled',
-    finalisedBy: wedding.finalisedBy || wedding.coordinator || 'Finance Operations',
-  };
-
-  // Live Database Lists (Zero Mock Data)
-  const projectExtras = liveExtras;
-  const projectVendorBills = liveVendorBills;
-  const invoices = liveInvoices;
-
-  // Submit extra charge to real PostgreSQL backend
-  const handleAddExtra = async (e: React.FormEvent) => {
+  // Submit Extra Charge
+  const handleCreateExtraCharge = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!desc) return;
-
-    const numQty = parseFloat(qty) || 1;
-    const numPrice = parseFloat(unitPrice) || 1000;
-
+    const idToFetch = projectId || project?.id;
     try {
-      await api.post(`/billing/projects/${wedding.id}/extras`, {
-        category,
-        description: desc,
-        qty: numQty,
-        unitPrice: `₹${numPrice.toLocaleString('en-IN')}`,
-        vendor,
+      setSubmittingExtra(true);
+      await api.post(`/billing/projects/${idToFetch}/extras`, {
+        category: extraCategory,
+        description: extraDesc,
+        qty: parseFloat(extraQty) || 1,
+        unitPrice: parseFloat(extraUnitPrice) || 0,
+        vendor: extraVendor,
+        performedBy: 'Devika Sharma (Finance Manager)',
       });
-      setModalOpen(false);
-      setDesc('');
-      await fetchProjectData();
-    } catch (err: any) {
-      alert(`Error saving extra charge: ${err.message}`);
+      setExtraModalOpen(false);
+      await fetchProjectDossier();
+    } catch (err) {
+      console.error('Failed to create extra charge:', err);
+    } finally {
+      setSubmittingExtra(false);
     }
   };
 
-  // Reconcile vendor bill in real PostgreSQL backend
-  const handleReconcileBill = async (billId: string) => {
+  // Submit New Vendor Bill
+  const handleCreateVendorBill = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const idToFetch = projectId || project?.id;
     try {
-      await api.put(`/billing/vendor-bills/${billId}/reconcile`);
-      await fetchProjectData();
-    } catch (err: any) {
-      alert(`Error reconciling vendor bill: ${err.message}`);
+      setSubmittingBill(true);
+      await api.post(`/billing/projects/${idToFetch}/vendor-bills`, {
+        vendorId: newBillVendorId,
+        agreedBaseAmount: parseFloat(newBillAgreedBase) || 0,
+        advancePaid: parseFloat(newBillAdvance) || 0,
+        notes: newBillNotes,
+        performedBy: 'Devika Sharma (Finance Manager)',
+      });
+      setBillModalOpen(false);
+      await fetchProjectDossier();
+    } catch (err) {
+      console.error('Failed to add vendor bill:', err);
+    } finally {
+      setSubmittingBill(false);
     }
   };
 
-  // Mark invoice paid in real PostgreSQL backend
-  const handlePayInvoice = async (invoiceId: string) => {
+  // Submit Reconcile / Record Vendor Bill Payment
+  const handleReconcileBill = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBill) return;
+    const idToFetch = projectId || project?.id;
     try {
-      await api.put(`/billing/invoices/${invoiceId}/pay`);
-      await fetchProjectData();
-    } catch (err: any) {
-      alert(`Error updating invoice: ${err.message}`);
+      setSubmittingReconcile(true);
+      await api.put(`/billing/projects/${idToFetch}/vendor-bills/${selectedBill.id}/reconcile`, {
+        paymentAmount: parseFloat(reconcileAmount) || selectedBill.rawBalanceDue,
+        paymentReference: reconcileRef,
+        notes: reconcileNotes,
+        performedBy: 'Devika Sharma (Finance Manager)',
+      });
+      setReconcileModalOpen(false);
+      setSelectedBill(null);
+      await fetchProjectDossier();
+    } catch (err) {
+      console.error('Failed to reconcile bill:', err);
+    } finally {
+      setSubmittingReconcile(false);
     }
   };
 
-  // Finalise project in real PostgreSQL backend
-  const handleFinalise = async () => {
+  // Submit Pay Invoice
+  const handlePayInvoice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedInvoice) return;
+    const idToFetch = projectId || project?.id;
     try {
-      await api.put(`/billing/projects/${wedding.id}/finalise`);
+      setSubmittingPay(true);
+      await api.put(`/billing/projects/${idToFetch}/pay-invoice`, {
+        invoiceId: selectedInvoice.id,
+        paidAmount: parseFloat(payAmount) || selectedInvoice.rawAmountDue,
+        paymentReference: payRef,
+        performedBy: 'Aditya Singhal (Finance Director)',
+      });
+      setPayInvoiceModalOpen(false);
+      setSelectedInvoice(null);
+      await fetchProjectDossier();
+    } catch (err) {
+      console.error('Failed to pay invoice:', err);
+    } finally {
+      setSubmittingPay(false);
+    }
+  };
+
+  // Submit Finalise Project
+  const handleFinaliseProject = async () => {
+    const idToFetch = projectId || project?.id;
+    try {
+      setSubmittingFinalise(true);
+      await api.put(`/billing/projects/${idToFetch}/finalise`, {
+        notes: finaliseNotes,
+        performedBy: 'Aditya Singhal (Super Admin)',
+      });
       setFinaliseModalOpen(false);
-      await fetchProjectData();
-    } catch (err: any) {
-      alert(`Error finalising project: ${err.message}`);
+      await fetchProjectDossier();
+    } catch (err) {
+      console.error('Failed to finalise project:', err);
+    } finally {
+      setSubmittingFinalise(false);
     }
   };
+
+  // Status badge helper
+  const renderStatusBadge = (status: string) => {
+    switch (status) {
+      case 'LIVE_BIG_DAY':
+        return (
+          <Badge className="bg-rose-50 text-rose-700 border border-rose-200 gap-1.5 font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+            Live Big Day
+          </Badge>
+        );
+      case 'IN_PLANNING':
+        return (
+          <Badge className="bg-blue-50 text-blue-700 border border-blue-200 gap-1.5 font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+            In Planning
+          </Badge>
+        );
+      case 'BOOKED':
+        return (
+          <Badge className="bg-amber-50 text-amber-700 border border-amber-200 gap-1.5 font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            Booked
+          </Badge>
+        );
+      case 'FINALISED_SETTLED':
+        return (
+          <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 gap-1.5 font-semibold">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            Finalised & Settled
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="outline" className="text-slate-600">
+            {status}
+          </Badge>
+        );
+    }
+  };
+
+  const isFinalised = project?.isFinalised || project?.status === 'FINALISED_SETTLED';
 
   return (
-    <div className="space-y-4 pb-8">
-      {/* Top Breadcrumb & Back Navigation */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => navigate('/billing')}
-          className="inline-flex items-center gap-2 text-xs font-semibold text-[#714B67] hover:text-[#5C3D54] hover:underline cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-2xs transition"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Back to Billing Projects</span>
-        </button>
+    <div className="space-y-5 pb-12">
+      {/* 1. Top Navigation Bar */}
+      <div className="bg-white border border-slate-200 rounded-lg p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs">
+        <div>
+          <button
+            onClick={() => navigate('/billing')}
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors mb-2 cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back to Billing Registry
+          </button>
 
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <span>Billing & Extras</span>
-          <span>/</span>
-          <span className="font-semibold text-slate-800">{wedding.code}</span>
-          <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
-            {loading ? 'Syncing...' : 'PostgreSQL Live'}
-          </span>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-[#714B67]/10 text-[#714B67] border border-[#714B67]/20">
+              {project?.code || 'RW-2026-001'}
+            </span>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+              {project?.couple || storeWedding?.couple}
+            </h1>
+            {renderStatusBadge(project?.status || 'IN_PLANNING')}
+          </div>
+
+          <div className="flex items-center gap-3 text-xs text-slate-500 mt-1.5">
+            <span className="flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5 text-slate-400" />
+              {project?.city} • {project?.venue}
+            </span>
+            <span>•</span>
+            <span className="flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              {project?.startDate}
+            </span>
+            <span>•</span>
+            <span className="flex items-center gap-1">
+              <Users className="w-3.5 h-3.5 text-slate-400" />
+              {project?.guestCount} Guests
+            </span>
+          </div>
+        </div>
+
+        {/* Header Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchProjectDossier}
+            className="text-xs font-semibold border-slate-200 hover:bg-slate-50 cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
+            Refresh
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setExtraModalOpen(true)}
+            className="text-xs font-semibold border-amber-300 bg-amber-50/50 text-amber-900 hover:bg-amber-100/50 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5 mr-1 text-amber-700" />
+            + Add Extra Charge
+          </Button>
+
+          <Button
+            size="sm"
+            onClick={() => setBillModalOpen(true)}
+            className="bg-[#714B67] hover:bg-[#5a3b52] text-white text-xs font-semibold shadow-2xs cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            + Add Vendor Bill
+          </Button>
+
+          {!isFinalised ? (
+            <Button
+              size="sm"
+              onClick={() => setFinaliseModalOpen(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-2xs cursor-pointer"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+              Finalise & Settle
+            </Button>
+          ) : (
+            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 py-1.5 px-3 gap-1.5 text-xs font-bold">
+              <Lock className="w-3.5 h-3.5" />
+              Ledger Locked & Settled
+            </Badge>
+          )}
         </div>
       </div>
 
-      {/* Project Hero Banner */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs space-y-3">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-purple-100 text-[#714B67] border border-purple-200">
-                {wedding.code}
-              </span>
-              <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-slate-400" /> {wedding.city}
-              </span>
-              <span className="text-slate-300">•</span>
-              <span className="text-xs text-slate-600 font-medium">{wedding.venue}</span>
-            </div>
+      {/* 2. Executive Financial Metric Ribbon (6 KPI Cards) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="bg-white border border-slate-200 rounded-lg p-3.5 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Base Contract</span>
+          <span className="font-mono font-bold text-lg text-slate-900 mt-1 block">
+            {project?.baseContract || '₹3.50 Cr'}
+          </span>
+          <span className="text-[10px] text-slate-400 block mt-0.5">Fixed Agency Agreement</span>
+        </div>
 
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              {wedding.couple}
-            </h1>
+        <div className="bg-white border border-slate-200 rounded-lg p-3.5 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Invoiced Total</span>
+          <span className="font-mono font-bold text-lg text-emerald-700 mt-1 block">
+            {project?.totalInvoiced || '₹3.51 Cr'}
+          </span>
+          <span className="text-[10px] text-emerald-600 block mt-0.5">
+            Base + {project?.totalExtras || '₹0'} Extras
+          </span>
+        </div>
 
-            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 pt-0.5">
-              <span className="flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" /> {wedding.startDate}
-              </span>
-              <span className="flex items-center gap-1">
-                <Users className="w-3.5 h-3.5 text-slate-400" /> {wedding.guestCount} Guests
-              </span>
-              <span>👤 Lead Coordinator: <strong className="text-slate-700">{wedding.coordinator}</strong></span>
-              <span>📦 Package: <strong className="text-slate-700">{wedding.packageType}</strong></span>
-            </div>
-          </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-3.5 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Vendor Bills Total</span>
+          <span className="font-mono font-bold text-lg text-slate-900 mt-1 block">
+            {project?.vendorCommitments || '₹0'}
+          </span>
+          <span className="text-[10px] text-slate-400 block mt-0.5">Across {vendorBills.length} Suppliers</span>
+        </div>
 
-          {/* Action Buttons & Status Badge */}
-          {/* Status Badge when Finalised */}
-          {isFinalised && (
-            <div className="flex items-center gap-2">
-              <div className="text-right bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
-                <div className="text-[10px] font-bold text-emerald-800 uppercase flex items-center gap-1 justify-end">
-                  <Lock className="w-3 h-3" /> Finalised & Audited
+        <div className="bg-white border border-slate-200 rounded-lg p-3.5 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Advances Paid</span>
+          <span className="font-mono font-bold text-lg text-blue-700 mt-1 block">
+            {project?.vendorAdvancePaid || '₹0'}
+          </span>
+          <span className="text-[10px] text-blue-600 block mt-0.5">Cleared Tranches</span>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-lg p-3.5 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Net Balance Due</span>
+          <span className={`font-mono font-bold text-lg mt-1 block ${
+            project?.rawVendorBalanceDue === 0 ? 'text-emerald-600' : 'text-rose-600'
+          }`}>
+            {project?.vendorBalanceDue || '₹0'}
+          </span>
+          <span className="text-[10px] text-slate-400 block mt-0.5">Outstanding Payables</span>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-lg p-3.5 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Gross Margin</span>
+          <span className="font-mono font-bold text-lg text-purple-700 mt-1 block">
+            {project?.grossMargin || '22.4%'}
+          </span>
+          <span className="text-[10px] text-purple-600 block mt-0.5">Agency Retained Profit</span>
+        </div>
+      </div>
+
+      {/* 3. Main Operational Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="bg-slate-100 p-1 rounded-lg border border-slate-200/80 w-full justify-start overflow-x-auto">
+          <TabsTrigger value="vendorBills" className="gap-2 text-xs font-semibold cursor-pointer py-2">
+            <CreditCard className="w-4 h-4 text-[#714B67]" />
+            Vendor Bills & PO Ledger ({vendorBills.length})
+          </TabsTrigger>
+
+          <TabsTrigger value="extraCharges" className="gap-2 text-xs font-semibold cursor-pointer py-2">
+            <Receipt className="w-4 h-4 text-amber-600" />
+            Audited Extra Charges ({extraCharges.length})
+          </TabsTrigger>
+
+          <TabsTrigger value="invoices" className="gap-2 text-xs font-semibold cursor-pointer py-2">
+            <FileText className="w-4 h-4 text-emerald-600" />
+            Client Milestone Invoices ({invoices.length})
+          </TabsTrigger>
+
+          <TabsTrigger value="changelog" className="gap-2 text-xs font-semibold cursor-pointer py-2">
+            <History className="w-4 h-4 text-slate-600" />
+            Audit Changelog ({changelog.length})
+          </TabsTrigger>
+        </TabsList>
+
+        {/* TAB 1: VENDOR BILLS & PURCHASES (MAIN MISSING FEATURE) */}
+        <TabsContent value="vendorBills" className="mt-4 space-y-4">
+          {/* Awarded Quotes Banner: Sync Winning Quotes into Bills */}
+          {availableQuotes.length > 0 && (
+            <div className="bg-purple-50/70 border border-purple-200/80 rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded bg-[#714B67] text-white flex items-center justify-center shrink-0 font-bold mt-0.5">
+                  <Sparkles className="w-4 h-4 text-amber-300" />
                 </div>
-                <div className="text-[10px] text-slate-500">
-                  {finalisedInfo.finalisedDate} by {finalisedInfo.finalisedBy}
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900">
+                    Awarded Quotes Detected from Procurement Matrix
+                  </h4>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    Found {availableQuotes.length} selected vendor quote(s) in RFQs for this wedding project.
+                  </p>
                 </div>
               </div>
 
               <Button
-                variant="outline"
                 size="sm"
-                onClick={() => alert(`Exporting formal settlement statement for ${wedding.code}`)}
-                className="gap-1.5 h-9 text-xs border-slate-200 hover:bg-slate-50"
+                onClick={handleSyncAwardedQuotes}
+                className="bg-[#714B67] hover:bg-[#5a3b52] text-white text-xs font-semibold shadow-2xs cursor-pointer shrink-0"
               >
-                <FileText className="w-3.5 h-3.5 text-slate-500" />
-                <span>Invoice Statement</span>
+                <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                Auto-Generate Bills from Winning Quotes
               </Button>
             </div>
           )}
-        </div>
 
-        {/* Executive Financial Ledger KPI Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-2">
-          <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-            <div className="text-[10px] uppercase font-bold text-slate-400">Base Contract</div>
-            <div className="font-mono font-bold text-sm text-slate-800 mt-0.5">{wedding.baseContract || wedding.budget}</div>
-          </div>
+          {/* Vendor Bills Table */}
+          <Card className="border-slate-200 shadow-2xs overflow-hidden">
+            <CardHeader className="p-4 bg-slate-50/70 border-b border-slate-200 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-bold text-slate-900">
+                  Vendor Accounts Payable & Two-Way Matching
+                </CardTitle>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Tracks agreed PO base costs against audited extra charges, advance disbursements, and outstanding settlements.
+                </p>
+              </div>
 
-          <div className="p-3 rounded-lg bg-purple-50/70 border border-purple-200/60">
-            <div className="text-[10px] uppercase font-bold text-purple-700">Day-of Extras</div>
-            <div className="font-mono font-bold text-sm text-[#714B67] mt-0.5">
-              {wedding.totalExtras}
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setBillModalOpen(true)}
+                  className="text-xs font-semibold border-slate-300 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  + Add Bill Manually
+                </Button>
+              </div>
+            </CardHeader>
+
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="border-slate-200">
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Vendor & Category</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Agreed Base</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Audited Extras</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Total Payable</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Advance Paid</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Balance Due</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Status</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right py-3">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {vendorBills.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-10 text-slate-400">
+                        <AlertCircle className="w-6 h-6 text-slate-300 mx-auto mb-1.5" />
+                        <p className="text-xs font-semibold text-slate-600">No vendor bills added yet</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Click &quot;Auto-Generate Bills from Winning Quotes&quot; or &quot;+ Add Bill Manually&quot;.
+                        </p>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    vendorBills.map((b) => (
+                      <TableRow key={b.id} className="border-slate-100 hover:bg-slate-50/70 transition-colors">
+                        <TableCell className="py-3">
+                          <div className="font-bold text-xs text-slate-900">{b.vendor}</div>
+                          <div className="text-[11px] text-slate-500 font-medium">{b.category}</div>
+                        </TableCell>
+
+                        <TableCell className="py-3 font-mono text-xs text-slate-700">
+                          {b.agreedBase}
+                        </TableCell>
+
+                        <TableCell className="py-3 font-mono text-xs">
+                          {b.rawExtras > 0 ? (
+                            <span className="text-amber-700 font-semibold">{b.extras}</span>
+                          ) : (
+                            <span className="text-slate-400">₹0</span>
+                          )}
+                        </TableCell>
+
+                        <TableCell className="py-3 font-mono text-xs font-bold text-slate-900">
+                          {b.totalPayable}
+                        </TableCell>
+
+                        <TableCell className="py-3 font-mono text-xs text-blue-700 font-semibold">
+                          {b.advancePaid}
+                        </TableCell>
+
+                        <TableCell className="py-3 font-mono text-xs font-bold">
+                          {b.rawBalanceDue === 0 ? (
+                            <span className="text-emerald-600">₹0 (Settled)</span>
+                          ) : (
+                            <span className="text-rose-600">{b.balanceDue}</span>
+                          )}
+                        </TableCell>
+
+                        <TableCell className="py-3">
+                          {b.status === 'SETTLEMENT_CLEARED' ? (
+                            <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+                              Settlement Cleared
+                            </Badge>
+                          ) : b.status === 'RECONCILED_MATCHED' ? (
+                            <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-bold">
+                              Reconciled (Matched)
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-bold">
+                              Pending Advance
+                            </Badge>
+                          )}
+                        </TableCell>
+
+                        <TableCell className="py-3 text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedBill(b);
+                              setReconcileAmount(String(b.rawBalanceDue));
+                              setReconcileModalOpen(true);
+                            }}
+                            className="text-xs font-semibold h-7 border-slate-300 hover:bg-[#714B67]/10 hover:text-[#714B67] cursor-pointer"
+                          >
+                            Reconcile / Pay
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
-          </div>
+          </Card>
+        </TabsContent>
 
-          <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-            <div className="text-[10px] uppercase font-bold text-slate-400">Total Invoiced</div>
-            <div className="font-mono font-bold text-sm text-slate-900 mt-0.5">
-              {wedding.totalInvoiced}
-            </div>
-          </div>
+        {/* TAB 2: AUDITED EXTRA CHARGES (ADDITIONS) */}
+        <TabsContent value="extraCharges" className="mt-4 space-y-4">
+          <Card className="border-slate-200 shadow-2xs overflow-hidden">
+            <CardHeader className="p-4 bg-slate-50/70 border-b border-slate-200 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-bold text-slate-900">
+                  Audited Extra Charges & Change Requests
+                </CardTitle>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Overruns (e.g. 60 Banquet covers @ ₹2,100, DJ 2.5 hr overtime) audited and attached to final client billing.
+                </p>
+              </div>
 
-          <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-            <div className="text-[10px] uppercase font-bold text-slate-400">Advances Paid</div>
-            <div className="font-mono font-bold text-sm text-slate-700 mt-0.5">{wedding.vendorAdvancePaid}</div>
-          </div>
-
-          <div className="p-3 rounded-lg bg-emerald-50/70 border border-emerald-200/60">
-            <div className="text-[10px] uppercase font-bold text-emerald-800">Vendor Balance Due</div>
-            <div className="font-mono font-bold text-sm text-emerald-900 mt-0.5">
-              {wedding.vendorBalanceDue}
-            </div>
-          </div>
-
-          <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-            <div className="text-[10px] uppercase font-bold text-slate-400">Gross Margin</div>
-            <div className="font-mono font-bold text-sm text-slate-800 mt-0.5 flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-              <span>{wedding.grossMargin}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs Navigation for Commercial & Billing Detail */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-1.5 shadow-2xs">
-          <TabsList className="bg-slate-100/90 p-1 border border-slate-200/80 rounded-lg h-auto flex flex-wrap gap-1.5 w-full justify-start">
-            <TabsTrigger
-              value="milestones"
-              className="px-3.5 py-2 text-xs font-semibold gap-2 data-[state=active]:bg-white data-[state=active]:text-[#714B67] data-[state=active]:shadow-2xs rounded-md transition-all cursor-pointer"
-            >
-              <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Staged Client Billing (Milestone Invoices)</span>
-              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                {invoices.length}
-              </span>
-            </TabsTrigger>
-
-            <TabsTrigger
-              value="extras"
-              className="px-3.5 py-2 text-xs font-semibold gap-2 data-[state=active]:bg-white data-[state=active]:text-[#714B67] data-[state=active]:shadow-2xs rounded-md transition-all cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5 text-purple-600" />
-              <span>Day-of Additions & Extra Charges Invoiced to Couple (Banquet Overruns)</span>
-              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-[#714B67]">
-                {projectExtras.length}
-              </span>
-            </TabsTrigger>
-
-            <TabsTrigger
-              value="vendor-bills"
-              className="px-3.5 py-2 text-xs font-semibold gap-2 data-[state=active]:bg-white data-[state=active]:text-[#714B67] data-[state=active]:shadow-2xs rounded-md transition-all cursor-pointer"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-              <span>Vendor Bill Two-Way Matching Ledger</span>
-              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800">
-                {projectVendorBills.length}
-              </span>
-            </TabsTrigger>
-          </TabsList>
-        </div>
-
-        {/* Tab 1: Staged Client Billing (Scene 5 Milestone Billing) */}
-        <TabsContent value="milestones" className="mt-0">
-          <Card className="border border-slate-200 shadow-2xs rounded-xl bg-white overflow-hidden">
-        <CardHeader className="p-4 border-b border-slate-200 bg-slate-50/80 flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-emerald-700" />
-              <span>Staged Client Billing (Milestone Invoices)</span>
-            </CardTitle>
-            <div className="text-xs text-slate-500">
-              Contract milestones: 20% Booking Deposit, 50% Pre-Wedding Advance, and 30% Final Settlement + Extras
-            </div>
-          </div>
-
-          <Badge variant="outline" className="font-mono text-xs font-bold px-2 py-0.5">
-            {invoices.length} Milestone Invoices
-          </Badge>
-        </CardHeader>
-
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-slate-100/80 border-b border-slate-200">
-              <TableRow>
-                <TableHead className="font-bold text-slate-700 text-xs">Invoice #</TableHead>
-                <TableHead className="font-bold text-slate-700 text-xs">Milestone Payment Stage</TableHead>
-                <TableHead className="font-bold text-slate-700 text-xs">Due Date</TableHead>
-                <TableHead className="font-bold text-slate-700 text-xs text-right">Amount Due</TableHead>
-                <TableHead className="font-bold text-slate-700 text-xs text-right">Paid Amount</TableHead>
-                <TableHead className="font-bold text-slate-700 text-xs text-center">Payment Status</TableHead>
-                <TableHead className="font-bold text-slate-700 text-xs text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody className="divide-y divide-slate-100">
-              {invoices.map((inv) => (
-                <TableRow key={inv.id} className="hover:bg-slate-50 transition">
-                  <TableCell className="py-3 font-mono font-bold text-xs text-slate-800">
-                    {inv.invoiceNumber}
-                  </TableCell>
-
-                  <TableCell className="py-3">
-                    <div className="font-bold text-xs text-slate-900">{inv.stageLabel}</div>
-                    {inv.paymentReference && (
-                      <div className="text-[11px] text-slate-500 font-mono">Ref: {inv.paymentReference}</div>
-                    )}
-                  </TableCell>
-
-                  <TableCell className="py-3 text-xs text-slate-600 font-medium">
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-slate-400" />
-                      <span>{inv.dueDate}</span>
-                    </div>
-                  </TableCell>
-
-                  <TableCell className="py-3 text-right font-mono text-xs font-bold text-slate-900">
-                    {inv.amountDue}
-                  </TableCell>
-
-                  <TableCell className="py-3 text-right font-mono text-xs text-slate-700">
-                    {inv.paidAmount}
-                  </TableCell>
-
-                  <TableCell className="py-3 text-center">
-                    {inv.status === 'PAID' ? (
-                      <Badge variant="success" className="text-[10px] gap-1">
-                        <CheckCircle2 className="w-2.5 h-2.5" /> PAID
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-[10px] font-bold border-amber-300 text-amber-800 bg-amber-50">
-                        UNPAID
-                      </Badge>
-                    )}
-                  </TableCell>
-
-                  <TableCell className="py-3 text-right">
-                    {inv.status === 'UNPAID' ? (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => handlePayInvoice(inv.id)}
-                        className="h-7 px-2.5 text-xs gap-1"
-                      >
-                        <CheckCircle2 className="w-3 h-3" />
-                        <span>Receive Payment</span>
-                      </Button>
-                    ) : (
-                      <span className="text-[11px] text-slate-400 font-medium">Cleared</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </TabsContent>
-
-        {/* Tab 2: Day-of Additions & Extra Charges Invoiced to Client */}
-        <TabsContent value="extras" className="mt-0">
-          <Card className="border border-slate-200 shadow-2xs rounded-xl bg-white">
-        <CardHeader className="p-4 border-b border-slate-200 bg-slate-50/80 flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-sm font-bold text-slate-900">
-              Day-of Additions & Extra Charges Invoiced to Couple (Banquet Overruns)
-            </CardTitle>
-            <div className="text-xs text-slate-500">
-              Handling the 60 unexpected banquet guests (Contracted 400 vs 460 actuals @ ₹2,100/plate) and DJ overtime charges
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="font-mono text-xs font-bold px-2 py-0.5">
-              {projectExtras.length} Items • {wedding.totalExtras}
-            </Badge>
-
-            {!isFinalised && (
               <Button
-                variant="default"
                 size="sm"
-                onClick={() => setModalOpen(true)}
-                className="gap-1.5 h-8 text-xs"
+                onClick={() => setExtraModalOpen(true)}
+                className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-2xs cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Extra</span>
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                + Add Extra Charge
               </Button>
-            )}
-          </div>
-        </CardHeader>
+            </CardHeader>
 
-        <CardContent className="p-4 space-y-2.5">
-          {projectExtras.map((ext) => (
-            <div
-              key={ext.id}
-              className="p-3.5 rounded-lg border border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs hover:border-slate-300 transition"
-            >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-slate-500 text-xs">{ext.id}</span>
-                  <Badge variant="outline" className="text-[10px] font-mono">
-                    {ext.category}
-                  </Badge>
-                  <span className="text-slate-500 text-xs">&bull; {ext.vendor}</span>
-                </div>
-                <div className="font-bold text-slate-900 text-xs">{ext.description}</div>
-                <div className="text-slate-500 text-xs">
-                  Rate: {ext.qty} units &times; {ext.unitPrice} ={' '}
-                  <strong className="font-mono text-slate-900">{ext.total}</strong>
-                </div>
-              </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="border-slate-200">
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Charge ID</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Category & Scope</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Qty</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Unit Rate</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Total Cost</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Vendor Attribution</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Client Invoiced</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Approved By</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {extraCharges.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-10 text-slate-400">
+                        <AlertCircle className="w-6 h-6 text-slate-300 mx-auto mb-1.5" />
+                        <p className="text-xs font-semibold text-slate-600">No extra charges recorded</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Use &quot;+ Add Extra Charge&quot; to audit event overruns.</p>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    extraCharges.map((e) => (
+                      <TableRow key={e.id} className="border-slate-100 hover:bg-slate-50/70 transition-colors">
+                        <TableCell className="py-3 font-mono text-xs font-bold text-slate-800">
+                          {e.id}
+                        </TableCell>
 
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="text-right">
-                  <Badge variant="success" className="text-[10px] flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> Invoiced to Couple
-                  </Badge>
-                  <div className="text-[10px] text-slate-400 mt-0.5">
-                    Authorized: {ext.approvedBy}
-                  </div>
-                </div>
-              </div>
+                        <TableCell className="py-3">
+                          <span className="font-mono text-[10px] font-bold text-[#714B67] bg-purple-50 px-1.5 py-0.5 rounded mr-1.5">
+                            {e.category}
+                          </span>
+                          <span className="text-xs text-slate-900 font-medium">{e.description}</span>
+                        </TableCell>
+
+                        <TableCell className="py-3 font-mono text-xs text-slate-700">
+                          {e.qty}
+                        </TableCell>
+
+                        <TableCell className="py-3 font-mono text-xs text-slate-700">
+                          {e.unitPrice}
+                        </TableCell>
+
+                        <TableCell className="py-3 font-mono text-xs font-bold text-amber-700">
+                          {e.total}
+                        </TableCell>
+
+                        <TableCell className="py-3 text-xs text-slate-700 font-medium">
+                          {e.vendor}
+                        </TableCell>
+
+                        <TableCell className="py-3">
+                          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+                            <Check className="w-3 h-3 mr-1" />
+                            Added to Client Bill
+                          </Badge>
+                        </TableCell>
+
+                        <TableCell className="py-3 text-xs text-slate-600">
+                          {e.approvedBy}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
-          ))}
-        </CardContent>
-      </Card>
-    </TabsContent>
+          </Card>
+        </TabsContent>
 
-        {/* Tab 3: Vendor Disbursement Ledger & Two-Way Matching */}
-        <TabsContent value="vendor-bills" className="mt-0">
-          <Card className="border border-slate-200 shadow-2xs rounded-xl bg-white">
-        <CardHeader className="p-4 border-b border-slate-200 bg-slate-50/80">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-sm font-bold text-slate-900">
-                Vendor Bill Two-Way Matching Ledger
+        {/* TAB 3: CLIENT MILESTONE INVOICES */}
+        <TabsContent value="invoices" className="mt-4 space-y-4">
+          <Card className="border-slate-200 shadow-2xs overflow-hidden">
+            <CardHeader className="p-4 bg-slate-50/70 border-b border-slate-200 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-bold text-slate-900">
+                  Client Milestone Invoicing Schedule (20% - 50% - 30% + Extras)
+                </CardTitle>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Deposit on signing, pre-wedding production advance, and post-event final settlement with verified extra charges.
+                </p>
+              </div>
+            </CardHeader>
+
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="border-slate-200">
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Invoice Number</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Stage Milestone</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Percentage</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Due Date</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Amount Due</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Payment Reference</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Status</TableHead>
+                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right py-3">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoices.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-10 text-slate-400">
+                        <AlertCircle className="w-6 h-6 text-slate-300 mx-auto mb-1.5" />
+                        <p className="text-xs font-semibold text-slate-600">No client invoices available</p>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    invoices.map((inv) => (
+                      <TableRow key={inv.id} className="border-slate-100 hover:bg-slate-50/70 transition-colors">
+                        <TableCell className="py-3 font-mono text-xs font-bold text-slate-800">
+                          {inv.invoiceNumber}
+                        </TableCell>
+
+                        <TableCell className="py-3 text-xs font-bold text-slate-900">
+                          {inv.stageLabel}
+                        </TableCell>
+
+                        <TableCell className="py-3 font-mono text-xs text-slate-700">
+                          {inv.percentage}%
+                        </TableCell>
+
+                        <TableCell className="py-3 text-xs text-slate-600">
+                          {inv.dueDate}
+                        </TableCell>
+
+                        <TableCell className="py-3 font-mono text-xs font-bold text-emerald-700">
+                          {inv.amountDue}
+                        </TableCell>
+
+                        <TableCell className="py-3 font-mono text-xs text-slate-500">
+                          {inv.paymentReference || 'Pending UTR'}
+                        </TableCell>
+
+                        <TableCell className="py-3">
+                          {inv.status === 'PAID' ? (
+                            <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+                              <Check className="w-3 h-3 mr-1" />
+                              PAID
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-bold">
+                              UNPAID
+                            </Badge>
+                          )}
+                        </TableCell>
+
+                        <TableCell className="py-3 text-right">
+                          {inv.status !== 'PAID' ? (
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setSelectedInvoice(inv);
+                                setPayAmount(String(inv.rawAmountDue));
+                                setPayInvoiceModalOpen(true);
+                              }}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold h-7 cursor-pointer"
+                            >
+                              Record Payment
+                            </Button>
+                          ) : (
+                            <span className="text-[11px] font-mono text-slate-400 font-semibold">
+                              Receipt Cleared
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        </TabsContent>
+
+        {/* TAB 4: AUDIT CHANGELOG ("settled and shit") */}
+        <TabsContent value="changelog" className="mt-4 space-y-4">
+          <Card className="border-slate-200 shadow-2xs overflow-hidden">
+            <CardHeader className="p-4 bg-slate-50/70 border-b border-slate-200">
+              <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <History className="w-4 h-4 text-[#714B67]" />
+                Commercial Audit Trail & Activity Changelog
               </CardTitle>
-              <div className="text-xs text-slate-500">
-                Matching submitted vendor bills against agreed RFQ purchase orders (Agreed Base + Extras = Total Payable)
-              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Immutable ledger history documenting all vendor bill approvals, milestone collections, charge overruns, and settlement sign-offs.
+              </p>
+            </CardHeader>
+
+            <div className="p-5">
+              {changelog.length === 0 ? (
+                <div className="text-center py-10 text-slate-400">
+                  <Clock className="w-6 h-6 text-slate-300 mx-auto mb-1.5" />
+                  <p className="text-xs font-semibold text-slate-600">No activity logged yet</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Transactions, payments, and extra charge additions will automatically appear in this audit trail.
+                  </p>
+                </div>
+              ) : (
+                <div className="relative pl-6 space-y-5 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                  {changelog.map((log) => (
+                    <div key={log.id} className="relative group">
+                      <div className="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-[#714B67] ring-4 ring-white" />
+                      
+                      <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-3 text-xs space-y-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 font-mono text-[11px]">
+                              {log.action}
+                            </span>
+                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-100 text-[#714B67]">
+                              {log.entityType}
+                            </span>
+                            {log.amount && (
+                              <span className="font-mono text-emerald-700 font-bold">
+                                {log.amount}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {log.createdAt}
+                          </span>
+                        </div>
+
+                        <p className="text-slate-700 font-medium mt-1">
+                          {log.notes || 'Transaction logged'}
+                        </p>
+
+                        <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-200/50 flex items-center justify-between">
+                          <span>Authorized By: <strong className="text-slate-600">{log.performedBy}</strong></span>
+                          {log.toStatus && (
+                            <span>Status Transition: <strong className="text-[#714B67]">{log.toStatus}</strong></span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-emerald-800 font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-200/60">
-              <ShieldCheck className="w-4 h-4 text-emerald-700" />
-              <span>Duplicate Payment Protected</span>
-            </div>
-          </div>
-        </CardHeader>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-slate-100/80 border-b border-slate-200">
-              <TableRow>
-                <TableHead className="font-bold text-slate-700 text-xs">Vendor & Service Account</TableHead>
-                <TableHead className="font-bold text-slate-700 text-xs text-right">Agreed RFQ Base</TableHead>
-                <TableHead className="font-bold text-slate-700 text-xs text-right">Day-of Extras</TableHead>
-                <TableHead className="font-bold text-slate-700 text-xs text-right">Total Payable</TableHead>
-                <TableHead className="font-bold text-slate-700 text-xs text-right">Advance Paid</TableHead>
-                <TableHead className="font-bold text-slate-700 text-xs text-right">Balance Due</TableHead>
-                <TableHead className="font-bold text-slate-700 text-xs text-center">Status</TableHead>
-                <TableHead className="font-bold text-slate-700 text-xs text-right">Two-Way Match</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody className="divide-y divide-slate-100">
-              {projectVendorBills.map((vb) => (
-                <TableRow key={vb.id} className="hover:bg-slate-50 transition">
-                  <TableCell className="py-3">
-                    <div className="font-bold text-xs text-slate-900">{vb.vendor}</div>
-                    <div className="text-[11px] text-slate-500">{vb.category}</div>
-                  </TableCell>
-
-                  <TableCell className="py-3 text-right font-mono text-xs text-slate-600">
-                    {vb.agreedBase}
-                  </TableCell>
-
-                  <TableCell className="py-3 text-right font-mono text-xs font-semibold text-amber-800">
-                    {vb.extras}
-                  </TableCell>
-
-                  <TableCell className="py-3 text-right font-mono text-xs font-bold text-slate-900">
-                    {vb.totalPayable}
-                  </TableCell>
-
-                  <TableCell className="py-3 text-right font-mono text-xs text-slate-600">
-                    {vb.advancePaid}
-                  </TableCell>
-
-                  <TableCell className="py-3 text-right font-mono text-xs font-bold text-emerald-900">
-                    {vb.balanceDue}
-                  </TableCell>
-
-                  <TableCell className="py-3 text-center">
-                    {vb.status === 'SETTLEMENT_CLEARED' ? (
-                      <Badge variant="success" className="text-[10px] gap-1">
-                        <CheckCircle2 className="w-2.5 h-2.5" /> Cleared
-                      </Badge>
-                    ) : vb.status === 'RECONCILED_MATCHED' ? (
-                      <Badge variant="outline" className="text-[10px] font-bold border-emerald-300 text-emerald-800 bg-emerald-50">
-                        MATCHED
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-[10px] font-bold border-amber-300 text-amber-800 bg-amber-50">
-                        {vb.status}
-                      </Badge>
-                    )}
-                  </TableCell>
-
-                  <TableCell className="py-3 text-right">
-                    {vb.status !== 'SETTLEMENT_CLEARED' ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleReconcileBill(vb.id)}
-                        className="h-7 px-2 text-xs text-[#714B67] hover:bg-purple-100 font-semibold"
-                      >
-                        Reconcile
-                      </Button>
-                    ) : (
-                      <span className="text-[11px] text-slate-400">Audited</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </TabsContent>
-  </Tabs>
-
-      {/* Modal: Add Extra Charge */}
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-md bg-white">
+      {/* MODAL 1: ADD EXTRA CHARGE */}
+      <Dialog open={extraModalOpen} onOpenChange={setExtraModalOpen}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900">
-              Add Day-of Extra Charge to Invoice
+              Audit & Record Extra Charge Overrun
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Record unexpected banquet headcount overrun or curfew overtime to {wedding.code}.
+              Attach unbudgeted banquet overruns, overtime, or client requests to both client settlement and supplier disbursement.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleAddExtra} className="space-y-3.5 pt-2">
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold text-slate-700">Category</Label>
-              <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger className="h-8 text-xs bg-slate-50">
-                  <SelectValue placeholder="Select Category" />
+          <form onSubmit={handleCreateExtraCharge} className="space-y-3.5 py-2">
+            <div>
+              <Label className="text-xs font-bold text-slate-700">Category</Label>
+              <Select value={extraCategory} onValueChange={setExtraCategory}>
+                <SelectTrigger className="h-9 text-xs border-slate-200 mt-1">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="EXTRA_PLATES">Extra Banquet Plates (Overrun Covers)</SelectItem>
-                  <SelectItem value="DJ_OVERTIME">DJ & Sound Curfew Overtime</SelectItem>
-                  <SelectItem value="VINTAGE_CAR">Baraat Vintage Car Addition</SelectItem>
-                  <SelectItem value="ADDITIONAL_POWER">Diesel Generator Backup</SelectItem>
-                  <SelectItem value="SPECIAL_FIREWORKS">Fireworks & Special Effects</SelectItem>
+                  <SelectItem value="EXTRA_PLATES">Extra Dinner / Banquet Plates</SelectItem>
+                  <SelectItem value="DJ_OVERTIME">DJ & Sound Extension Overtime</SelectItem>
+                  <SelectItem value="VINTAGE_CAR">Vintage Baraat Vehicle Overrun</SelectItem>
+                  <SelectItem value="ADDITIONAL_POWER">Backup Diesel Genset</SelectItem>
+                  <SelectItem value="BOAT_SHUTTLE_OVERRUN">Water Taxi / Boat Shuttle Overrun</SelectItem>
+                  <SelectItem value="SPECIAL_FIREWORKS">Pyro / Fireworks Permit</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold text-slate-700">Description</Label>
+            <div>
+              <Label className="text-xs font-bold text-slate-700">Description / Scope Details</Label>
               <Input
-                placeholder="e.g. 60 unexpected banquet guests verified with kitchen captain"
-                value={desc}
-                onChange={(e) => setDesc(e.target.value)}
-                className="h-8 text-xs bg-slate-50"
+                value={extraDesc}
+                onChange={(e) => setExtraDesc(e.target.value)}
+                className="h-9 text-xs border-slate-200 mt-1"
+                placeholder="e.g. 60 unexpected banquet guests verified by banquet captain"
                 required
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold text-slate-700">Quantity / Hours</Label>
+              <div>
+                <Label className="text-xs font-bold text-slate-700">Quantity / Units</Label>
                 <Input
                   type="number"
-                  step="0.5"
-                  value={qty}
-                  onChange={(e) => setQty(e.target.value)}
-                  className="h-8 text-xs bg-slate-50 font-mono"
+                  value={extraQty}
+                  onChange={(e) => setExtraQty(e.target.value)}
+                  className="h-9 text-xs border-slate-200 mt-1"
                   required
                 />
               </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold text-slate-700">Unit Price (₹)</Label>
+              <div>
+                <Label className="text-xs font-bold text-slate-700">Unit Rate (₹)</Label>
                 <Input
                   type="number"
-                  value={unitPrice}
-                  onChange={(e) => setUnitPrice(e.target.value)}
-                  className="h-8 text-xs bg-slate-50 font-mono"
+                  value={extraUnitPrice}
+                  onChange={(e) => setExtraUnitPrice(e.target.value)}
+                  className="h-9 text-xs border-slate-200 mt-1"
                   required
                 />
               </div>
             </div>
 
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold text-slate-700">Responsible Vendor</Label>
+            <div>
+              <Label className="text-xs font-bold text-slate-700">Vendor Attribution</Label>
               <Input
-                value={vendor}
-                onChange={(e) => setVendor(e.target.value)}
-                className="h-8 text-xs bg-slate-50"
+                value={extraVendor}
+                onChange={(e) => setExtraVendor(e.target.value)}
+                className="h-9 text-xs border-slate-200 mt-1"
+                placeholder="e.g. Marwar Heritage Kitchens"
                 required
               />
             </div>
 
-            <div className="p-2.5 rounded bg-purple-50 border border-purple-200 text-xs flex items-center justify-between font-mono">
-              <span className="font-semibold text-slate-600">Calculated Addition:</span>
-              <span className="font-bold text-sm text-[#714B67]">
-                ₹{((parseFloat(qty) || 0) * (parseFloat(unitPrice) || 0)).toLocaleString('en-IN')}
-              </span>
+            <div className="bg-amber-50 p-2.5 rounded border border-amber-200/80 text-[11px] text-amber-900 flex items-center justify-between font-mono">
+              <span>Calculated Total Addition:</span>
+              <strong className="text-xs font-bold text-amber-800">
+                ₹{((parseFloat(extraQty) || 0) * (parseFloat(extraUnitPrice) || 0)).toLocaleString('en-IN')}
+              </strong>
             </div>
 
             <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setModalOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setExtraModalOpen(false)}
+                className="text-xs border-slate-200 cursor-pointer"
+              >
                 Cancel
               </Button>
-              <Button type="submit" variant="default" size="sm">
-                Save to Database
+              <Button
+                type="submit"
+                size="sm"
+                disabled={submittingExtra}
+                className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-2xs cursor-pointer"
+              >
+                {submittingExtra ? 'Auditing...' : 'Confirm & Audit Extra'}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Modal: Finalise & Lock Settlement */}
-      <Dialog open={finaliseModalOpen} onOpenChange={setFinaliseModalOpen}>
-        <DialogContent className="max-w-md bg-white">
+      {/* MODAL 2: ADD VENDOR BILL */}
+      <Dialog open={billModalOpen} onOpenChange={setBillModalOpen}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-emerald-600" />
-              <span>Finalise Settlement for {wedding.code}</span>
+            <DialogTitle className="text-base font-bold text-slate-900">
+              Create Vendor Bill & Record PO
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Confirm that all day-of extras are reconciled with couple and vendor disbursements are matched.
+              Record a supplier contract commitment into this wedding&apos;s accounts payable ledger.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 pt-2 text-xs">
-            <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 space-y-1">
-              <div className="font-bold text-emerald-900">Audit Signoff Summary:</div>
-              <ul className="list-disc list-inside text-emerald-800 space-y-0.5">
-                <li>Total Invoiced: <strong>{wedding.totalInvoiced}</strong></li>
-                <li>Extra Charges: <strong>{wedding.totalExtras}</strong></li>
-                <li>All Vendor Accounts Matched against Awarded RFQ</li>
-                <li>PostgreSQL records will be locked and audited</li>
+          <form onSubmit={handleCreateVendorBill} className="space-y-3.5 py-2">
+            <div>
+              <Label className="text-xs font-bold text-slate-700">Vendor Partner</Label>
+              <Select value={newBillVendorId} onValueChange={setNewBillVendorId}>
+                <SelectTrigger className="h-9 text-xs border-slate-200 mt-1">
+                  <SelectValue placeholder="Select Vendor Partner" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="e0000001-0000-0000-0000-000000000001">Royal Rasoi Caterers (Catering)</SelectItem>
+                  <SelectItem value="e0000001-0000-0000-0000-000000000002">Marwar Heritage Kitchens (Catering)</SelectItem>
+                  <SelectItem value="e0000001-0000-0000-0000-000000000003">Rajputana Feasts & Banquets (Catering)</SelectItem>
+                  <SelectItem value="e0000001-0000-0000-0000-000000000004">Mewar Royal Florals & Decor (Decor)</SelectItem>
+                  <SelectItem value="e0000001-0000-0000-0000-000000000005">Jodhpur Beats & Sound Production (DJ / AV)</SelectItem>
+                  <SelectItem value="e0000001-0000-0000-0000-000000000007">Udaipur Royal Cinematography (Photography)</SelectItem>
+                  <SelectItem value="e0000001-0000-0000-0000-000000000008">Royal Rajputana Fleet (Transport)</SelectItem>
+                  <SelectItem value="e0000001-0000-0000-0000-000000000009">Jaipur Power Grid Rentals (Infrastructure)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-bold text-slate-700">Agreed PO Base Cost (₹)</Label>
+                <Input
+                  type="number"
+                  value={newBillAgreedBase}
+                  onChange={(e) => setNewBillAgreedBase(e.target.value)}
+                  className="h-9 text-xs border-slate-200 mt-1"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs font-bold text-slate-700">Initial Advance Paid (₹)</Label>
+                <Input
+                  type="number"
+                  value={newBillAdvance}
+                  onChange={(e) => setNewBillAdvance(e.target.value)}
+                  className="h-9 text-xs border-slate-200 mt-1"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs font-bold text-slate-700">PO / Reference Notes</Label>
+              <Input
+                value={newBillNotes}
+                onChange={(e) => setNewBillNotes(e.target.value)}
+                className="h-9 text-xs border-slate-200 mt-1"
+                placeholder="e.g. Sourced via Procurement Decision Matrix"
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setBillModalOpen(false)}
+                className="text-xs border-slate-200 cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={submittingBill || !newBillVendorId}
+                className="bg-[#714B67] hover:bg-[#5a3b52] text-white text-xs font-semibold shadow-2xs cursor-pointer"
+              >
+                {submittingBill ? 'Adding...' : 'Add Vendor Bill'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL 3: RECONCILE / RECORD BILL PAYMENT */}
+      <Dialog open={reconcileModalOpen} onOpenChange={setReconcileModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900">
+              Reconcile & Record Vendor Disbursement
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Record a bank transfer payment tranche for {selectedBill?.vendor}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleReconcileBill} className="space-y-3.5 py-2">
+            <div className="bg-slate-50 p-3 rounded border border-slate-200 space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Total Payable:</span>
+                <span className="font-mono font-bold text-slate-900">{selectedBill?.totalPayable}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Current Advance Paid:</span>
+                <span className="font-mono text-blue-700">{selectedBill?.advancePaid}</span>
+              </div>
+              <div className="flex justify-between font-bold pt-1 border-t border-slate-200">
+                <span className="text-slate-700">Remaining Balance:</span>
+                <span className="font-mono text-rose-600">{selectedBill?.balanceDue}</span>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs font-bold text-slate-700">Payment Amount (₹)</Label>
+              <Input
+                type="number"
+                value={reconcileAmount}
+                onChange={(e) => setReconcileAmount(e.target.value)}
+                className="h-9 text-xs border-slate-200 mt-1 font-mono"
+                required
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-bold text-slate-700">Bank Transfer / NEFT Reference</Label>
+              <Input
+                value={reconcileRef}
+                onChange={(e) => setReconcileRef(e.target.value)}
+                className="h-9 text-xs border-slate-200 mt-1 font-mono"
+                placeholder="e.g. HDFC-NEFT-998811"
+                required
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-bold text-slate-700">Settlement Notes</Label>
+              <Input
+                value={reconcileNotes}
+                onChange={(e) => setReconcileNotes(e.target.value)}
+                className="h-9 text-xs border-slate-200 mt-1"
+                placeholder="e.g. Final balance clearance upon event signoff"
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setReconcileModalOpen(false)}
+                className="text-xs border-slate-200 cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={submittingReconcile}
+                className="bg-[#714B67] hover:bg-[#5a3b52] text-white text-xs font-semibold shadow-2xs cursor-pointer"
+              >
+                {submittingReconcile ? 'Reconciling...' : 'Confirm Disbursement'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL 4: RECORD CLIENT INVOICE PAYMENT */}
+      <Dialog open={payInvoiceModalOpen} onOpenChange={setPayInvoiceModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900">
+              Record Client Milestone Payment
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Log bank receipt for {selectedInvoice?.invoiceNumber} ({selectedInvoice?.stageLabel}).
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handlePayInvoice} className="space-y-3.5 py-2">
+            <div>
+              <Label className="text-xs font-bold text-slate-700">Collected Amount (₹)</Label>
+              <Input
+                type="number"
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+                className="h-9 text-xs border-slate-200 mt-1 font-mono"
+                required
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-bold text-slate-700">Payment Reference / UTR</Label>
+              <Input
+                value={payRef}
+                onChange={(e) => setPayRef(e.target.value)}
+                className="h-9 text-xs border-slate-200 mt-1 font-mono"
+                placeholder="e.g. ICICI-RTGS-774411"
+                required
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setPayInvoiceModalOpen(false)}
+                className="text-xs border-slate-200 cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={submittingPay}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-2xs cursor-pointer"
+              >
+                {submittingPay ? 'Recording...' : 'Mark Invoice Paid'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL 5: FINALISE & SETTLE PROJECT */}
+      <Dialog open={finaliseModalOpen} onOpenChange={setFinaliseModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" />
+              Finalise & Settle Wedding Project
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Sign off on commercial audit, lock accounts ledger, and transition project to FINALISED & SETTLED.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3.5 py-2">
+            <div className="bg-emerald-50 border border-emerald-200/80 rounded p-3 text-xs text-emerald-900 space-y-1">
+              <p className="font-bold">Audit Verification Checks Passed:</p>
+              <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-emerald-800">
+                <li>All {vendorBills.length} vendor supplier balances reconciled.</li>
+                <li>Audited extra charges ({extraCharges.length} items) attached to client statement.</li>
+                <li>Client milestone payments reconciled with bank statements.</li>
               </ul>
             </div>
-          </div>
 
-          <DialogFooter className="pt-3">
-            <Button variant="outline" size="sm" onClick={() => setFinaliseModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="default" size="sm" onClick={handleFinalise} className="bg-emerald-700 hover:bg-emerald-800">
-              Lock & Finalise in PostgreSQL
-            </Button>
-          </DialogFooter>
+            <div>
+              <Label className="text-xs font-bold text-slate-700">Audit Sign-off Notes</Label>
+              <Input
+                value={finaliseNotes}
+                onChange={(e) => setFinaliseNotes(e.target.value)}
+                className="h-9 text-xs border-slate-200 mt-1"
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setFinaliseModalOpen(false)}
+                className="text-xs border-slate-200 cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={submittingFinalise}
+                onClick={handleFinaliseProject}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-2xs cursor-pointer"
+              >
+                {submittingFinalise ? 'Locking...' : 'Confirm Final Sign-off'}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
