@@ -5,8 +5,11 @@ import dotenv from 'dotenv';
 import { checkDatabaseConnection, pool } from './db';
 import { authRoutes } from './routes/auth';
 import { enquiryRoutes } from './routes/enquiries';
+import { billingRoutes } from './routes/billing';
 
 dotenv.config();
+
+// Backend server initialized
 
 const fastify = Fastify({
   logger: {
@@ -79,6 +82,9 @@ async function buildServer() {
 
   // Mount Enquiry & Lead Capture Routes under /api/enquiries
   await fastify.register(enquiryRoutes, { prefix: '/api/enquiries' });
+
+  // Mount Billing & Extra Charges Routes under /api/billing (PeopleFirst standard)
+  await fastify.register(billingRoutes, { prefix: '/api/billing' });
 
   return fastify;
 }

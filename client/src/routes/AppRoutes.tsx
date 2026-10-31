@@ -9,6 +9,7 @@ import { Procurement } from '../pages/Procurement';
 import { Tasks } from '../pages/Tasks';
 import { DayOf } from '../pages/DayOf';
 import { Billing } from '../pages/Billing';
+import { BillingProjectDetail } from '../pages/BillingProjectDetail';
 import { SettingsPage } from '../pages/Settings';
 
 export const AppRoutes: React.FC = () => {
@@ -28,6 +29,7 @@ export const AppRoutes: React.FC = () => {
           <Route path="tasks" element={<Tasks />} />
           <Route path="day-of" element={<DayOf />} />
           <Route path="billing" element={<Billing />} />
+          <Route path="billing/:projectId" element={<BillingProjectDetail />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Route>
