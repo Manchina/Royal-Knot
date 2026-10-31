@@ -154,30 +154,6 @@ export const Login: React.FC = () => {
             <CardDescription className="text-xs text-slate-500">
               Enter your work credentials or toggle quick demo access below
             </CardDescription>
-
-            {/* Quick Demo Access Chip for Super Admin */}
-            <div className="mt-2.5 p-2 rounded-md bg-purple-50/80 border border-purple-200/80 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <ShieldCheck className="w-4 h-4 text-[#714B67] shrink-0" />
-                <div className="min-w-0 leading-tight">
-                  <span className="font-bold text-slate-900">Super Admin: </span>
-                  <span className="font-mono text-[11px] text-slate-600">admin@royalknot.com</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedRole('SUPER_ADMIN');
-                  setEmail('admin@royalknot.com');
-                  setPassword('password123');
-                  clearError();
-                  setFieldErrors({});
-                }}
-                className="text-[10px] font-bold text-[#714B67] hover:text-[#56344E] cursor-pointer px-2 py-0.5 rounded bg-white border border-purple-200 shadow-2xs shrink-0"
-              >
-                Autofill
-              </button>
-            </div>
           </CardHeader>
 
           <CardContent className="p-4 space-y-3">
@@ -199,11 +175,10 @@ export const Login: React.FC = () => {
                     }}
                     required={!isDemoMode}
                     disabled={isDemoMode}
-                    className={`text-xs h-9 disabled:opacity-50 disabled:bg-slate-50 transition-colors ${
-                      fieldErrors.email
-                        ? 'border-rose-400 bg-rose-50/20 focus-visible:ring-rose-400'
-                        : 'border-slate-300'
-                    }`}
+                    className={`text-xs h-9 disabled:opacity-50 disabled:bg-slate-50 transition-colors ${fieldErrors.email
+                      ? 'border-rose-400 bg-rose-50/20 focus-visible:ring-rose-400'
+                      : 'border-slate-300'
+                      }`}
                   />
                   {fieldErrors.email && (
                     <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
@@ -227,11 +202,10 @@ export const Login: React.FC = () => {
                     }}
                     required={!isDemoMode}
                     disabled={isDemoMode}
-                    className={`text-xs h-9 disabled:opacity-50 disabled:bg-slate-50 transition-colors ${
-                      fieldErrors.password
-                        ? 'border-rose-400 bg-rose-50/20 focus-visible:ring-rose-400'
-                        : 'border-slate-300'
-                    }`}
+                    className={`text-xs h-9 disabled:opacity-50 disabled:bg-slate-50 transition-colors ${fieldErrors.password
+                      ? 'border-rose-400 bg-rose-50/20 focus-visible:ring-rose-400'
+                      : 'border-slate-300'
+                      }`}
                   />
                   {fieldErrors.password && (
                     <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">

@@ -15,7 +15,8 @@ import {
   LayoutList,
   LayoutGrid,
   Check,
-  AlertCircle
+  AlertCircle,
+  Clock,
 } from 'lucide-react';
 import {
   Card,
@@ -35,6 +36,9 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
+  Tabs,
+  TabsList,
+  TabsTrigger,
 } from '../components/ui';
 import { useWeddingStore } from '../store/useWeddingStore';
 import { useBillingStore } from '../store/useBillingStore';
@@ -45,8 +49,8 @@ export const Billing: React.FC = () => {
   const { setSelectedWeddingId } = useWeddingStore();
   const { projects, summary, fetchBillingProjects } = useBillingStore();
 
-  // Module filters initialized from URL query params
-  const [stageFilter, setStageFilter] = useState<string>(
+  const [activeTab, setActiveTab] = useState<'ongoing' | 'finalised'>('ongoing');
+  const [statusFilter, setStatusFilter] = useState<string>(
     () => searchParams.get('status') || searchParams.get('stage') || 'ALL'
   );
   const [cityFilter, setCityFilter] = useState<string>(
@@ -62,7 +66,7 @@ export const Billing: React.FC = () => {
     const urlStatus = searchParams.get('status') || searchParams.get('stage');
     const urlCity = searchParams.get('city');
     const urlSearch = searchParams.get('search');
-    if (urlStatus) setStageFilter(urlStatus);
+    if (urlStatus) setStatusFilter(urlStatus);
     if (urlCity) setCityFilter(urlCity);
     if (urlSearch) setSearchQuery(urlSearch);
   }, [searchParams]);
@@ -72,23 +76,41 @@ export const Billing: React.FC = () => {
 
   const safeProjects = useMemo(() => (Array.isArray(projects) ? projects : []), [projects]);
 
-  // Counts for Stage Filter Pills
-  const stageCounts = useMemo(() => {
-    return {
-      ALL: safeProjects.length,
-      LIVE_BIG_DAY: safeProjects.filter((p) => p.status === 'LIVE_BIG_DAY').length,
-      IN_PLANNING: safeProjects.filter((p) => p.status === 'IN_PLANNING').length,
-      BOOKED: safeProjects.filter((p) => p.status === 'BOOKED').length,
-      FINALISED: safeProjects.filter((p) => p.status === 'FINALISED').length,
-      FINALISED_SETTLED: safeProjects.filter((p) => p.status === 'FINALISED_SETTLED').length,
-    };
-  }, [safeProjects]);
+  const ongoingProjects = useMemo(
+    () => safeProjects.filter((p) => p.status !== 'FINALISED' && p.status !== 'FINALISED_SETTLED'),
+    [safeProjects]
+  );
+
+  const finalisedProjects = useMemo(
+    () => safeProjects.filter((p) => p.status === 'FINALISED' || p.status === 'FINALISED_SETTLED'),
+    [safeProjects]
+  );
+
+  const ongoingStatusTabs = useMemo(() => {
+    return [
+      { id: 'ALL', label: 'All', count: ongoingProjects.length, dotColor: 'bg-purple-600' },
+      { id: 'LIVE_BIG_DAY', label: 'Live Big Day', count: ongoingProjects.filter((p) => p.status === 'LIVE_BIG_DAY').length, dotColor: 'bg-rose-500 animate-pulse' },
+      { id: 'IN_PLANNING', label: 'In Planning', count: ongoingProjects.filter((p) => p.status === 'IN_PLANNING').length, dotColor: 'bg-blue-500' },
+      { id: 'BOOKED', label: 'Booked', count: ongoingProjects.filter((p) => p.status === 'BOOKED').length, dotColor: 'bg-emerald-500' },
+    ];
+  }, [ongoingProjects]);
+
+  const finalisedStatusTabs = useMemo(() => {
+    return [
+      { id: 'ALL', label: 'All', count: finalisedProjects.length, dotColor: 'bg-emerald-600' },
+      { id: 'FINALISED', label: 'Finalised', count: finalisedProjects.filter((p) => p.status === 'FINALISED').length, dotColor: 'bg-emerald-500' },
+      { id: 'FINALISED_SETTLED', label: 'Finalised & Settled', count: finalisedProjects.filter((p) => p.status === 'FINALISED_SETTLED').length, dotColor: 'bg-teal-600' },
+    ];
+  }, [finalisedProjects]);
+
+  const currentStatusTabs = activeTab === 'ongoing' ? ongoingStatusTabs : finalisedStatusTabs;
 
   // Filtered List
   const filteredList = useMemo(() => {
-    return safeProjects.filter((p) => {
+    const baseList = activeTab === 'ongoing' ? ongoingProjects : finalisedProjects;
+    return baseList.filter((p) => {
       // Stage check
-      if (stageFilter !== 'ALL' && p.status !== stageFilter) return false;
+      if (statusFilter !== 'ALL' && p.status !== statusFilter) return false;
 
       // City check
       if (cityFilter !== 'ALL' && p.city.toLowerCase() !== cityFilter.toLowerCase()) return false;
@@ -106,7 +128,7 @@ export const Billing: React.FC = () => {
 
       return true;
     });
-  }, [safeProjects, stageFilter, cityFilter, searchQuery]);
+  }, [activeTab, ongoingProjects, finalisedProjects, statusFilter, cityFilter, searchQuery]);
 
   // Helper for status badge
   const renderStatusBadge = (status: string) => {
@@ -250,37 +272,75 @@ export const Billing: React.FC = () => {
         </Card>
       </div>
 
-      {/* 3. Stage Pills Filter Toolbar (Matching Weddings.tsx & Enquiries.tsx) */}
-      <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200/80 text-xs w-fit">
-        {[
-          { id: 'ALL', label: 'All Projects', count: stageCounts.ALL },
-          { id: 'LIVE_BIG_DAY', label: 'Live Big Day', count: stageCounts.LIVE_BIG_DAY },
-          { id: 'IN_PLANNING', label: 'In Planning', count: stageCounts.IN_PLANNING },
-          { id: 'BOOKED', label: 'Booked', count: stageCounts.BOOKED },
-          { id: 'FINALISED', label: 'Finalised', count: stageCounts.FINALISED },
-          { id: 'FINALISED_SETTLED', label: 'Settled & Closed', count: stageCounts.FINALISED_SETTLED },
-        ].map((tab) => {
-          const isActive = stageFilter === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setStageFilter(tab.id)}
-              className={`px-3 py-1.5 rounded font-medium transition-all flex items-center gap-1.5 cursor-pointer ${isActive
-                ? 'bg-white text-slate-900 shadow-2xs font-bold border border-slate-200'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                }`}
+      {/* 3. PeopleFirst Tab Bar: Ongoing Projects vs Finalised Projects (Restored Old Aesthetic) */}
+      <Tabs
+        value={activeTab}
+        onValueChange={(val) => {
+          setActiveTab(val as 'ongoing' | 'finalised');
+          setStatusFilter('ALL');
+        }}
+        className="w-full gap-3"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+          <TabsList className="bg-slate-100 p-1 border border-slate-200 rounded-lg h-9.5">
+            <TabsTrigger
+              value="ongoing"
+              className="px-4 py-1.5 text-xs font-semibold gap-2 data-[state=active]:bg-white data-[state=active]:text-[#714B67] data-[state=active]:shadow-xs rounded-md transition-all cursor-pointer"
             >
-              <span>{tab.label}</span>
-              <span
-                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${isActive ? 'bg-[#714B67] text-white' : 'bg-slate-200 text-slate-700'
-                  }`}
-              >
-                {tab.count}
+              <Clock className="w-3.5 h-3.5 text-amber-600" />
+              <span>Ongoing Projects</span>
+              <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-purple-100 text-[#714B67]">
+                {ongoingProjects.length}
               </span>
-            </button>
-          );
-        })}
-      </div>
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="finalised"
+              className="px-4 py-1.5 text-xs font-semibold gap-2 data-[state=active]:bg-white data-[state=active]:text-[#714B67] data-[state=active]:shadow-xs rounded-md transition-all cursor-pointer"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Finalised Projects</span>
+              <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800">
+                {finalisedProjects.length}
+              </span>
+            </TabsTrigger>
+          </TabsList>
+
+          <div className="hidden sm:flex items-center gap-1.5 px-2 text-[11px] text-slate-500 font-medium">
+            <span>Viewing:</span>
+            <span className="font-semibold text-slate-800">
+              {currentStatusTabs.find((t) => t.id === statusFilter)?.label || 'All'}
+            </span>
+            <span className="text-slate-300">•</span>
+            <span className="font-mono font-bold text-[#714B67]">{filteredList.length}</span>
+            <span>{filteredList.length === 1 ? 'Project' : 'Projects'}</span>
+          </div>
+        </div>
+
+        {/* Sub-Tabs: Status Breakdown */}
+        <div className="bg-white border border-slate-200 rounded-lg p-1.5 shadow-2xs flex items-center justify-between gap-2 mt-2">
+          <div className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar py-0.5">
+            {currentStatusTabs.map((tab) => {
+              const isActive = statusFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setStatusFilter(tab.id)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 shrink-0 border relative ${isActive
+                    ? 'bg-purple-50 text-[#714B67] border-purple-200/80 shadow-2xs'
+                    : 'bg-transparent text-slate-600 border-transparent hover:bg-slate-50 hover:text-slate-900'
+                    }`}
+                >
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${tab.dotColor}`} />
+                  <span>{tab.label}</span>
+                  <span className="font-mono text-[10px] opacity-80">({tab.count})</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </Tabs>
 
       {/* 4. Search and Filter Toolbar */}
       <div className="bg-white border border-slate-200 rounded-lg p-3 flex flex-col md:flex-row items-center justify-between gap-3 shadow-2xs">

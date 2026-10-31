@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { 
-  Plus, 
-  Search, 
-  Calendar, 
-  Users, 
+import {
+  Plus,
+  Search,
+  Calendar,
+  Users,
   Building2,
   ArrowRight,
   LayoutList,
@@ -356,9 +356,8 @@ export const Weddings: React.FC = () => {
             <button
               type="button"
               onClick={() => setViewMode('table')}
-              className={`p-1.5 rounded transition-colors cursor-pointer ${
-                viewMode === 'table' ? 'bg-white shadow-2xs text-[#714B67]' : 'text-slate-500 hover:text-slate-800'
-              }`}
+              className={`p-1.5 rounded transition-colors cursor-pointer ${viewMode === 'table' ? 'bg-white shadow-2xs text-[#714B67]' : 'text-slate-500 hover:text-slate-800'
+                }`}
               title="Table View (Odoo List)"
             >
               <LayoutList className="w-4 h-4" />
@@ -366,9 +365,8 @@ export const Weddings: React.FC = () => {
             <button
               type="button"
               onClick={() => setViewMode('cards')}
-              className={`p-1.5 rounded transition-colors cursor-pointer ${
-                viewMode === 'cards' ? 'bg-white shadow-2xs text-[#714B67]' : 'text-slate-500 hover:text-slate-800'
-              }`}
+              className={`p-1.5 rounded transition-colors cursor-pointer ${viewMode === 'cards' ? 'bg-white shadow-2xs text-[#714B67]' : 'text-slate-500 hover:text-slate-800'
+                }`}
               title="Kanban Cards View"
             >
               <LayoutGrid className="w-4 h-4" />
@@ -393,9 +391,7 @@ export const Weddings: React.FC = () => {
                 <TableHead className="text-xs font-bold">Guests</TableHead>
                 <TableHead className="text-xs font-bold">Budget</TableHead>
                 <TableHead className="text-xs font-bold">Coordinator</TableHead>
-                <TableHead className="text-xs font-bold">Status</TableHead>
-                <TableHead className="text-right text-xs font-bold pr-4">Actions</TableHead>
-              </TableRow>
+                <TableHead className="text-xs font-bold">Status</TableHead>              </TableRow>
             </TableHeader>
             <TableBody>
               {filteredWeddings.length === 0 ? (
@@ -455,32 +451,6 @@ export const Weddings: React.FC = () => {
                     <TableCell>
                       {getStageBadge(w.status)}
                     </TableCell>
-
-                    {/* Actions */}
-                    <TableCell className="text-right pr-4" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate(`/weddings/${w.code || w.id}`)}
-                          className="h-7 text-xs text-[#714B67] hover:text-[#5b3c53] font-semibold"
-                        >
-                          Dossier
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedWeddingId(w.id);
-                            navigate('/procurement');
-                          }}
-                          className="h-7 text-xs text-slate-700 font-medium"
-                          title="Open Sourcing"
-                        >
-                          <SlidersHorizontal className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -513,7 +483,7 @@ export const Weddings: React.FC = () => {
                         </Badge>
                         {getStageBadge(w.status)}
                       </div>
-                      <CardTitle 
+                      <CardTitle
                         onClick={() => navigate(`/weddings/${w.code || w.id}`)}
                         className="text-sm font-bold text-slate-900 pt-0.5 cursor-pointer hover:text-[#714B67]"
                       >

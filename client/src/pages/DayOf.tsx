@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { 
-  CheckCircle2, 
-  MapPin, 
-  User, 
+import {
+  CheckCircle2,
+  MapPin,
+  User,
   Clock,
   Plus,
   Trash2,
@@ -300,20 +300,18 @@ export const DayOf: React.FC = () => {
             variant="outline"
             size="sm"
             onClick={() => setIncidentListModalOpen(true)}
-            className={`gap-1.5 h-8 text-xs font-semibold border transition ${
-              pendingIncidentsCount > 0
-                ? 'border-rose-300 bg-rose-50/80 text-rose-800 hover:bg-rose-100 hover:text-rose-900 shadow-2xs'
-                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs'
-            }`}
+            className={`gap-1.5 h-8 text-xs font-semibold border transition ${pendingIncidentsCount > 0
+              ? 'border-rose-300 bg-rose-50/80 text-rose-800 hover:bg-rose-100 hover:text-rose-900 shadow-2xs'
+              : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs'
+              }`}
             title="View Active Operational Incidents"
           >
             <AlertTriangle className={`w-3.5 h-3.5 ${pendingIncidentsCount > 0 ? 'text-rose-600 animate-pulse' : 'text-slate-500'}`} />
             <span>Incidents</span>
             <Badge
               variant={pendingIncidentsCount > 0 ? 'destructive' : 'secondary'}
-              className={`h-4 px-1.5 text-[10px] font-mono leading-none ml-0.5 ${
-                pendingIncidentsCount > 0 ? 'bg-rose-600 text-white' : 'bg-slate-200 text-slate-700'
-              }`}
+              className={`h-4 px-1.5 text-[10px] font-mono leading-none ml-0.5 ${pendingIncidentsCount > 0 ? 'bg-rose-600 text-white' : 'bg-slate-200 text-slate-700'
+                }`}
             >
               {pendingIncidentsCount}
             </Badge>
@@ -418,18 +416,17 @@ export const DayOf: React.FC = () => {
                             item.status === 'UPCOMING'
                               ? 'IN_PROGRESS'
                               : item.status === 'IN_PROGRESS'
-                              ? 'COMPLETED'
-                              : 'UPCOMING';
+                                ? 'COMPLETED'
+                                : 'UPCOMING';
                           updateScheduleMutation.mutate({ id: item.id, status: nextStatus });
                         }}
                         disabled={updateScheduleMutation.isPending}
-                        className={`w-7 h-7 rounded flex items-center justify-center text-xs font-bold border shrink-0 mt-0.5 cursor-pointer hover:opacity-85 transition shadow-2xs ${
-                          item.status === 'COMPLETED'
-                            ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
-                            : item.status === 'IN_PROGRESS'
+                        className={`w-7 h-7 rounded flex items-center justify-center text-xs font-bold border shrink-0 mt-0.5 cursor-pointer hover:opacity-85 transition shadow-2xs ${item.status === 'COMPLETED'
+                          ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
+                          : item.status === 'IN_PROGRESS'
                             ? 'bg-[#714B67] border-[#714B67] text-white hover:bg-[#5a3a52]'
                             : 'bg-slate-100 border-slate-300 text-slate-600 hover:bg-slate-200'
-                        }`}
+                          }`}
                         title={`Status: ${item.status}. Click to cycle: Upcoming → In Progress → Completed`}
                       >
                         {item.status === 'COMPLETED' ? (
@@ -453,13 +450,12 @@ export const DayOf: React.FC = () => {
                                   status: e.target.value as 'COMPLETED' | 'IN_PROGRESS' | 'UPCOMING',
                                 });
                               }}
-                              className={`h-5 text-[10px] font-bold rounded px-1.5 border cursor-pointer focus:outline-none transition ${
-                                item.status === 'COMPLETED'
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                                  : item.status === 'IN_PROGRESS'
+                              className={`h-5 text-[10px] font-bold rounded px-1.5 border cursor-pointer focus:outline-none transition ${item.status === 'COMPLETED'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                : item.status === 'IN_PROGRESS'
                                   ? 'bg-[#714B67]/10 text-[#714B67] border-[#714B67]/30'
                                   : 'bg-slate-50 text-slate-700 border-slate-300'
-                              }`}
+                                }`}
                             >
                               <option value="UPCOMING">UPCOMING</option>
                               <option value="IN_PROGRESS">IN PROGRESS</option>
@@ -895,30 +891,6 @@ export const DayOf: React.FC = () => {
               ))
             )}
           </div>
-
-          <DialogFooter className="pt-2 flex sm:justify-between items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setIncidentWeddingId(selectedWeddingId || '');
-                setReportModalOpen(true);
-              }}
-              className="gap-1.5 text-xs text-rose-700 border-rose-300 hover:bg-rose-50"
-            >
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>Log New Incident</span>
-            </Button>
-            <Button
-              type="button"
-              variant="default"
-              size="sm"
-              onClick={() => setIncidentListModalOpen(false)}
-            >
-              Close
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
