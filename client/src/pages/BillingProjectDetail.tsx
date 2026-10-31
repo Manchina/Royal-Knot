@@ -288,7 +288,7 @@ export const BillingProjectDetail: React.FC = () => {
 
           {/* Action Buttons & Status Badge */}
           {/* Status Badge when Finalised */}
-          {isFinalised && (
+          {isFinalised ? (
             <div className="flex items-center gap-2">
               <div className="text-right bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
                 <div className="text-[10px] font-bold text-emerald-800 uppercase flex items-center gap-1 justify-end">
@@ -303,10 +303,32 @@ export const BillingProjectDetail: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => alert(`Exporting formal settlement statement for ${wedding.code}`)}
-                className="gap-1.5 h-9 text-xs border-slate-200 hover:bg-slate-50"
+                className="gap-1.5 h-9 text-xs border-slate-200 hover:bg-slate-50 cursor-pointer"
               >
                 <FileText className="w-3.5 h-3.5 text-slate-500" />
                 <span>Invoice Statement</span>
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFinaliseModalOpen(true)}
+                className="gap-1.5 h-9 text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50 cursor-pointer"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Finalise Settlement</span>
+              </Button>
+
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setModalOpen(true)}
+                className="gap-1.5 h-9 text-xs cursor-pointer shadow-xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Extra Charge</span>
               </Button>
             </div>
           )}
@@ -408,9 +430,23 @@ export const BillingProjectDetail: React.FC = () => {
             </div>
           </div>
 
-          <Badge variant="outline" className="font-mono text-xs font-bold px-2 py-0.5">
-            {invoices.length} Milestone Invoices
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="font-mono text-xs font-bold px-2 py-0.5">
+              {invoices.length} Milestone Invoices
+            </Badge>
+
+            {!isFinalised && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setModalOpen(true)}
+                className="gap-1.5 h-8 text-xs cursor-pointer shadow-xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Extra Charge</span>
+              </Button>
+            )}
+          </div>
         </CardHeader>
 
         <CardContent className="p-0">
@@ -572,9 +608,23 @@ export const BillingProjectDetail: React.FC = () => {
                 Matching submitted vendor bills against agreed RFQ purchase orders (Agreed Base + Extras = Total Payable)
               </div>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-emerald-800 font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-200/60">
-              <ShieldCheck className="w-4 h-4 text-emerald-700" />
-              <span>Duplicate Payment Protected</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 text-xs text-emerald-800 font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-200/60">
+                <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                <span>Duplicate Payment Protected</span>
+              </div>
+
+              {!isFinalised && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setModalOpen(true)}
+                  className="gap-1.5 h-8 text-xs cursor-pointer shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Extra Charge</span>
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -638,18 +688,40 @@ export const BillingProjectDetail: React.FC = () => {
                   </TableCell>
 
                   <TableCell className="py-3 text-right">
-                    {vb.status !== 'SETTLEMENT_CLEARED' ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleReconcileBill(vb.id)}
-                        className="h-7 px-2 text-xs text-[#714B67] hover:bg-purple-100 font-semibold"
-                      >
-                        Reconcile
-                      </Button>
-                    ) : (
-                      <span className="text-[11px] text-slate-400">Audited</span>
-                    )}
+                    <div className="flex items-center justify-end gap-1.5">
+                      {!isFinalised && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setVendor(vb.vendor);
+                            setCategory(
+                              vb.category === 'CATERER' ? 'EXTRA_PLATES' :
+                              vb.category === 'DJ' ? 'DJ_OVERTIME' :
+                              'SPECIAL_FIREWORKS'
+                            );
+                            setModalOpen(true);
+                          }}
+                          className="h-7 px-2 text-[11px] border-purple-200 text-[#714B67] hover:bg-purple-50 gap-1 cursor-pointer"
+                          title={`Add extra overrun charge for ${vb.vendor}`}
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Add Extra</span>
+                        </Button>
+                      )}
+                      {vb.status !== 'SETTLEMENT_CLEARED' ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleReconcileBill(vb.id)}
+                          className="h-7 px-2 text-xs text-[#714B67] hover:bg-purple-100 font-semibold cursor-pointer"
+                        >
+                          Reconcile
+                        </Button>
+                      ) : (
+                        <span className="text-[11px] text-slate-400">Audited</span>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

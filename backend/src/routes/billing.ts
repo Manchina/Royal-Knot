@@ -447,7 +447,15 @@ export async function billingRoutes(fastify: FastifyInstance) {
           payment_reference
         FROM client_invoices
         WHERE wedding_id = $1
-        ORDER BY due_date ASC`,
+        ORDER BY 
+          CASE stage_key 
+            WHEN 'BOOKING_DEPOSIT' THEN 1 
+            WHEN 'PRE_WEDDING_ADVANCE' THEN 2 
+            WHEN 'FINAL_SETTLEMENT' THEN 3 
+            ELSE 4 
+          END, 
+          due_date ASC, 
+          id ASC`,
         [weddingUuid]
       );
 
@@ -463,6 +471,12 @@ export async function billingRoutes(fastify: FastifyInstance) {
         } else if (r.stage_key === 'FINAL_SETTLEMENT') {
           stageLabel = 'Post-Event Final Settlement (30% + Extras)';
           pct = 30;
+        } else if (r.stage_key === 'DAY_OF_EXTRA' || (typeof r.stage_key === 'string' && r.stage_key.startsWith('EXTRA'))) {
+          stageLabel = r.payment_reference ? `Day-of Extra: ${r.payment_reference}` : 'Day-of Addition Extra Charge';
+          pct = 0;
+        } else {
+          stageLabel = r.payment_reference ? `Extra: ${r.payment_reference}` : (r.stage_key || 'Additional Invoice');
+          pct = 0;
         }
 
         return {
@@ -583,23 +597,67 @@ export async function billingRoutes(fastify: FastifyInstance) {
 
         // If vendor exists, also update/insert into vendor_bills
         if (vendorId) {
-          await pool.query(
-            `UPDATE vendor_bills 
-             SET extra_charges_amount = extra_charges_amount + $1,
-                 total_payable = total_payable + $1,
-                 balance_due = balance_due + $1
-             WHERE wedding_id = $2 AND vendor_id = $3`,
-            [calcTotal, weddingUuid, vendorId]
+          const vbCheck = await pool.query(
+            `SELECT id FROM vendor_bills WHERE wedding_id = $1 AND vendor_id = $2`,
+            [weddingUuid, vendorId]
           );
+          if (vbCheck.rows.length > 0) {
+            await pool.query(
+              `UPDATE vendor_bills 
+               SET extra_charges_amount = extra_charges_amount + $1,
+                   total_payable = total_payable + $1,
+                   balance_due = balance_due + $1
+               WHERE wedding_id = $2 AND vendor_id = $3`,
+              [calcTotal, weddingUuid, vendorId]
+            );
+          } else {
+            await pool.query(
+              `INSERT INTO vendor_bills (wedding_id, vendor_id, agreed_base_amount, extra_charges_amount, total_payable, advance_paid, balance_due, status)
+               VALUES ($1, $2, 0, $3, $3, 0, $3, 'RECONCILED_MATCHED')`,
+              [weddingUuid, vendorId, calcTotal]
+            );
+          }
         }
 
-        // Also append extra to final settlement invoice if exists
-        await pool.query(
-          `UPDATE client_invoices
-           SET amount_due = amount_due + $1
-           WHERE wedding_id = $2 AND stage_key = 'FINAL_SETTLEMENT'`,
-          [calcTotal, weddingUuid]
+        // Count existing client invoices to generate sequential invoice number: e.g. INV-2026-001-EX1
+        const countRes = await pool.query(
+          `SELECT count(*) FROM client_invoices WHERE wedding_id = $1`,
+          [weddingUuid]
         );
+        const invoiceCount = parseInt(countRes.rows[0].count, 10) || 0;
+        const cleanCode = (wRes.rows[0].code || 'RW-2026-001').replace(/^RW-/, '');
+
+        let invNumber = `INV-${cleanCode}-EX${invoiceCount >= 3 ? invoiceCount - 2 : invoiceCount + 1}`;
+        const existingInv = await pool.query(`SELECT id FROM client_invoices WHERE invoice_number = $1`, [invNumber]);
+        if (existingInv.rows.length > 0) {
+          invNumber = `INV-${cleanCode}-EX-${Date.now().toString().slice(-4)}`;
+        }
+
+        // Create new invoice record in client_invoices (Staged Client Billing)
+        const invRes = await pool.query(
+          `INSERT INTO client_invoices (
+            wedding_id, 
+            invoice_number, 
+            stage_key, 
+            amount_due, 
+            due_date, 
+            status, 
+            paid_amount, 
+            paid_at, 
+            payment_reference
+          )
+          VALUES ($1, $2, 'DAY_OF_EXTRA', $3, CURRENT_DATE, 'UNPAID', 0, NULL, $4)
+          RETURNING id, invoice_number, stage_key, amount_due, due_date, status`,
+          [weddingUuid, invNumber, calcTotal, description || category || 'Day-of Extra Addition']
+        );
+
+        // Link client_invoice_id to wedding_extra_charges
+        if (invRes.rows.length > 0) {
+          await pool.query(
+            `UPDATE wedding_extra_charges SET client_invoice_id = $1 WHERE id = $2`,
+            [invRes.rows[0].id, insertRes.rows[0].id]
+          );
+        }
 
         const newExtra: ExtraChargeItem = {
           id: insertRes.rows[0].id,
