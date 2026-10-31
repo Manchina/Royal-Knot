@@ -103,10 +103,10 @@ interface BillingState {
 export const useBillingStore = create<BillingState>((set, get) => ({
   projects: [],
   summary: {
-    totalBudget: '₹17.25 Cr',
-    totalInvoiced: '₹17.38 Cr',
-    totalVendorCommitments: '₹13.40 Cr',
-    averageGrossMargin: '23.4%',
+    totalBudget: '₹0.00 Cr',
+    totalInvoiced: '₹0.00 Cr',
+    totalVendorCommitments: '₹0.00 Cr',
+    averageGrossMargin: '0.0%',
   },
   currentProject: null,
   loading: false,
@@ -130,12 +130,12 @@ export const useBillingStore = create<BillingState>((set, get) => ({
         });
         return res.data;
       }
-      set({ loading: false, isLoading: false });
-      return get().projects;
+      set({ projects: [], loading: false, isLoading: false });
+      return [];
     } catch (err: any) {
-      console.warn('Failed to fetch billing projects:', err);
-      set({ loading: false, isLoading: false, error: err.message || 'Failed to fetch billing projects' });
-      return get().projects;
+      console.error('Failed to fetch billing projects from database:', err);
+      set({ projects: [], loading: false, isLoading: false, error: err.message || 'Failed to fetch billing projects' });
+      return [];
     }
   },
 

@@ -40,51 +40,6 @@ export interface WeddingOption {
   label: string;
 }
 
-export const SYSTEM_WEDDINGS: WeddingSummary[] = [
-  {
-    id: 'RW-2026-001',
-    code: 'RW-2026-001',
-    couple: 'Aanya Singhania & Raghav Mehra',
-    city: 'Udaipur',
-    venue: 'The Oberoi Udaivilas',
-    startDate: 'Dec 10 - 13, 2026',
-    guestCount: 400,
-    packageType: 'Full-Service Royal Wedding',
-    status: 'LIVE_BIG_DAY',
-    isFinalised: false,
-    budget: '₹3.50 Cr',
-    coordinator: 'Karan Verma',
-  },
-  {
-    id: 'RW-2026-002',
-    code: 'RW-2026-002',
-    couple: 'Kriti Maheshwari & Siddharth Jain',
-    city: 'Jaipur',
-    venue: 'Rambagh Palace',
-    startDate: 'Nov 20 - 23, 2026',
-    guestCount: 420,
-    packageType: 'Full-Service Royal Wedding',
-    status: 'IN_PLANNING',
-    isFinalised: false,
-    budget: '₹2.75 Cr',
-    coordinator: 'Devika Sharma',
-  },
-  {
-    id: 'RW-2026-003',
-    code: 'RW-2026-003',
-    couple: 'Simran Bajaj & Armaan Gill',
-    city: 'Jaipur',
-    venue: 'Alila Fort Bishangarh',
-    startDate: 'Jan 14 - 17, 2027',
-    guestCount: 500,
-    packageType: 'Day-of Execution',
-    status: 'BOOKED',
-    isFinalised: false,
-    budget: '₹3.00 Cr',
-    coordinator: 'Karan Verma',
-  },
-];
-
 interface WeddingState {
   weddings: WeddingSummary[];
   weddingOptions: WeddingOption[];
@@ -101,17 +56,8 @@ interface WeddingState {
 }
 
 export const useWeddingStore = create<WeddingState>((set, get) => ({
-  weddings: SYSTEM_WEDDINGS,
-  weddingOptions: SYSTEM_WEDDINGS.map((w) => ({
-    id: w.id,
-    code: w.code,
-    couple: w.couple,
-    city: w.city,
-    venue: w.venue,
-    guestCount: w.guestCount,
-    status: w.status,
-    label: `${w.code}: ${w.couple} (${w.city} • ${w.guestCount} Guests)`,
-  })),
+  weddings: [],
+  weddingOptions: [],
   selectedWeddingId: '',
   loading: false,
   isLoading: false,
@@ -206,13 +152,13 @@ export const useWeddingStore = create<WeddingState>((set, get) => ({
 
         return liveWeddings;
       } else {
-        set({ loading: false, isLoading: false });
-        return get().weddings;
+        set({ weddings: [], weddingOptions: [], loading: false, isLoading: false });
+        return [];
       }
     } catch (err: any) {
-      console.warn('Using local fallback weddings:', err);
-      set({ loading: false, isLoading: false, error: err.message || 'Failed to fetch weddings' });
-      return get().weddings;
+      console.error('Failed to fetch weddings from database:', err);
+      set({ weddings: [], weddingOptions: [], loading: false, isLoading: false, error: err.message || 'Failed to fetch weddings' });
+      return [];
     }
   },
 
@@ -223,10 +169,10 @@ export const useWeddingStore = create<WeddingState>((set, get) => ({
         set({ weddingOptions: res.data });
         return res.data;
       }
-      return get().weddingOptions;
+      return [];
     } catch (err) {
-      console.warn('Failed to fetch options, using store fallback:', err);
-      return get().weddingOptions;
+      console.error('Failed to fetch wedding options from database:', err);
+      return [];
     }
   },
 

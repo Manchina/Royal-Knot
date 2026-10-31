@@ -23,49 +23,6 @@ export interface Enquiry {
   createdAt?: string;
 }
 
-export const SYSTEM_ENQUIRIES: Enquiry[] = [
-  {
-    id: 'ENQ-2026-104',
-    couple: 'Kriti Maheshwari & Siddharth Jain',
-    channel: 'WhatsApp Inquiry',
-    phone: '+91 98290 11223',
-    cityPreference: 'Udaipur',
-    datesRough: 'Dec 2026 (Winter Wedding)',
-    guestCount: 420,
-    theme: 'Royal Heritage / Palace Romance',
-    budgetMax: '₹2.50 Cr',
-    agreementStatus: 'Signed on Mobile',
-    agreementSignedAt: 'Oct 29, 2026',
-    status: 'Consultation Booked',
-  },
-  {
-    id: 'ENQ-2026-103',
-    couple: 'Simran Bajaj & Armaan Gill',
-    channel: 'Instagram DM',
-    phone: '+91 98110 44556',
-    cityPreference: 'Jaipur',
-    datesRough: 'Nov 2026',
-    guestCount: 500,
-    theme: 'Regal Fortress Chic',
-    budgetMax: '₹3.00 Cr',
-    agreementStatus: 'Sent - Pending Signature',
-    status: 'Agreement Awaited',
-  },
-  {
-    id: 'ENQ-2026-102',
-    couple: 'Niharika Verma & Kabir Saxena',
-    channel: 'Phone Call Referral',
-    phone: '+91 99887 66554',
-    cityPreference: 'Udaipur',
-    datesRough: 'Jan 2027',
-    guestCount: 380,
-    theme: 'Lakeside Candlelight',
-    budgetMax: '₹1.80 Cr',
-    agreementStatus: 'Drafting Agreement',
-    status: 'Initial Discovery',
-  },
-];
-
 interface EnquiryState {
   enquiries: Enquiry[];
   loading: boolean;
@@ -89,7 +46,7 @@ interface EnquiryState {
 }
 
 export const useEnquiryStore = create<EnquiryState>((set, get) => ({
-  enquiries: SYSTEM_ENQUIRIES,
+  enquiries: [],
   loading: false,
   isLoading: false,
   error: null,
@@ -142,12 +99,12 @@ export const useEnquiryStore = create<EnquiryState>((set, get) => ({
         set({ enquiries: mapped, loading: false, isLoading: false });
         return mapped;
       }
-      set({ loading: false, isLoading: false });
-      return get().enquiries;
+      set({ enquiries: [], loading: false, isLoading: false });
+      return [];
     } catch (err: any) {
-      console.warn('Failed to load enquiries from API, using fallback store:', err);
-      set({ loading: false, isLoading: false, error: err.message || 'Failed to fetch enquiries' });
-      return get().enquiries;
+      console.error('Failed to load enquiries from database:', err);
+      set({ enquiries: [], loading: false, isLoading: false, error: err.message || 'Failed to fetch enquiries' });
+      return [];
     }
   },
 

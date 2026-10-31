@@ -48,15 +48,17 @@ export const BillingProjectDetail: React.FC = () => {
   const [selectedBill, setSelectedBill] = useState<LiveVendorBill | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<LiveInvoice | null>(null);
 
-  // Fallback target wedding from store
+  // Target wedding from store
   const storeWedding = useMemo(() => {
-    return weddings.find((w) => w.id === projectId || w.code === projectId) || weddings[0];
+    return weddings.find((w) => w.id === projectId || w.code === projectId);
   }, [weddings, projectId]);
 
-  const idToFetch = projectId || storeWedding?.id || 'RW-2026-001';
+  const idToFetch = projectId || storeWedding?.id || '';
 
   useEffect(() => {
-    fetchProjectDossier(idToFetch);
+    if (idToFetch) {
+      fetchProjectDossier(idToFetch);
+    }
   }, [idToFetch, fetchProjectDossier]);
 
   // Sync Winning Quotes Action
