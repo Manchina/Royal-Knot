@@ -21,6 +21,7 @@ interface BillingHeaderProps {
   onOpenBillModal: () => void;
   onOpenFinaliseModal: () => void;
   onBack: () => void;
+  isClient?: boolean;
 }
 
 export const BillingHeader: React.FC<BillingHeaderProps> = ({
@@ -30,6 +31,7 @@ export const BillingHeader: React.FC<BillingHeaderProps> = ({
   onOpenBillModal,
   onOpenFinaliseModal,
   onBack,
+  isClient = false,
 }) => {
   const isFinalised = project?.isFinalised || project?.status === 'FINALISED_SETTLED';
 
@@ -124,39 +126,48 @@ export const BillingHeader: React.FC<BillingHeaderProps> = ({
 
       {/* Action Buttons */}
       <div className="flex flex-wrap items-center gap-2.5">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onOpenExtraModal}
-          className="text-xs font-semibold border-amber-300 bg-amber-50/50 text-amber-900 hover:bg-amber-100/50 cursor-pointer"
-        >
-          <Plus className="w-3.5 h-3.5 mr-1 text-amber-700" />
-          Add Extra Charge
-        </Button>
-
-        <Button
-          size="sm"
-          onClick={onOpenBillModal}
-          className="bg-[#714B67] hover:bg-[#5a3b52] text-white text-xs font-semibold shadow-2xs cursor-pointer"
-        >
-          <Plus className="w-3.5 h-3.5 mr-1" />
-          Add Vendor Bill
-        </Button>
-
-        {!isFinalised ? (
-          <Button
-            size="sm"
-            onClick={onOpenFinaliseModal}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-2xs cursor-pointer"
-          >
-            <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-            Finalise & Settle
-          </Button>
-        ) : (
-          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 py-1.5 px-3 gap-1.5 text-xs font-bold">
-            <Lock className="w-3.5 h-3.5" />
-            Ledger Locked & Settled
+        {isClient ? (
+          <Badge className="bg-[#714B67]/10 text-[#714B67] border-[#714B67]/30 py-1.5 px-3 gap-1.5 text-xs font-semibold">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#714B67]" />
+            Official Client Financial Dossier
           </Badge>
+        ) : (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenExtraModal}
+              className="text-xs font-semibold border-amber-300 bg-amber-50/50 text-amber-900 hover:bg-amber-100/50 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1 text-amber-700" />
+              Add Extra Charge
+            </Button>
+
+            <Button
+              size="sm"
+              onClick={onOpenBillModal}
+              className="bg-[#714B67] hover:bg-[#5a3b52] text-white text-xs font-semibold shadow-2xs cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              Add Vendor Bill
+            </Button>
+
+            {!isFinalised ? (
+              <Button
+                size="sm"
+                onClick={onOpenFinaliseModal}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-2xs cursor-pointer"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                Finalise & Settle
+              </Button>
+            ) : (
+              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 py-1.5 px-3 gap-1.5 text-xs font-bold">
+                <Lock className="w-3.5 h-3.5" />
+                Ledger Locked & Settled
+              </Badge>
+            )}
+          </>
         )}
       </div>
     </div>

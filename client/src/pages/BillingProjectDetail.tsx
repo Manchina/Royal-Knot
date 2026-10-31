@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui';
 import { useWeddingStore } from '../store/useWeddingStore';
 import { useBillingStore } from '../store/useBillingStore';
+import { useAuthStore } from '../store/useAuthStore';
 import {
   type LiveVendorBill,
   type LiveInvoice,
@@ -22,6 +23,8 @@ import {
 export const BillingProjectDetail: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const isClient = user?.role === 'CLIENT';
   const { weddings } = useWeddingStore();
   const {
     currentProject: project,
@@ -34,7 +37,7 @@ export const BillingProjectDetail: React.FC = () => {
     finaliseProject,
   } = useBillingStore();
 
-  const [activeTab, setActiveTab] = useState<string>('vendorBills');
+  const [activeTab, setActiveTab] = useState<string>(isClient ? 'invoices' : 'vendorBills');
 
   // Modals state
   const [extraModalOpen, setExtraModalOpen] = useState<boolean>(false);
@@ -138,56 +141,55 @@ export const BillingProjectDetail: React.FC = () => {
         onOpenBillModal={() => setBillModalOpen(true)}
         onOpenFinaliseModal={() => setFinaliseModalOpen(true)}
         onBack={() => navigate('/billing')}
+        isClient={isClient}
       />
 
       {/* 2. Executive Financial Ribbon */}
-      <BillingMetricsRibbon project={project} />
+      <BillingMetricsRibbon project={project} isClient={isClient} />
 
       {/* 3. Main Operational Tabs (Standard Odoo ERP Tab Bar) */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="bg-white border border-slate-200 rounded p-1.5 shadow-2xs">
           <TabsList className="h-9 bg-slate-100 border border-slate-200 w-full justify-start overflow-x-auto p-1">
-            <TabsTrigger value="vendorBills" className="text-xs px-3 font-semibold">
-              Vendor Bills & PO Ledger ({project?.vendorBills?.length || 0})
-            </TabsTrigger>
-
-            <TabsTrigger value="extraCharges" className="text-xs px-3 font-semibold">
-              Audited Extra Charges ({project?.extraCharges?.length || 0})
-            </TabsTrigger>
+            {!isClient && (
+              <TabsTrigger value="vendorBills" className="text-xs px-3 font-semibold">
+                Vendor Bills & PO Ledger ({project?.vendorBills?.length || 0})
+              </TabsTrigger>
+            )}
 
             <TabsTrigger value="invoices" className="text-xs px-3 font-semibold">
               Client Milestone Invoices ({project?.invoices?.length || 0})
             </TabsTrigger>
 
-            <TabsTrigger value="changelog" className="text-xs px-3 font-semibold">
-              Audit Changelog ({project?.changelog?.length || 0})
+            <TabsTrigger value="extraCharges" className="text-xs px-3 font-semibold">
+              {isClient ? 'Audited Event Extras' : 'Audited Extra Charges'} ({project?.extraCharges?.length || 0})
             </TabsTrigger>
+
+            {!isClient && (
+              <TabsTrigger value="changelog" className="text-xs px-3 font-semibold">
+                Audit Changelog ({project?.changelog?.length || 0})
+              </TabsTrigger>
+            )}
           </TabsList>
         </div>
 
-        {/* Tab 1: Vendor Bills (Purchases & 3-Way Matching) */}
-        <TabsContent value="vendorBills" className="mt-4">
-          <VendorBillsTab
-            vendorBills={project?.vendorBills || []}
-            availableQuotes={project?.availableQuotes || []}
-            onSyncQuotes={handleSyncAwardedQuotes}
-            onOpenAddBill={() => setBillModalOpen(true)}
-            onSelectReconcile={(b) => {
-              setSelectedBill(b);
-              setReconcileModalOpen(true);
-            }}
-          />
-        </TabsContent>
+        {/* Tab 1: Vendor Bills (Purchases & 3-Way Matching - Internal Planners only) */}
+        {!isClient && (
+          <TabsContent value="vendorBills" className="mt-4">
+            <VendorBillsTab
+              vendorBills={project?.vendorBills || []}
+              availableQuotes={project?.availableQuotes || []}
+              onSyncQuotes={handleSyncAwardedQuotes}
+              onOpenAddBill={() => setBillModalOpen(true)}
+              onSelectReconcile={(b) => {
+                setSelectedBill(b);
+                setReconcileModalOpen(true);
+              }}
+            />
+          </TabsContent>
+        )}
 
-        {/* Tab 2: Audited Extra Charges (Additions & Overruns) */}
-        <TabsContent value="extraCharges" className="mt-4">
-          <ExtraChargesTab
-            extraCharges={project?.extraCharges || []}
-            onOpenAddExtra={() => setExtraModalOpen(true)}
-          />
-        </TabsContent>
-
-        {/* Tab 3: Client Milestone Invoices (Revenue Schedule) */}
+        {/* Tab 2: Client Milestone Invoices (Revenue Schedule) */}
         <TabsContent value="invoices" className="mt-4">
           <MilestoneInvoicesTab
             invoices={project?.invoices || []}
@@ -198,10 +200,21 @@ export const BillingProjectDetail: React.FC = () => {
           />
         </TabsContent>
 
-        {/* Tab 4: Audit Trail & Activity Changelog */}
-        <TabsContent value="changelog" className="mt-4">
-          <AuditChangelogTab changelog={project?.changelog || []} />
+        {/* Tab 3: Audited Extra Charges (Additions & Overruns) */}
+        <TabsContent value="extraCharges" className="mt-4">
+          <ExtraChargesTab
+            extraCharges={project?.extraCharges || []}
+            onOpenAddExtra={() => setExtraModalOpen(true)}
+            isClient={isClient}
+          />
         </TabsContent>
+
+        {/* Tab 4: Audit Trail & Activity Changelog (Internal Planners only) */}
+        {!isClient && (
+          <TabsContent value="changelog" className="mt-4">
+            <AuditChangelogTab changelog={project?.changelog || []} />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Interactive Modals */}

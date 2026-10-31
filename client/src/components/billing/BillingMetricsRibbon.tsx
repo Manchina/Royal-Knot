@@ -3,9 +3,41 @@ import type { ProjectFinancials } from './types';
 
 interface BillingMetricsRibbonProps {
   project: ProjectFinancials | null;
+  isClient?: boolean;
 }
 
-export const BillingMetricsRibbon: React.FC<BillingMetricsRibbonProps> = ({ project }) => {
+export const BillingMetricsRibbon: React.FC<BillingMetricsRibbonProps> = ({ project, isClient = false }) => {
+  if (isClient) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-white border border-slate-200 rounded-lg p-3.5 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Base Contract Budget</span>
+          <span className="font-mono font-bold text-lg text-slate-900 mt-1 block">
+            {project?.baseContract || '₹3.50 Cr'}
+          </span>
+          <span className="text-[10px] text-slate-400 block mt-0.5">Fixed Agreement Total</span>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-lg p-3.5 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Audited Banquet Extras</span>
+          <span className="font-mono font-bold text-lg text-amber-700 mt-1 block">
+            {project?.totalExtras || '₹0'}
+          </span>
+          <span className="text-[10px] text-amber-600 block mt-0.5">
+            {project?.extrasCount || 0} Approved Additions
+          </span>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-lg p-3.5 shadow-2xs">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Invoiced Amount</span>
+          <span className="font-mono font-bold text-lg text-emerald-700 mt-1 block">
+            {project?.totalInvoiced || '₹3.51 Cr'}
+          </span>
+          <span className="text-[10px] text-emerald-600 block mt-0.5">Contract + Verified Extras</span>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
       <div className="bg-white border border-slate-200 rounded-lg p-3.5 shadow-2xs">

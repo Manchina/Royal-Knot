@@ -67,7 +67,7 @@ export const AppRoutes: React.FC = () => {
           </Route>
 
           {/* Billing & Settlement Dossier */}
-          <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'FINANCE_MANAGER', 'FOUNDER']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'FINANCE_MANAGER', 'FOUNDER', 'LEAD_PLANNER', 'CLIENT']} />}>
             <Route path="billing" element={<Billing />} />
             <Route path="billing/:projectId" element={<BillingProjectDetail />} />
           </Route>

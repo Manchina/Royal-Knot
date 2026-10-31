@@ -14,7 +14,7 @@ import {
   masterOptions,
 } from '../db/schema';
 import { eq, desc, asc, ilike, or, and, sql, inArray } from 'drizzle-orm';
-import { isUUID } from '../utils';
+import { isUUID, getAuthUser } from '../utils';
 
 export interface ExtraChargeItem {
   id: string;
@@ -187,8 +187,11 @@ export async function billingRoutes(fastify: FastifyInstance) {
       const normalizedSearch = search.trim().toLowerCase();
 
       try {
+        const authUser = await getAuthUser(request);
+        const isClient = authUser?.role === 'CLIENT';
+
         // Query weddings with clients and coordinators using Drizzle ORM
-        const weddingRows = await db
+        const rawWeddingRows = await db
           .select({
             id: weddings.id,
             code: weddings.code,
@@ -212,6 +215,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
           .leftJoin(clients, eq(weddings.clientId, clients.id))
           .leftJoin(users, eq(weddings.leadPlannerId, users.id))
           .orderBy(desc(weddings.startDate));
+
+        const weddingRows = isClient && authUser.clientWeddingId
+          ? rawWeddingRows.filter((w) => w.id === authUser.clientWeddingId)
+          : rawWeddingRows;
 
         // Aggregate extra charges per wedding
         const extraRows = await db
@@ -318,14 +325,14 @@ export async function billingRoutes(fastify: FastifyInstance) {
             extrasCount,
             totalInvoiced: formatInr(totalInvoicedNum),
             rawTotalInvoiced: totalInvoicedNum,
-            vendorCommitments: formatInr(billData.payable),
-            rawVendorCommitments: billData.payable,
-            vendorAdvancePaid: formatInr(billData.advance),
-            rawVendorAdvancePaid: billData.advance,
-            vendorBalanceDue: isFinal && w.status === 'FINALISED_SETTLED' ? '₹0 (Settled)' : formatInr(billData.balance),
-            rawVendorBalanceDue: billData.balance,
-            grossMargin: `${grossMarginNum.toFixed(1)}%`,
-            billsCount: billData.count,
+            vendorCommitments: isClient ? 'Confidential' : formatInr(billData.payable),
+            rawVendorCommitments: isClient ? 0 : billData.payable,
+            vendorAdvancePaid: isClient ? 'Confidential' : formatInr(billData.advance),
+            rawVendorAdvancePaid: isClient ? 0 : billData.advance,
+            vendorBalanceDue: isClient ? 'Confidential' : (isFinal && w.status === 'FINALISED_SETTLED' ? '₹0 (Settled)' : formatInr(billData.balance)),
+            rawVendorBalanceDue: isClient ? 0 : billData.balance,
+            grossMargin: isClient ? 'Confidential' : `${grossMarginNum.toFixed(1)}%`,
+            billsCount: isClient ? 0 : billData.count,
             extraCharges: [],
             vendorBills: [],
             invoices: [],
@@ -424,8 +431,8 @@ export async function billingRoutes(fastify: FastifyInstance) {
           summary: {
             totalBudget: `₹${(totalBudgetSum / 10000000).toFixed(2)} Cr`,
             totalInvoiced: formatInr(totalInvoicedSum),
-            totalVendorCommitments: formatInr(totalVendorCommitmentsSum),
-            averageGrossMargin: `${avgGrossMargin.toFixed(1)}%`,
+            totalVendorCommitments: isClient ? 'Confidential' : formatInr(totalVendorCommitmentsSum),
+            averageGrossMargin: isClient ? 'Confidential' : `${avgGrossMargin.toFixed(1)}%`,
           },
           data: {
             ongoing: ongoingAll,
@@ -487,6 +494,9 @@ export async function billingRoutes(fastify: FastifyInstance) {
     const { id } = request.params;
 
     try {
+      const authUser = await getAuthUser(request);
+      const isClient = authUser?.role === 'CLIENT';
+
       // 1. Fetch wedding by UUID or Code
       const condition = isUUID(id) ? eq(weddings.id, id) : eq(weddings.code, id);
       const [w] = await db
@@ -519,6 +529,11 @@ export async function billingRoutes(fastify: FastifyInstance) {
       if (!w) {
         reply.status(404);
         return { success: false, message: `Project '${id}' not found` };
+      }
+
+      if (isClient && authUser.clientWeddingId && authUser.clientWeddingId !== w.id) {
+        reply.status(403);
+        return { success: false, message: 'Forbidden: Access restricted to your own wedding project.' };
       }
 
       const weddingUuid = w.id;
@@ -794,19 +809,19 @@ export async function billingRoutes(fastify: FastifyInstance) {
         extrasCount: extraCharges.length,
         totalInvoiced: formatInr(totalInvoicedNum),
         rawTotalInvoiced: totalInvoicedNum,
-        vendorCommitments: formatInr(totalVendorPayable),
-        rawVendorCommitments: totalVendorPayable,
-        vendorAdvancePaid: formatInr(totalVendorAdvance),
-        rawVendorAdvancePaid: totalVendorAdvance,
-        vendorBalanceDue: isFinal && w.status === 'FINALISED_SETTLED' ? '₹0 (Settled)' : formatInr(totalVendorBalance),
-        rawVendorBalanceDue: totalVendorBalance,
-        grossMargin: `${grossMarginNum.toFixed(1)}%`,
-        billsCount: vendorBillsList.length,
+        vendorCommitments: isClient ? 'Confidential' : formatInr(totalVendorPayable),
+        rawVendorCommitments: isClient ? 0 : totalVendorPayable,
+        vendorAdvancePaid: isClient ? 'Confidential' : formatInr(totalVendorAdvance),
+        rawVendorAdvancePaid: isClient ? 0 : totalVendorAdvance,
+        vendorBalanceDue: isClient ? 'Confidential' : (isFinal && w.status === 'FINALISED_SETTLED' ? '₹0 (Settled)' : formatInr(totalVendorBalance)),
+        rawVendorBalanceDue: isClient ? 0 : totalVendorBalance,
+        grossMargin: isClient ? 'Confidential' : `${grossMarginNum.toFixed(1)}%`,
+        billsCount: isClient ? 0 : vendorBillsList.length,
         extraCharges,
-        vendorBills: vendorBillsList,
+        vendorBills: isClient ? [] : vendorBillsList,
         invoices,
-        availableQuotes,
-        changelog,
+        availableQuotes: isClient ? [] : availableQuotes,
+        changelog: isClient ? [] : changelog,
       };
 
       return {
