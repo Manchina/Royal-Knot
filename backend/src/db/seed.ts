@@ -18,6 +18,13 @@ export async function seedDatabase() {
 
   // 1. Seed Master Options
   const masterOptions = [
+    // Wedding Statuses (Master Data for Project Lifecycle & Billing)
+    { cat: 'WEDDING_STATUS', key: 'LIVE_BIG_DAY', label: 'Live Big Day', desc: 'Day-of live wedding execution with active minute-by-minute run sheet & vendor check-ins' },
+    { cat: 'WEDDING_STATUS', key: 'IN_PLANNING', label: 'In Planning', desc: 'Active design, RFQ vendor contracting, tastings, and checklist milestone execution' },
+    { cat: 'WEDDING_STATUS', key: 'BOOKED', label: 'Booked', desc: 'Contract signed, booking deposit locked, and project kickoff scheduled' },
+    { cat: 'WEDDING_STATUS', key: 'FINALISED', label: 'Finalised & Audited', desc: 'Event concluded, all extra charges reconciled, vendor disbursements cleared' },
+    { cat: 'WEDDING_STATUS', key: 'ENQUIRY', label: 'Initial Discovery', desc: 'Consultation request, theme proposal, and budget qualification' },
+
     // Package Types
     { cat: 'PACKAGE_TYPE', key: 'FULL_SERVICE', label: 'Full-Service Royal Wedding', desc: 'End-to-end design, vendor contracting, guest management & day-of coordination' },
     { cat: 'PACKAGE_TYPE', key: 'DAY_OF', label: 'Partial / Day-of Execution', desc: 'Vendor check-in, live minute-by-minute run sheet & incident firefighting' },
