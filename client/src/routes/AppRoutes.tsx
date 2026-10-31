@@ -30,18 +30,48 @@ export const AppRoutes: React.FC = () => {
       {/* Protected Application Routes */}
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="weddings" element={<Weddings />} />
-          <Route path="weddings/:id" element={<WeddingDetail />} />
-          <Route path="enquiries" element={<Enquiries />} />
-          <Route path="enquiries/:id" element={<EnquiryDetail />} />
+          {/* Executive & Internal Team Dashboards */}
+          <Route element={<ProtectedRoute allowedRoles={['FOUNDER', 'SUPER_ADMIN', 'LEAD_PLANNER', 'COORDINATOR', 'FINANCE_MANAGER']} />}>
+            <Route path="dashboard" element={<Dashboard />} />
+          </Route>
+
+          {/* Weddings Registry */}
+          <Route element={<ProtectedRoute allowedRoles={['FOUNDER', 'SUPER_ADMIN', 'LEAD_PLANNER', 'COORDINATOR']} />}>
+            <Route path="weddings" element={<Weddings />} />
+            <Route path="weddings/:id" element={<WeddingDetail />} />
+          </Route>
+
+          {/* Enquiries Pipeline */}
+          <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'LEAD_PLANNER']} />}>
+            <Route path="enquiries" element={<Enquiries />} />
+            <Route path="enquiries/:id" element={<EnquiryDetail />} />
+          </Route>
+
+          {/* Procurement & Vendor Sourcing (Clients access their own wedding vendors only) */}
           <Route path="procurement" element={<Procurement />} />
-          <Route path="procurement/vendors/:id" element={<VendorDetail />} />
-          <Route path="vendors/:id" element={<VendorDetail />} />
-          <Route path="tasks" element={<Tasks />} />
-          <Route path="day-of" element={<DayOf />} />
-          <Route path="billing" element={<Billing />} />
-          <Route path="billing/:projectId" element={<BillingProjectDetail />} />
+
+          {/* Internal Vendor CRM Details */}
+          <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'LEAD_PLANNER']} />}>
+            <Route path="procurement/vendors/:id" element={<VendorDetail />} />
+            <Route path="vendors/:id" element={<VendorDetail />} />
+          </Route>
+
+          {/* Checklists & Operational Blueprint */}
+          <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'LEAD_PLANNER', 'COORDINATOR']} />}>
+            <Route path="tasks" element={<Tasks />} />
+          </Route>
+
+          {/* Day-Of Command Center */}
+          <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'COORDINATOR', 'LEAD_PLANNER']} />}>
+            <Route path="day-of" element={<DayOf />} />
+          </Route>
+
+          {/* Billing & Settlement Dossier */}
+          <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'FINANCE_MANAGER', 'FOUNDER']} />}>
+            <Route path="billing" element={<Billing />} />
+            <Route path="billing/:projectId" element={<BillingProjectDetail />} />
+          </Route>
+
           <Route path="settings" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Route>

@@ -117,7 +117,12 @@ export const Login: React.FC = () => {
     }
 
     if (success) {
-      navigate('/dashboard');
+      const loggedInRole = isDemoMode ? selectedRole : useAuthStore.getState().user?.role;
+      if (loggedInRole === 'CLIENT') {
+        navigate('/procurement');
+      } else {
+        navigate('/dashboard');
+      }
     }
   };
 

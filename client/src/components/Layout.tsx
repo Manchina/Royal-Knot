@@ -95,7 +95,7 @@ export const Layout: React.FC = () => {
       name: 'Dashboard',
       path: '/dashboard',
       icon: BarChart3,
-      roles: ['FOUNDER', 'SUPER_ADMIN', 'LEAD_PLANNER', 'COORDINATOR', 'FINANCE_MANAGER', 'CLIENT']
+      roles: ['FOUNDER', 'SUPER_ADMIN', 'LEAD_PLANNER', 'COORDINATOR', 'FINANCE_MANAGER']
     },
     {
       name: 'Weddings',
@@ -112,7 +112,7 @@ export const Layout: React.FC = () => {
       count: '3'
     },
     {
-      name: 'Vendor RFQs',
+      name: activeRole === 'CLIENT' ? 'My Wedding Vendors' : 'Vendor RFQs',
       path: '/procurement',
       icon: Utensils,
       roles: ['SUPER_ADMIN', 'LEAD_PLANNER', 'CLIENT']
@@ -156,7 +156,8 @@ export const Layout: React.FC = () => {
     .substring(0, 2)
     .toUpperCase();
 
-  const currentModule = allNavItems.find((item) => item.path === location.pathname)?.name || 'Dashboard';
+  const currentModule = visibleNavItems.find((item) => item.path === location.pathname)?.name
+    || (activeRole === 'CLIENT' ? 'My Wedding Vendors' : 'Dashboard');
   const isPinned = pinned;
 
   return (
@@ -180,7 +181,7 @@ export const Layout: React.FC = () => {
         <div className="flex flex-col h-full min-h-0 overflow-hidden">
           {/* Sidebar Header: Logo, Brand & Pin Toggle */}
           <div className="h-12 px-3 border-b border-white/15 flex items-center justify-between shrink-0">
-            <NavLink to="/dashboard" className="flex items-center gap-2.5 min-w-0" title="The Royal Knot">
+            <NavLink to={activeRole === 'CLIENT' ? '/procurement' : '/dashboard'} className="flex items-center gap-2.5 min-w-0" title="The Royal Knot">
               <div className="w-8 h-8 rounded bg-white/20 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
                 <Layers className="w-4 h-4" />
               </div>
