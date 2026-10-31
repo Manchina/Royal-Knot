@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search,
   ShieldCheck,
@@ -73,15 +73,34 @@ interface ProjectBillingItem {
 
 export const Billing: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { setSelectedWeddingId } = useWeddingStore();
 
   const [projects, setProjects] = useState<ProjectBillingItem[]>([]);
   const [_loading, setLoading] = useState<boolean>(true);
   const [activeTab, _setActiveTab] = useState<'ongoing' | 'finalised'>('ongoing');
-  const [stageFilter, setStageFilter] = useState<string>('ALL');
-  const [cityFilter, setCityFilter] = useState<string>('ALL');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Module filters initialized from URL query params
+  const [stageFilter, setStageFilter] = useState<string>(
+    () => searchParams.get('status') || searchParams.get('stage') || 'ALL'
+  );
+  const [cityFilter, setCityFilter] = useState<string>(
+    () => searchParams.get('city') || 'ALL'
+  );
+  const [searchQuery, setSearchQuery] = useState<string>(
+    () => searchParams.get('search') || ''
+  );
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+
+  // Sync state if URL query params change
+  useEffect(() => {
+    const urlStatus = searchParams.get('status') || searchParams.get('stage');
+    const urlCity = searchParams.get('city');
+    const urlSearch = searchParams.get('search');
+    if (urlStatus) setStageFilter(urlStatus);
+    if (urlCity) setCityFilter(urlCity);
+    if (urlSearch) setSearchQuery(urlSearch);
+  }, [searchParams]);
 
   const [summary, setSummary] = useState({
     totalBudget: '₹17.25 Cr',

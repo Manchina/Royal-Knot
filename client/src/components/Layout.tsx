@@ -95,7 +95,7 @@ export const Layout: React.FC = () => {
       name: 'Dashboard',
       path: '/dashboard',
       icon: BarChart3,
-      roles: ['FOUNDER', 'SUPER_ADMIN', 'FINANCE_MANAGER']
+      roles: ['FOUNDER', 'SUPER_ADMIN', 'LEAD_PLANNER', 'COORDINATOR', 'FINANCE_MANAGER', 'CLIENT']
     },
     {
       name: 'Weddings',
