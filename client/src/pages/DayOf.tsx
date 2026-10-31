@@ -96,11 +96,13 @@ export const DayOf: React.FC = () => {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
 
   // Form states for Incident
+  const [incidentWeddingId, setIncidentWeddingId] = useState<string>('');
   const [newTitle, setNewTitle] = useState('');
   const [newSeverity, setNewSeverity] = useState<'HIGH' | 'MEDIUM' | 'LOW'>('HIGH');
   const [newAssignee, setNewAssignee] = useState('Karan Verma');
 
   // Form states for Schedule Item
+  const [scheduleWeddingId, setScheduleWeddingId] = useState<string>('');
   const [newScheduleTime, setNewScheduleTime] = useState('14:30');
   const [newScheduleTitle, setNewScheduleTitle] = useState('');
   const [newScheduleVenue, setNewScheduleVenue] = useState('Palace Courtyard');
@@ -226,9 +228,13 @@ export const DayOf: React.FC = () => {
   const handleReportIncident = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
+    if (!incidentWeddingId) {
+      alert('Please select a wedding project for this incident.');
+      return;
+    }
 
     reportIncidentMutation.mutate({
-      weddingId: selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001',
+      weddingId: incidentWeddingId || selectedWeddingId,
       title: newTitle.trim(),
       severity: newSeverity,
       ownerName: newAssignee,
@@ -238,9 +244,13 @@ export const DayOf: React.FC = () => {
   const handleCreateScheduleItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newScheduleTitle.trim()) return;
+    if (!scheduleWeddingId) {
+      alert('Please select a wedding project for this schedule cue.');
+      return;
+    }
 
     createScheduleMutation.mutate({
-      weddingId: selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001',
+      weddingId: scheduleWeddingId || selectedWeddingId,
       timeSlot: newScheduleTime,
       activityTitle: newScheduleTitle.trim(),
       location: newScheduleVenue.trim(),
@@ -262,8 +272,8 @@ export const DayOf: React.FC = () => {
             </span>
             <span className="text-slate-300">•</span>
             <span className="text-[11px] font-mono font-bold text-[#714B67]">
-              {selectedWeddingId === 'ALL'
-                ? 'All Live Weddings'
+              {!selectedWeddingId
+                ? 'No Project Selected (Select Below)'
                 : `${selectedWeddingId} • ${activeWedding?.couple || 'Active Project'}`}
             </span>
           </div>
@@ -275,11 +285,11 @@ export const DayOf: React.FC = () => {
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-500 font-medium hidden sm:inline">Project:</span>
           <select
-            value={selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'}
+            value={selectedWeddingId || ''}
             onChange={(e) => setSelectedWeddingId(e.target.value)}
             className="h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67] cursor-pointer max-w-[240px] truncate"
           >
-            <option value="ALL">All Weddings (Agency View)</option>
+            <option value="">-- Select a Wedding Project --</option>
             {weddings.map((w) => (
               <option key={w.id} value={w.id}>
                 {w.code}: {w.couple} ({w.city})
@@ -290,7 +300,7 @@ export const DayOf: React.FC = () => {
           <Button
             variant="destructive"
             size="sm"
-            onClick={() => setReportModalOpen(true)}
+            onClick={() => { setIncidentWeddingId(selectedWeddingId || ''); setReportModalOpen(true); }}
             className="gap-1.5 h-8 text-xs"
           >
             <AlertTriangle className="w-3.5 h-3.5" />
@@ -316,6 +326,11 @@ export const DayOf: React.FC = () => {
         <CardContent className="p-3 space-y-2">
           {incidentsLoading ? (
             <div className="text-xs text-slate-400 py-2">Loading active incidents...</div>
+          ) : !selectedWeddingId ? (
+            <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 p-2.5 rounded flex items-center justify-between">
+              <span>Select a wedding project above to view and log live incidents.</span>
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+            </div>
           ) : incidents.length === 0 ? (
             <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 p-2.5 rounded flex items-center justify-between">
               <span>All clear. Zero unresolved incidents logged for this project.</span>
@@ -334,6 +349,7 @@ export const DayOf: React.FC = () => {
                   >
                     {inc.severity}
                   </Badge>
+                  <Badge variant="outline" className="text-[10px] font-mono text-[#714B67] bg-[#714B67]/5 border-[#714B67]/20">{inc.weddingCode || 'RW-2026-001'}</Badge>
                   <span className="font-bold text-slate-900">{inc.title}</span>
                 </div>
 
@@ -381,7 +397,7 @@ export const DayOf: React.FC = () => {
             <Button
               variant="default"
               size="sm"
-              onClick={() => setScheduleModalOpen(true)}
+              onClick={() => { setScheduleWeddingId(selectedWeddingId || ''); setScheduleModalOpen(true); }}
               className="gap-1.5 h-8 text-xs font-semibold"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -412,6 +428,11 @@ export const DayOf: React.FC = () => {
             <CardContent className="p-4">
               {runSheetLoading ? (
                 <div className="py-8 text-center text-xs text-slate-400">Loading run sheet timeline from database...</div>
+              ) : !selectedWeddingId ? (
+                <div className="py-12 text-center text-xs text-slate-500 space-y-1">
+                  <div className="font-semibold text-slate-700">No Wedding Project Selected</div>
+                  <div className="text-slate-400">Please choose a wedding project from the selector above to view the minute-by-minute run sheet.</div>
+                </div>
               ) : schedule.length === 0 ? (
                 <div className="py-8 text-center text-xs text-slate-500 space-y-1">
                   <div className="font-semibold text-slate-700">No run sheet items recorded yet</div>
@@ -535,6 +556,11 @@ export const DayOf: React.FC = () => {
             <CardContent className="p-0">
               {checkinsLoading ? (
                 <div className="py-8 text-center text-xs text-slate-400">Loading vendor telemetry records...</div>
+              ) : !selectedWeddingId ? (
+                <div className="py-12 text-center text-xs text-slate-500 space-y-1">
+                  <div className="font-semibold text-slate-700">No Wedding Project Selected</div>
+                  <div className="text-slate-400">Please choose a wedding project from the selector above to monitor vendor telemetry.</div>
+                </div>
               ) : vendorCheckins.length === 0 ? (
                 <div className="py-8 text-center text-xs text-slate-500">No vendor check-in records found for this wedding.</div>
               ) : (
@@ -639,6 +665,24 @@ export const DayOf: React.FC = () => {
 
           <form onSubmit={handleReportIncident} className="space-y-3 py-2">
             <div className="space-y-1">
+              <Label htmlFor="inc_wedding">Target Wedding Project</Label>
+              <select
+                id="inc_wedding"
+                value={incidentWeddingId}
+                onChange={(e) => setIncidentWeddingId(e.target.value)}
+                required
+                className="w-full h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67] cursor-pointer"
+              >
+                <option value="">-- Select a Wedding Project --</option>
+                {weddings.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.code}: {w.couple} ({w.city})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
               <Label htmlFor="inc_title">Incident Description</Label>
               <Input
                 id="inc_title"
@@ -714,6 +758,24 @@ export const DayOf: React.FC = () => {
           </DialogHeader>
 
           <form onSubmit={handleCreateScheduleItem} className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="sched_wedding">Target Wedding Project</Label>
+              <select
+                id="sched_wedding"
+                value={scheduleWeddingId}
+                onChange={(e) => setScheduleWeddingId(e.target.value)}
+                required
+                className="w-full h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67] cursor-pointer"
+              >
+                <option value="">-- Select a Wedding Project --</option>
+                {weddings.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.code}: {w.couple} ({w.city})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="grid grid-cols-2 gap-2.5">
               <div className="space-y-1">
                 <Label htmlFor="sched_time">Time Slot (HH:MM)</Label>
