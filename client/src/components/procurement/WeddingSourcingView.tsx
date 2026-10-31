@@ -976,9 +976,6 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
         onViewPdf={(q) => {
           setViewingPdfQuote(q);
         }}
-        onEditQuote={(q) => {
-          handleOpenEditQuote(q);
-        }}
         isClient={isClient}
       />
     </div>
