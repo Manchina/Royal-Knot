@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
   BarChart3,
@@ -41,7 +41,11 @@ const SIDEBAR_STORAGE_KEY = 'rk_sidebar_open';
 
 export const Layout: React.FC = () => {
   const { user, logout } = useAuthStore();
-  const { weddings, selectedWeddingId, setSelectedWeddingId } = useWeddingStore();
+  const { weddings, selectedWeddingId, setSelectedWeddingId, fetchWeddings } = useWeddingStore();
+
+  useEffect(() => {
+    fetchWeddings();
+  }, [fetchWeddings]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -336,7 +340,7 @@ export const Layout: React.FC = () => {
             <div className="h-3.5 w-px bg-slate-200 shrink-0 hidden sm:block" />
 
             {/* Global Wedding Context Filter (Replaced by PeopleFirst Tab Navigation on /billing) */}
-            {location.pathname !== '/billing' ? (
+            {location.pathname !== '/billing' && location.pathname !== '/tasks' ? (
               <div className="flex items-center gap-1.5 min-w-0">
                 <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider shrink-0 hidden lg:inline">
                   Project:
