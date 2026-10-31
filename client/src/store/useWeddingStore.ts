@@ -40,6 +40,52 @@ export interface WeddingOption {
   label: string;
 }
 
+export interface CreateWeddingPayload {
+  code?: string;
+  couple?: string;
+  brideName?: string;
+  groomName?: string;
+  phone?: string;
+  email?: string;
+  city: string;
+  venue?: string;
+  startDate?: string;
+  endDate?: string;
+  guestCount?: number;
+  packageType?: string;
+  budget?: string | number;
+  theme?: string;
+  coordinator?: string;
+  notes?: string;
+}
+
+export interface RawWeddingRow {
+  id: string;
+  uuid?: string;
+  code: string;
+  couple?: string;
+  brideName?: string;
+  groomName?: string;
+  clientPhone?: string;
+  clientEmail?: string;
+  city?: string;
+  venue?: string;
+  startDate?: string;
+  endDate?: string;
+  guestCount?: number;
+  packageType?: string;
+  status?: string;
+  isFinalised?: boolean;
+  finalisedDate?: string;
+  finalisedBy?: string;
+  budget?: string | number;
+  rawBudget?: number;
+  agencyFee?: string | number;
+  theme?: string;
+  coordinator?: string;
+  coordinatorPhone?: string;
+}
+
 interface WeddingState {
   weddings: WeddingSummary[];
   weddingOptions: WeddingOption[];
@@ -52,7 +98,7 @@ interface WeddingState {
   getSelectedWedding: () => WeddingSummary | undefined;
   fetchWeddings: () => Promise<WeddingSummary[]>;
   fetchWeddingOptions: () => Promise<WeddingOption[]>;
-  createWedding: (payload: any) => Promise<WeddingSummary | null>;
+  createWedding: (payload: CreateWeddingPayload) => Promise<WeddingSummary | null>;
 }
 
 export const useWeddingStore = create<WeddingState>((set, get) => ({
@@ -84,7 +130,7 @@ export const useWeddingStore = create<WeddingState>((set, get) => ({
   fetchWeddings: async () => {
     set({ loading: true, isLoading: true, error: null });
     try {
-      const res = await api.get<{ success: boolean; data: any[] }>('/weddings');
+      const res = await api.get<{ success: boolean; data: RawWeddingRow[] }>('/weddings');
       if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
         const liveWeddings: WeddingSummary[] = res.data.map((w) => ({
           id: w.id || w.code,
@@ -155,9 +201,10 @@ export const useWeddingStore = create<WeddingState>((set, get) => ({
         set({ weddings: [], weddingOptions: [], loading: false, isLoading: false });
         return [];
       }
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch weddings';
       console.error('Failed to fetch weddings from database:', err);
-      set({ weddings: [], weddingOptions: [], loading: false, isLoading: false, error: err.message || 'Failed to fetch weddings' });
+      set({ weddings: [], weddingOptions: [], loading: false, isLoading: false, error: message });
       return [];
     }
   },
@@ -176,21 +223,22 @@ export const useWeddingStore = create<WeddingState>((set, get) => ({
     }
   },
 
-  createWedding: async (payload: any) => {
+  createWedding: async (payload: CreateWeddingPayload) => {
     set({ loading: true, isLoading: true, error: null });
     try {
-      const res = await api.post<{ success: boolean; data: any }>('/weddings', payload);
+      const res = await api.post<{ success: boolean; data: RawWeddingRow }>('/weddings', payload);
       if (res?.success && res.data) {
         await get().fetchWeddings();
         await get().fetchWeddingOptions();
         if (res.data.id || res.data.code) {
           set({ selectedWeddingId: res.data.id || res.data.code });
         }
-        return res.data;
+        return res.data as unknown as WeddingSummary;
       }
       return null;
-    } catch (err: any) {
-      set({ error: err.message || 'Failed to create wedding' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create wedding';
+      set({ error: message });
       throw err;
     } finally {
       set({ loading: false, isLoading: false });

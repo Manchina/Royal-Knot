@@ -81,8 +81,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         error: null,
       });
       return true;
-    } catch (err: any) {
-      set({ loading: false, error: err.message || 'Unable to connect to server' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to connect to server';
+      set({ loading: false, error: message });
       return false;
     }
   },

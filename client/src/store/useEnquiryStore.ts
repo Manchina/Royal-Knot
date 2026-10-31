@@ -23,6 +23,53 @@ export interface Enquiry {
   createdAt?: string;
 }
 
+export interface CreateEnquiryPayload {
+  coupleName: string;
+  phone: string;
+  email?: string;
+  channel?: string;
+  cityPreference: string;
+  datesRough?: string;
+  budgetMax?: number;
+  guestCount?: number;
+  theme?: string;
+  packagePreference?: string;
+  notes?: string;
+}
+
+export interface RawEnquiryRow {
+  id?: string;
+  code?: string;
+  coupleName?: string;
+  couple_name?: string;
+  primaryContactName?: string;
+  primary_contact_name?: string;
+  channel?: string;
+  phone?: string;
+  email?: string;
+  cityPreference?: string;
+  city_preference?: string;
+  datesRough?: string;
+  dates_rough?: string;
+  guestCount?: number;
+  guest_count?: number;
+  theme?: string;
+  budgetMax?: string | number;
+  budget_max?: string | number;
+  packagePreference?: string;
+  package_preference?: string;
+  agreementStatus?: string;
+  agreement_status?: string;
+  agreementSignedAt?: string;
+  agreement_signed_at?: string;
+  status?: string;
+  weddingId?: string;
+  wedding_id?: string;
+  notes?: string;
+  createdAt?: string;
+  created_at?: string;
+}
+
 interface EnquiryState {
   enquiries: Enquiry[];
   loading: boolean;
@@ -30,19 +77,7 @@ interface EnquiryState {
   error: string | null;
 
   fetchEnquiries: () => Promise<Enquiry[]>;
-  createEnquiry: (payload: {
-    coupleName: string;
-    phone: string;
-    email?: string;
-    channel?: string;
-    cityPreference: string;
-    datesRough?: string;
-    budgetMax?: number;
-    guestCount?: number;
-    theme?: string;
-    packagePreference?: string;
-    notes?: string;
-  }) => Promise<any>;
+  createEnquiry: (payload: CreateEnquiryPayload) => Promise<RawEnquiryRow | null>;
 }
 
 export const useEnquiryStore = create<EnquiryState>((set, get) => ({
@@ -54,7 +89,7 @@ export const useEnquiryStore = create<EnquiryState>((set, get) => ({
   fetchEnquiries: async () => {
     set({ loading: true, isLoading: true, error: null });
     try {
-      const res = await api.get<{ success: boolean; data: any[] }>('/enquiries');
+      const res = await api.get<{ success: boolean; data: RawEnquiryRow[] }>('/enquiries');
       if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
         const mapped: Enquiry[] = res.data.map((row) => {
           const budgetNum = Number(row.budgetMax || row.budget_max) || 0;
@@ -89,7 +124,7 @@ export const useEnquiryStore = create<EnquiryState>((set, get) => ({
             packagePreference: row.packagePreference || row.package_preference || 'FULL_SERVICE',
             agreementStatus: agreementSt,
             agreementSignedAt: signedAt ? new Date(signedAt).toLocaleDateString() : undefined,
-            status: row.status || 'Initial Discovery',
+            status: (row.status as Enquiry['status']) || 'Initial Discovery',
             weddingId: row.weddingId || row.wedding_id,
             notes: row.notes || '',
             createdAt: row.createdAt || row.created_at,
@@ -101,24 +136,26 @@ export const useEnquiryStore = create<EnquiryState>((set, get) => ({
       }
       set({ enquiries: [], loading: false, isLoading: false });
       return [];
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch enquiries';
       console.error('Failed to load enquiries from database:', err);
-      set({ enquiries: [], loading: false, isLoading: false, error: err.message || 'Failed to fetch enquiries' });
+      set({ enquiries: [], loading: false, isLoading: false, error: message });
       return [];
     }
   },
 
-  createEnquiry: async (payload) => {
+  createEnquiry: async (payload: CreateEnquiryPayload) => {
     set({ loading: true, isLoading: true, error: null });
     try {
-      const res = await api.post<{ success: boolean; data: any }>('/enquiries', payload);
-      if (res?.success) {
+      const res = await api.post<{ success: boolean; data: RawEnquiryRow }>('/enquiries', payload);
+      if (res?.success && res.data) {
         await get().fetchEnquiries();
         return res.data;
       }
       return null;
-    } catch (err: any) {
-      set({ error: err.message || 'Failed to create enquiry' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create enquiry';
+      set({ error: message });
       throw err;
     } finally {
       set({ loading: false, isLoading: false });

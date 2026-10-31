@@ -62,9 +62,10 @@ export const useProcurementStore = create<ProcurementState>((set, get) => ({
       });
 
       return { vendors, counts, weddingsOverview };
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch procurement data';
       console.error('Failed to load procurement data:', err);
-      set({ loading: false, isLoading: false, error: err.message || 'Failed to fetch procurement data' });
+      set({ loading: false, isLoading: false, error: message });
       return {
         vendors: get().vendorsList,
         counts: get().vendorCounts,
@@ -82,8 +83,9 @@ export const useProcurementStore = create<ProcurementState>((set, get) => ({
         return res.data;
       }
       return null;
-    } catch (err: any) {
-      set({ error: err.message || 'Failed to create vendor' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create vendor';
+      set({ error: message });
       throw err;
     } finally {
       set({ loading: false, isLoading: false });
@@ -99,8 +101,9 @@ export const useProcurementStore = create<ProcurementState>((set, get) => ({
         return true;
       }
       return false;
-    } catch (err: any) {
-      set({ error: err.message || 'Failed to assign vendor options' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to assign vendor options';
+      set({ error: message });
       throw err;
     } finally {
       set({ loading: false, isLoading: false });

@@ -41,6 +41,12 @@ export interface BillingSummary {
   averageGrossMargin: string;
 }
 
+export interface BillingProjectsResponse {
+  ongoing?: ProjectBillingItem[];
+  finalised?: ProjectBillingItem[];
+  activeList?: ProjectBillingItem[];
+}
+
 interface BillingState {
   projects: ProjectBillingItem[];
   summary: BillingSummary;
@@ -119,22 +125,34 @@ export const useBillingStore = create<BillingState>((set, get) => ({
       const res = await api.get<{
         success: boolean;
         summary?: BillingSummary;
-        data: ProjectBillingItem[];
+        data: ProjectBillingItem[] | BillingProjectsResponse;
       }>('/billing/projects');
       if (res?.success && res.data) {
+        let projectList: ProjectBillingItem[] = [];
+        if (Array.isArray(res.data)) {
+          projectList = res.data;
+        } else if (Array.isArray(res.data.activeList)) {
+          projectList = res.data.activeList;
+        } else {
+          projectList = [
+            ...(res.data.ongoing || []),
+            ...(res.data.finalised || []),
+          ];
+        }
         set({
-          projects: res.data,
+          projects: projectList,
           summary: res.summary || get().summary,
           loading: false,
           isLoading: false,
         });
-        return res.data;
+        return projectList;
       }
       set({ projects: [], loading: false, isLoading: false });
       return [];
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch billing projects';
       console.error('Failed to fetch billing projects from database:', err);
-      set({ projects: [], loading: false, isLoading: false, error: err.message || 'Failed to fetch billing projects' });
+      set({ projects: [], loading: false, isLoading: false, error: message });
       return [];
     }
   },
@@ -151,9 +169,10 @@ export const useBillingStore = create<BillingState>((set, get) => ({
       }
       set({ loading: false, isLoading: false });
       return null;
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch project dossier';
       console.warn('Failed to fetch project dossier:', err);
-      set({ loading: false, isLoading: false, error: err.message || 'Failed to fetch project dossier' });
+      set({ loading: false, isLoading: false, error: message });
       return null;
     }
   },
@@ -170,7 +189,7 @@ export const useBillingStore = create<BillingState>((set, get) => ({
         return { success: true, syncedCount: res.syncedCount || 0 };
       }
       return { success: false, syncedCount: 0 };
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error syncing quotes:', err);
       return { success: false, syncedCount: 0 };
     } finally {

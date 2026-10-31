@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { pool } from '../db';
+import { seedAllBillingData } from './seedBilling';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -525,6 +526,7 @@ export async function seedDatabase() {
     [wedding1Id, vendorCaterer2, vendorDecor, vendorDJ]
   );
   console.log(`✨ Seeded Scene 5 Client Invoices, Extra Charges & Vendor Bills`);
+  await seedAllBillingData();
 
   console.log('🎉 Comprehensive database seeding finished successfully!');
 }

@@ -53,21 +53,23 @@ export const Billing: React.FC = () => {
     fetchBillingProjects();
   }, [fetchBillingProjects]);
 
+  const safeProjects = useMemo(() => (Array.isArray(projects) ? projects : []), [projects]);
+
   // Counts for Stage Filter Pills
   const stageCounts = useMemo(() => {
     return {
-      ALL: projects.length,
-      LIVE_BIG_DAY: projects.filter((p) => p.status === 'LIVE_BIG_DAY').length,
-      IN_PLANNING: projects.filter((p) => p.status === 'IN_PLANNING').length,
-      BOOKED: projects.filter((p) => p.status === 'BOOKED').length,
-      FINALISED: projects.filter((p) => p.status === 'FINALISED').length,
-      FINALISED_SETTLED: projects.filter((p) => p.status === 'FINALISED_SETTLED').length,
+      ALL: safeProjects.length,
+      LIVE_BIG_DAY: safeProjects.filter((p) => p.status === 'LIVE_BIG_DAY').length,
+      IN_PLANNING: safeProjects.filter((p) => p.status === 'IN_PLANNING').length,
+      BOOKED: safeProjects.filter((p) => p.status === 'BOOKED').length,
+      FINALISED: safeProjects.filter((p) => p.status === 'FINALISED').length,
+      FINALISED_SETTLED: safeProjects.filter((p) => p.status === 'FINALISED_SETTLED').length,
     };
-  }, [projects]);
+  }, [safeProjects]);
 
   // Filtered List
   const filteredList = useMemo(() => {
-    return projects.filter((p) => {
+    return safeProjects.filter((p) => {
       // Stage check
       if (stageFilter !== 'ALL' && p.status !== stageFilter) return false;
 
@@ -87,7 +89,7 @@ export const Billing: React.FC = () => {
 
       return true;
     });
-  }, [projects, stageFilter, cityFilter, searchQuery]);
+  }, [safeProjects, stageFilter, cityFilter, searchQuery]);
 
   // Helper for status badge
   const renderStatusBadge = (status: string) => {
