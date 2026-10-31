@@ -88,6 +88,9 @@ async function start() {
     const dbCheck = await checkDatabaseConnection();
     if (dbCheck.connected) {
       console.log(`✅ PostgreSQL Connected successfully! (${dbCheck.version?.split(' ')[0]} ${dbCheck.version?.split(' ')[1]})\n`);
+      // Auto-seed if database is empty on server startup
+      const { runAutoSeedIfEmpty } = await import('./db/seed');
+      await runAutoSeedIfEmpty();
     } else {
       console.warn(`⚠️ PostgreSQL connection warning: ${dbCheck.error}`);
       console.warn(`👉 Make sure your DATABASE_URL in server/.env is configured properly.\n`);

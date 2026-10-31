@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { pool } from '../db';
 import { DEMO_USERS } from '../seeds/users';
 
 export async function authRoutes(fastify: FastifyInstance) {
@@ -11,7 +12,22 @@ export async function authRoutes(fastify: FastifyInstance) {
       return { success: false, message: 'Email is required' };
     }
 
-    const user = DEMO_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    let user: any = null;
+    try {
+      const res = await pool.query(
+        'SELECT id, full_name, email, role, title, password FROM users WHERE LOWER(email) = LOWER($1)',
+        [email.trim()]
+      );
+      if (res.rows.length > 0) {
+        user = res.rows[0];
+      }
+    } catch (e: any) {
+      fastify.log.warn(`DB user query error: ${e.message}`);
+    }
+
+    if (!user) {
+      user = DEMO_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase().trim());
+    }
 
     if (!user) {
       reply.status(401);
@@ -32,7 +48,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         email: user.email,
         full_name: user.full_name,
         role: user.role,
-        title: user.title,
+        title: user.title || user.role,
       },
     };
   });
@@ -49,13 +65,27 @@ export async function authRoutes(fastify: FastifyInstance) {
     }],
   }, async (request: FastifyRequest) => {
     const decoded = request.user as { userId: string; role: string };
-    const user = DEMO_USERS.find((u) => u.id === decoded.userId) || {
-      id: decoded.userId,
-      email: '',
-      full_name: 'Authenticated User',
-      role: decoded.role,
-      title: decoded.role,
-    };
+    
+    let user: any = null;
+    try {
+      const res = await pool.query(
+        'SELECT id, full_name, email, role, title FROM users WHERE id = $1',
+        [decoded.userId]
+      );
+      if (res.rows.length > 0) {
+        user = res.rows[0];
+      }
+    } catch {}
+
+    if (!user) {
+      user = DEMO_USERS.find((u) => u.id === decoded.userId) || {
+        id: decoded.userId,
+        email: '',
+        full_name: 'Authenticated User',
+        role: decoded.role,
+        title: decoded.role,
+      };
+    }
 
     return {
       success: true,
@@ -71,9 +101,28 @@ export async function authRoutes(fastify: FastifyInstance) {
 
   // Available roles for preview
   fastify.get('/roles', async () => {
+    try {
+      const res = await pool.query(
+        'SELECT id, full_name, email, role, title FROM users WHERE is_active = TRUE ORDER BY created_at ASC'
+      );
+      if (res.rows.length > 0) {
+        return {
+          success: true,
+          roles: res.rows.map((u) => ({
+            id: u.id,
+            role: u.role,
+            email: u.email,
+            full_name: u.full_name,
+            title: u.title || u.role,
+          })),
+        };
+      }
+    } catch {}
+
     return {
       success: true,
       roles: DEMO_USERS.map((u) => ({
+        id: u.id,
         role: u.role,
         email: u.email,
         full_name: u.full_name,
