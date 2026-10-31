@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { db } from '../db';
-import { enquiries, clients, weddings, enquiryChangeLogs } from '../db/schema';
+import { enquiries, clients, weddings, enquiryChangeLogs, users } from '../db/schema';
 import { eq, desc, asc, ilike, or, and, count, sql } from 'drizzle-orm';
 
 const matchEnquiry = (param: string) => sql`(${enquiries.id}::text = ${param} OR ${enquiries.code} = ${param})`;
@@ -199,17 +199,27 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
         return { success: false, message: 'Enquiry not found.' };
       }
 
+      const isSent = agreementStatus === 'Sent - Pending Signature';
+
+      let action = 'STATUS_UPDATED';
+      let logNotes = `Status updated to "${updated.status}". ${notes || ''}`;
+      if (isSigned) {
+        action = 'AGREEMENT_SIGNED';
+        logNotes = 'Client reviewed and digitally signed royal wedding agreement via mobile magic link.';
+      } else if (isSent) {
+        action = 'AGREEMENT_SENT';
+        logNotes = 'Dummy wedding service agreement generated and magic signing link dispatched to client.';
+      }
+
       // Record audit change log
       try {
         await db.insert(enquiryChangeLogs).values({
           enquiryId: updated.id,
-          action: isSigned ? 'AGREEMENT_SIGNED' : 'STATUS_UPDATED',
+          action,
           fromStatus: null,
           toStatus: updated.status,
           performedBy: 'Lead Planner (Devika Sharma)',
-          notes: isSigned
-            ? 'Client signed digital service agreement on mobile.'
-            : `Status updated to "${updated.status}". ${notes || ''}`,
+          notes: logNotes,
         });
       } catch (logErr: any) {
         fastify.log.warn(`Change log insert error: ${logErr.message}`);
@@ -297,7 +307,26 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
         })
         .returning();
 
-      // 4. Update enquiry link
+      // 4. Provision Couple User Account with default password password123
+      const clientEmail = enquiry.email || `client_${weddingCode.toLowerCase().replace(/[^a-z0-9]/g, '')}@royalknot.com`;
+      const [existingUser] = await db.select().from(users).where(eq(users.email, clientEmail));
+      let clientUser = existingUser;
+      if (!existingUser) {
+        [clientUser] = await db
+          .insert(users)
+          .values({
+            fullName: enquiry.coupleName,
+            email: clientEmail,
+            password: 'password123',
+            phone: enquiry.phone,
+            role: 'CLIENT',
+            title: 'Royal Couple',
+            isActive: true,
+          })
+          .returning();
+      }
+
+      // 5. Update enquiry link
       await db
         .update(enquiries)
         .set({
@@ -308,7 +337,7 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
         })
         .where(eq(enquiries.id, enquiry.id));
 
-      // 5. Record change log
+      // 6. Record change log
       try {
         await db.insert(enquiryChangeLogs).values({
           enquiryId: enquiry.id,
@@ -316,7 +345,7 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
           fromStatus: enquiry.status,
           toStatus: 'Converted to Wedding',
           performedBy: 'Lead Planner (Devika Sharma)',
-          notes: `Converted lead to active Wedding Project ${weddingCode} (${newWedding.primaryVenue}).`,
+          notes: `Converted lead to active Wedding Project ${weddingCode} (${newWedding.primaryVenue}). Client Portal user provisioned for ${clientEmail} with default password: password123.`,
         });
       } catch (logErr: any) {
         fastify.log.warn(`Change log insert error: ${logErr.message}`);
@@ -324,8 +353,16 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
 
       return {
         success: true,
-        message: `Enquiry successfully converted to Wedding Project ${weddingCode} via Drizzle ORM!`,
+        message: `Enquiry successfully converted to Wedding Project ${weddingCode} and client user provisioned!`,
         wedding: newWedding,
+        client: newClient,
+        user: {
+          id: clientUser?.id,
+          email: clientUser?.email,
+          fullName: clientUser?.fullName,
+          role: clientUser?.role,
+          defaultPassword: 'password123',
+        },
       };
     } catch (err: any) {
       fastify.log.error(`Enquiry conversion error via Drizzle: ${err.message}`);

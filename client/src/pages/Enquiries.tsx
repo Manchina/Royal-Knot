@@ -3,7 +3,6 @@ import {
   Plus,
   Phone,
   Search,
-  ChevronRight,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
@@ -349,7 +348,6 @@ export const Enquiries: React.FC = () => {
               <TableHead>Scale & Budget</TableHead>
               <TableHead>Agreement Status</TableHead>
               <TableHead>Pipeline Stage</TableHead>
-              <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -408,10 +406,10 @@ export const Enquiries: React.FC = () => {
                   {/* Agreement Status */}
                   <TableCell>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border ${enq.agreementStatus === 'Signed on Mobile'
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                        : enq.agreementStatus === 'Sent - Pending Signature'
-                          ? 'bg-amber-50 text-amber-800 border-amber-200'
-                          : 'bg-slate-100 text-slate-700 border-slate-200'
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : enq.agreementStatus === 'Sent - Pending Signature'
+                        ? 'bg-amber-50 text-amber-800 border-amber-200'
+                        : 'bg-slate-100 text-slate-700 border-slate-200'
                       }`}>
                       {enq.agreementStatus}
                     </span>
@@ -433,11 +431,6 @@ export const Enquiries: React.FC = () => {
                     >
                       {enq.status}
                     </Badge>
-                  </TableCell>
-
-                  {/* Row Navigation Indicator */}
-                  <TableCell className="text-right pr-4 text-slate-400">
-                    <ChevronRight className="w-4 h-4 ml-auto text-slate-400" />
                   </TableCell>
                 </TableRow>
               ))

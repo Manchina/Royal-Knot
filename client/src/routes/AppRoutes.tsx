@@ -12,6 +12,7 @@ import { Tasks } from '../pages/Tasks';
 import { DayOf } from '../pages/DayOf';
 import { Billing } from '../pages/Billing';
 import { SettingsPage } from '../pages/Settings';
+import { SignAgreement } from '../pages/SignAgreement';
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -19,6 +20,7 @@ export const AppRoutes: React.FC = () => {
       {/* Public Landing & Consultation Routes */}
       <Route path="/" element={<Landing />} />
       <Route path="/enquire" element={<Landing defaultScrollToForm={true} />} />
+      <Route path="/sign/:id" element={<SignAgreement />} />
 
       {/* Public Login Route */}
       <Route path="/login" element={<Login />} />

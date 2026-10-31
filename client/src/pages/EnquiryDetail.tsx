@@ -13,6 +13,9 @@ import {
   FileCheck,
   Building2,
   CheckCircle2,
+  ExternalLink,
+  Link2,
+  KeyRound,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useWeddingStore } from '../store/useWeddingStore';
@@ -74,6 +77,9 @@ export const EnquiryDetail: React.FC = () => {
   const [logs, setLogs] = useState<ChangeLogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Magic link copy state
+  const [magicLinkCopied, setMagicLinkCopied] = useState(false);
 
   // Activity Log modal state
   const [activityModalOpen, setActivityModalOpen] = useState(false);
@@ -147,6 +153,26 @@ export const EnquiryDetail: React.FC = () => {
   useEffect(() => {
     fetchEnquiryDetails();
   }, [id]);
+
+  const handleCopyMagicLink = async () => {
+    if (!enquiry) return;
+    const signUrl = `${window.location.origin}/sign/${enquiry.code}`;
+    await navigator.clipboard.writeText(signUrl);
+    setMagicLinkCopied(true);
+    setTimeout(() => setMagicLinkCopied(false), 2500);
+
+    // If still drafting, mark as Sent - Pending Signature
+    if (enquiry.agreementStatus === 'Drafting Agreement') {
+      try {
+        await api.patch(`/enquiries/${enquiry.id}/status`, {
+          agreementStatus: 'Sent - Pending Signature',
+        });
+        await fetchEnquiryDetails();
+      } catch (err) {
+        console.error('Update status error:', err);
+      }
+    }
+  };
 
   // Action: Confirm Signed Agreement
   const handleSignAgreement = async () => {
@@ -268,15 +294,39 @@ export const EnquiryDetail: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           {/* Action Button depending on status */}
           {enquiry.agreementStatus !== 'Signed on Mobile' ? (
-            <Button
-              size="sm"
-              disabled={actionLoading}
-              onClick={handleSignAgreement}
-              className="h-8 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-2xs"
-            >
-              {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <FileCheck className="w-3.5 h-3.5 mr-1.5" />}
-              <span>Confirm Signed Agreement</span>
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyMagicLink}
+                className="h-8 text-xs font-medium border-slate-300 hover:bg-slate-50 cursor-pointer gap-1.5"
+                title="Copy digital agreement signing magic link"
+              >
+                {magicLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Link2 className="w-3.5 h-3.5 text-slate-500" />}
+                <span>{magicLinkCopied ? 'Link Copied!' : 'Copy Magic Sign Link'}</span>
+              </Button>
+
+              <a
+                href={`/sign/${enquiry.code}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center h-8 px-2.5 rounded border border-slate-300 bg-white hover:bg-slate-50 text-xs text-slate-700 font-medium transition cursor-pointer gap-1"
+                title="Open dummy agreement signing page in new tab"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                <span>Sign Page ↗</span>
+              </a>
+
+              <Button
+                size="sm"
+                disabled={actionLoading}
+                onClick={handleSignAgreement}
+                className="h-8 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-2xs"
+              >
+                {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <FileCheck className="w-3.5 h-3.5 mr-1.5" />}
+                <span>Confirm Signed</span>
+              </Button>
+            </>
           ) : !enquiry.weddingId ? (
             <Button
               size="sm"
@@ -369,6 +419,24 @@ export const EnquiryDetail: React.FC = () => {
 
       {/* 3. Full-Width Main Dossier Card */}
       <div className="w-full bg-white border border-slate-200 rounded p-6 shadow-2xs space-y-6">
+        {/* Client Portal Provisioned Banner (if converted to wedding) */}
+        {enquiry.weddingId && (
+          <div className="p-3 bg-purple-50/80 border border-purple-200 rounded-md text-xs flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <KeyRound className="w-4 h-4 text-[#714B67] shrink-0" />
+              <div className="min-w-0 leading-tight">
+                <span className="font-bold text-slate-900">Couple Client Portal Access Provisioned: </span>
+                <span className="font-mono text-slate-700">{enquiry.email || 'client@royalknot.com'}</span>
+                <span className="text-slate-400 mx-1.5">•</span>
+                <span className="text-slate-600">Password: <strong className="font-mono text-slate-900">password123</strong></span>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#714B67] bg-purple-100 px-2 py-0.5 rounded border border-purple-200 shrink-0">
+              Role: CLIENT
+            </span>
+          </div>
+        )}
+
         {/* Contact Information Section */}
         <div>
           <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 border-b border-slate-100 pb-1.5">
