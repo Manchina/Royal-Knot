@@ -8,9 +8,10 @@ import {
   Clock,
   Layers,
   UserCheck,
-  Briefcase
+  Briefcase,
+  ShieldCheck
 } from 'lucide-react';
-import { useAuthStore, type UserRole } from '../store/useAuthStore';
+import { useAuthStore, type UserRole, ROLE_EMAILS } from '../store/useAuthStore';
 import {
   Card,
   CardHeader,
@@ -23,34 +24,46 @@ import {
   Badge,
 } from '../components/ui';
 
-const DEMO_ROLES: { role: UserRole; title: string; subtitle: string; icon: typeof Layers }[] = [
+const DEMO_ROLES: { role: UserRole; title: string; email: string; subtitle: string; icon: typeof Layers }[] = [
+  {
+    role: 'SUPER_ADMIN',
+    title: 'Super Administrator',
+    email: 'admin@royalknot.com',
+    subtitle: 'Agency governance, platform control, configuration & access audits',
+    icon: ShieldCheck,
+  },
   {
     role: 'FOUNDER',
     title: 'Founder & Managing Director',
+    email: 'founder@royalknot.com',
     subtitle: 'Consolidated P&L, 35%+ margins, high-stakes seasonal auditing',
     icon: Briefcase,
   },
   {
     role: 'LEAD_PLANNER',
     title: 'Lead Wedding Planner',
+    email: 'planner@royalknot.com',
     subtitle: 'Client proposals, catering RFQ evaluations, master task checklists',
     icon: UserCheck,
   },
   {
     role: 'COORDINATOR',
     title: 'Day-of Operations Coordinator',
+    email: 'coordinator@royalknot.com',
     subtitle: 'Minute-by-minute run sheet, vendor arrival telemetry & incident triage',
     icon: Clock,
   },
   {
     role: 'FINANCE_MANAGER',
     title: 'Finance & Accounts Manager',
+    email: 'finance@royalknot.com',
     subtitle: 'Milestone billing, duplicate payment protection & extra plates audit',
     icon: CreditCard,
   },
   {
     role: 'CLIENT',
     title: 'Client Portal View',
+    email: 'client@royalknot.com',
     subtitle: 'Couple approval portal (Singhania & Mehra Wedding)',
     icon: Building2,
   },
@@ -60,14 +73,16 @@ export const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login, quickLogin, loading, error, clearError } = useAuthStore();
 
-  const [selectedRole, setSelectedRole] = useState<UserRole>('FOUNDER');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('SUPER_ADMIN');
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@royalknot.com');
+  const [password, setPassword] = useState('password123');
 
   const handleSelectRole = (r: UserRole) => {
     setSelectedRole(r);
     clearError();
+    setEmail(ROLE_EMAILS[r] || '');
+    setPassword('password123');
   };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -119,6 +134,29 @@ export const Login: React.FC = () => {
             <CardDescription className="text-xs text-slate-500">
               Enter your work credentials or toggle quick demo access below
             </CardDescription>
+
+            {/* Quick Demo Access Chip for Super Admin */}
+            <div className="mt-2.5 p-2 rounded-md bg-purple-50/80 border border-purple-200/80 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <ShieldCheck className="w-4 h-4 text-[#714B67] shrink-0" />
+                <div className="min-w-0 leading-tight">
+                  <span className="font-bold text-slate-900">Super Admin: </span>
+                  <span className="font-mono text-[11px] text-slate-600">admin@royalknot.com</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRole('SUPER_ADMIN');
+                  setEmail('admin@royalknot.com');
+                  setPassword('password123');
+                  clearError();
+                }}
+                className="text-[10px] font-bold text-[#714B67] hover:text-[#56344E] cursor-pointer px-2 py-0.5 rounded bg-white border border-purple-200 shadow-2xs shrink-0"
+              >
+                Autofill
+              </button>
+            </div>
           </CardHeader>
 
           <CardContent className="p-4 space-y-3">
@@ -222,6 +260,14 @@ export const Login: React.FC = () => {
                             <p className="text-[11px] text-slate-500 truncate mt-0.5">
                               {r.subtitle}
                             </p>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <span className="text-[10px] font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                {r.email}
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-400">
+                                • password123
+                              </span>
+                            </div>
                           </div>
                         </div>
                       );

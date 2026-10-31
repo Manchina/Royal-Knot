@@ -26,7 +26,7 @@ interface AuthState {
   clearError: () => void;
 }
 
-const ROLE_EMAILS: Record<UserRole, string> = {
+export const ROLE_EMAILS: Record<UserRole, string> = {
   FOUNDER: 'founder@royalknot.com',
   SUPER_ADMIN: 'admin@royalknot.com',
   LEAD_PLANNER: 'planner@royalknot.com',
