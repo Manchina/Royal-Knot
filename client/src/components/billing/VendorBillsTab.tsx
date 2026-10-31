@@ -1,52 +1,23 @@
 import React from 'react';
-import { Sparkles, Plus, AlertCircle } from 'lucide-react';
+import { Plus, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, Button, Badge, Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../ui';
 import type { LiveVendorBill, AvailableQuote } from './types';
 
 interface VendorBillsTabProps {
   vendorBills: LiveVendorBill[];
-  availableQuotes: AvailableQuote[];
-  onSyncQuotes: () => void;
+  availableQuotes?: AvailableQuote[];
+  onSyncQuotes?: () => void;
   onOpenAddBill: () => void;
   onSelectReconcile: (bill: LiveVendorBill) => void;
 }
 
 export const VendorBillsTab: React.FC<VendorBillsTabProps> = ({
   vendorBills,
-  availableQuotes,
-  onSyncQuotes,
   onOpenAddBill,
   onSelectReconcile,
 }) => {
   return (
     <div className="space-y-4">
-      {/* Awarded Quotes Banner: Sync Winning Quotes into Bills */}
-      {availableQuotes.length > 0 && (
-        <div className="bg-purple-50/70 border border-purple-200/80 rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded bg-[#714B67] text-white flex items-center justify-center shrink-0 font-bold mt-0.5">
-              <Sparkles className="w-4 h-4 text-amber-300" />
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-slate-900">
-                Awarded Quotes Detected from Procurement Matrix
-              </h4>
-              <p className="text-[11px] text-slate-600 mt-0.5">
-                Found {availableQuotes.length} selected vendor quote(s) in RFQs for this wedding project.
-              </p>
-            </div>
-          </div>
-
-          <Button
-            size="sm"
-            onClick={onSyncQuotes}
-            className="bg-[#714B67] hover:bg-[#5a3b52] text-white text-xs font-semibold shadow-2xs cursor-pointer shrink-0"
-          >
-            Auto-Generate Bills from Winning Quotes
-          </Button>
-        </div>
-      )}
-
       {/* Vendor Bills Table */}
       <Card className="border-slate-200 shadow-2xs overflow-hidden">
         <CardHeader className="p-4 bg-slate-50/70 border-b border-slate-200 flex flex-row items-center justify-between">

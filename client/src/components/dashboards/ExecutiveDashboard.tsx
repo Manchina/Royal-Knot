@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp,
   DollarSign,
@@ -16,9 +15,9 @@ import {
   Database,
   Table as TableIcon,
   BarChart3,
+  PieChart as PieChartIcon,
   ShieldCheck,
   Filter,
-  ArrowRight,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -29,7 +28,9 @@ import {
   CartesianGrid,
   Tooltip,
   ReferenceLine,
-  Cell
+  Cell,
+  PieChart,
+  Pie,
 } from 'recharts';
 import {
   Card,
@@ -76,6 +77,7 @@ export interface WeddingProfit {
   marginPct: string;
   marginPctNum?: number;
   status: 'High Margin' | 'On Target' | 'Audit Extras';
+  packageType?: string;
   leadPlanner: string;
   date: string;
 }
@@ -127,8 +129,6 @@ interface ExecutiveDashboardProps {
 export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
   selectedCouple = 'ALL',
 }) => {
-  const navigate = useNavigate();
-
   // View modes for individual sections ('table' | 'chart')
   const [profitViewMode, setProfitViewMode] = useState<'table' | 'chart'>('table');
   const [cashFlowViewMode, setCashFlowViewMode] = useState<'table' | 'chart'>('table');
@@ -137,6 +137,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
   // Filter & Export States
   const [searchTerm, setSearchTerm] = useState('');
   const [cityFilter, setCityFilter] = useState<string>('ALL');
+  const [packageFilter, setPackageFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'High Margin' | 'On Target' | 'Audit Extras'>('ALL');
   const [vendorCategoryFilter, setVendorCategoryFilter] = useState<string>('ALL');
   const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -186,6 +187,9 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
       if (cityFilter !== 'ALL' && w.city?.toLowerCase() !== cityFilter.toLowerCase()) {
         return false;
       }
+      if (packageFilter !== 'ALL' && w.packageType !== packageFilter) {
+        return false;
+      }
       const matchesSearch =
         w.couple.toLowerCase().includes(searchTerm.toLowerCase()) ||
         w.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -194,15 +198,111 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
       const matchesStatus = statusFilter === 'ALL' || w.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [weddingProfits, selectedCouple, cityFilter, searchTerm, statusFilter]);
+  }, [weddingProfits, selectedCouple, cityFilter, packageFilter, searchTerm, statusFilter]);
 
-  // Navigate to Billing Module with active filters
-  const handleGoToBillingModule = () => {
-    const params = new URLSearchParams();
-    if (cityFilter !== 'ALL') params.set('city', cityFilter);
-    if (searchTerm.trim()) params.set('search', searchTerm.trim());
-    navigate(`/billing?${params.toString()}`);
-  };
+  // Pie Chart Data: Revenue Distribution by Package Type
+  const packageDistributionData = useMemo(() => {
+    let fullServiceRev = 0;
+    let partialDayOfRev = 0;
+    let fullServiceCount = 0;
+    let partialDayOfCount = 0;
+
+    filteredWeddings.forEach((w) => {
+      const rev = w.clientBilledNum || 0;
+      if (w.packageType === 'PARTIAL_DAY_OF') {
+        partialDayOfRev += rev;
+        partialDayOfCount += 1;
+      } else {
+        fullServiceRev += rev;
+        fullServiceCount += 1;
+      }
+    });
+
+    const total = fullServiceRev + partialDayOfRev;
+    if (total === 0) return [];
+
+    return [
+      {
+        name: 'Full-Service Planning',
+        value: fullServiceRev,
+        formattedValue: `₹${(fullServiceRev / 10000000).toFixed(2)} Cr`,
+        pct: ((fullServiceRev / total) * 100).toFixed(1),
+        count: fullServiceCount,
+        color: '#714B67',
+      },
+      {
+        name: 'Partial / Day-Of Service',
+        value: partialDayOfRev,
+        formattedValue: `₹${(partialDayOfRev / 10000000).toFixed(2)} Cr`,
+        pct: ((partialDayOfRev / total) * 100).toFixed(1),
+        count: partialDayOfCount,
+        color: '#059669',
+      },
+    ];
+  }, [filteredWeddings]);
+
+  // Pie Chart Data: Destination Market Share (Jaipur vs Udaipur)
+  const destinationDistributionData = useMemo(() => {
+    const cityMap = new Map<string, { rev: number; count: number }>();
+    filteredWeddings.forEach((w) => {
+      const city = w.city || 'Other';
+      const current = cityMap.get(city) || { rev: 0, count: 0 };
+      cityMap.set(city, {
+        rev: current.rev + (w.clientBilledNum || 0),
+        count: current.count + 1,
+      });
+    });
+
+    const total = Array.from(cityMap.values()).reduce((sum, item) => sum + item.rev, 0);
+    if (total === 0) return [];
+
+    const colorPalette = ['#714B67', '#0284C7', '#D97706', '#059669', '#64748B'];
+    return Array.from(cityMap.entries()).map(([cityName, stats], index) => ({
+      name: cityName,
+      value: stats.rev,
+      formattedValue: `₹${(stats.rev / 10000000).toFixed(2)} Cr`,
+      pct: ((stats.rev / total) * 100).toFixed(1),
+      count: stats.count,
+      color: colorPalette[index % colorPalette.length],
+    }));
+  }, [filteredWeddings]);
+
+  // Pie Chart Data: Margin Health Distribution
+  const marginHealthDistributionData = useMemo(() => {
+    let highMarginCount = 0;
+    let onTargetCount = 0;
+    let auditExtrasCount = 0;
+
+    filteredWeddings.forEach((w) => {
+      if (w.status === 'High Margin') highMarginCount++;
+      else if (w.status === 'Audit Extras') auditExtrasCount++;
+      else onTargetCount++;
+    });
+
+    const total = filteredWeddings.length;
+    if (total === 0) return [];
+
+    return [
+      {
+        name: 'High Margin (≥23.5%)',
+        value: highMarginCount,
+        pct: ((highMarginCount / total) * 100).toFixed(0),
+        color: '#059669',
+      },
+      {
+        name: 'On Target Plan',
+        value: onTargetCount,
+        pct: ((onTargetCount / total) * 100).toFixed(0),
+        color: '#0284C7',
+      },
+      {
+        name: 'Audit Extras (Overtime/Plates)',
+        value: auditExtrasCount,
+        pct: ((auditExtrasCount / total) * 100).toFixed(0),
+        color: '#D97706',
+      },
+    ];
+  }, [filteredWeddings]);
 
   // Filtered vendors for scorecard
   const filteredVendors = useMemo(() => {
@@ -328,6 +428,46 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
     setExportModalOpen(false);
   };
 
+  const renderCustomPieTooltip = (props: {
+    active?: boolean;
+    payload?: readonly {
+      payload?: {
+        name: string;
+        value: number;
+        formattedValue?: string;
+        pct: string;
+        count?: number;
+        color: string;
+      };
+    }[];
+  }) => {
+    if (!props.active || !props.payload || props.payload.length === 0 || !props.payload[0]?.payload) return null;
+    const data = props.payload[0].payload;
+    return (
+      <div className="bg-white p-2.5 rounded-lg shadow-lg border border-slate-200 text-xs space-y-0.5">
+        <div className="font-bold text-slate-900 flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: data.color }} />
+          {data.name}
+        </div>
+        {data.formattedValue && (
+          <div className="text-slate-700 font-mono font-semibold">
+            Revenue: {data.formattedValue}
+          </div>
+        )}
+        {data.count !== undefined && (
+          <div className="text-slate-500 text-[11px]">
+            Weddings: {data.count} ({data.pct}%)
+          </div>
+        )}
+        {!data.formattedValue && data.pct && (
+          <div className="text-slate-600 font-medium">
+            Share: {data.pct}% ({data.value} weddings)
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4">
       {/* Control Panel: Header, Global View Mode & Live DB Indicator */}
@@ -353,7 +493,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
         </div>
 
         {/* Global Action Toolbar */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -362,17 +502,6 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
             <span className="hidden sm:inline">Export Ledger</span>
-          </Button>
-
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleGoToBillingModule}
-            className="text-xs gap-1.5 h-8 bg-[#714B67] hover:bg-[#5b3c53] text-white font-semibold shadow-2xs"
-            title="Open Billing & Extra Charges Module with current filters"
-          >
-            <span>Go to Billing Module</span>
-            <ArrowRight className="w-3.5 h-3.5" />
           </Button>
         </div>
       </div>
@@ -392,7 +521,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
 
             <div className="flex flex-wrap items-center gap-2">
               {/* City Filter */}
-              <div className="w-32">
+              <div className="w-28 sm:w-32">
                 <Select value={cityFilter} onValueChange={(val) => setCityFilter(val)}>
                   <SelectTrigger className="h-8 text-xs bg-white border-slate-300">
                     <SelectValue placeholder="City: All" />
@@ -406,15 +535,29 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                 </Select>
               </div>
 
+              {/* Package Filter */}
+              <div className="w-32 sm:w-36">
+                <Select value={packageFilter} onValueChange={(val) => setPackageFilter(val)}>
+                  <SelectTrigger className="h-8 text-xs bg-white border-slate-300">
+                    <SelectValue placeholder="All Packages" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Packages</SelectItem>
+                    <SelectItem value="FULL_SERVICE">Full-Service</SelectItem>
+                    <SelectItem value="PARTIAL_DAY_OF">Partial / Day-of</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Margin Status Filter */}
-              <div className="w-40">
+              <div className="w-32 sm:w-36">
                 <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val as 'ALL' | 'High Margin' | 'On Target' | 'Audit Extras')}>
                   <SelectTrigger className="h-8 text-xs bg-white border-slate-300">
                     <SelectValue placeholder="All Margins" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">All Margins</SelectItem>
-                    <SelectItem value="High Margin">High Margin (&gt;30%)</SelectItem>
+                    <SelectItem value="High Margin">High Margin (&gt;23%)</SelectItem>
                     <SelectItem value="On Target">On Target</SelectItem>
                     <SelectItem value="Audit Extras">Audit Extras</SelectItem>
                   </SelectContent>
@@ -422,21 +565,22 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
               </div>
 
               {/* Search input */}
-              <div className="relative w-44 sm:w-56">
+              <div className="relative w-40 sm:w-48">
                 <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <Input
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search code, couple, city..."
+                  placeholder="Search couple, venue..."
                   className="h-8 text-xs pl-8 bg-white border-slate-300"
                 />
               </div>
 
-              {(cityFilter !== 'ALL' || statusFilter !== 'ALL' || searchTerm.trim() !== '') && (
+              {(cityFilter !== 'ALL' || packageFilter !== 'ALL' || statusFilter !== 'ALL' || searchTerm.trim() !== '') && (
                 <button
                   type="button"
                   onClick={() => {
                     setCityFilter('ALL');
+                    setPackageFilter('ALL');
                     setStatusFilter('ALL');
                     setSearchTerm('');
                   }}
@@ -449,6 +593,207 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
               <Badge variant="outline" className="text-xs font-mono">
                 {filteredWeddings.length} Weddings
               </Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Operational KPI Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {metrics.length === 0 && loading ? (
+          <div className="col-span-4 p-8 text-center text-slate-500 bg-white border border-slate-200 rounded">
+            <RefreshCw className="w-5 h-5 animate-spin mx-auto text-slate-400 mb-2" />
+            Loading real financial metrics from PostgreSQL...
+          </div>
+        ) : (
+          metrics.map((m, i) => {
+            const Icon = m.icon || TrendingUp;
+            return (
+              <Card key={i} className="border border-slate-200 shadow-2xs rounded bg-white">
+                <CardContent className="p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      {m.label}
+                    </span>
+                    <div className="p-1 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                      <Icon className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+
+                  <div className="text-2xl font-bold font-mono text-slate-900 tracking-tight">
+                    {m.value}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 text-xs pt-1 border-t border-slate-100">
+                    <span
+                      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold border ${m.positive
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                        : 'bg-slate-100 text-slate-700 border-slate-300'
+                        }`}
+                    >
+                      {m.positive ? (
+                        <ArrowUpRight className="w-3 h-3 mr-0.5" />
+                      ) : (
+                        <ArrowDownRight className="w-3 h-3 mr-0.5" />
+                      )}
+                      {m.change}
+                    </span>
+                    <span className="text-slate-500 text-[11px] truncate">{m.sub}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
+      </div>
+
+      {/* Season Visual Intelligence & Mix Breakdown (3 Interactive Pie Charts) */}
+      <Card className="border border-slate-200 shadow-2xs rounded bg-white">
+        <CardHeader className="p-3 border-b border-slate-100 bg-slate-50/70">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <PieChartIcon className="w-4 h-4 text-[#714B67]" />
+              <CardTitle className="text-xs font-bold text-slate-900">
+                Season Mix & Portfolio Breakdown
+              </CardTitle>
+            </div>
+            <Badge variant="outline" className="text-[10px] font-mono">
+              {filteredWeddings.length} Active Weddings
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-3.5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* 1. Revenue by Package Type */}
+            <div className="flex flex-col items-center bg-slate-50/50 p-3 rounded-lg border border-slate-100">
+              <div className="text-xs font-bold text-slate-800 mb-0.5">
+                Revenue by Package
+              </div>
+              <div className="text-[11px] text-slate-500 mb-2">
+                Full-Service vs Partial Day-Of
+              </div>
+              <div className="w-full h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={packageDistributionData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={35}
+                      outerRadius={55}
+                      paddingAngle={4}
+                    >
+                      {packageDistributionData.map((entry, index) => (
+                        <Cell key={`cell-pkg-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={renderCustomPieTooltip} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="w-full space-y-1 mt-2 text-[11px]">
+                {packageDistributionData.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 truncate text-slate-600">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="truncate">{item.name}</span>
+                    </span>
+                    <span className="font-mono font-bold text-slate-900 shrink-0">
+                      {item.pct}% ({item.formattedValue})
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 2. Destination Market Share */}
+            <div className="flex flex-col items-center bg-slate-50/50 p-3 rounded-lg border border-slate-100">
+              <div className="text-xs font-bold text-slate-800 mb-0.5">
+                Destination Market Share
+              </div>
+              <div className="text-[11px] text-slate-500 mb-2">
+                Jaipur vs Udaipur Portfolio
+              </div>
+              <div className="w-full h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={destinationDistributionData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={35}
+                      outerRadius={55}
+                      paddingAngle={4}
+                    >
+                      {destinationDistributionData.map((entry, index) => (
+                        <Cell key={`cell-city-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={renderCustomPieTooltip} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="w-full space-y-1 mt-2 text-[11px]">
+                {destinationDistributionData.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 truncate text-slate-600">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="truncate">{item.name}</span>
+                    </span>
+                    <span className="font-mono font-bold text-slate-900 shrink-0">
+                      {item.pct}% ({item.formattedValue})
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 3. Season Margin Health */}
+            <div className="flex flex-col items-center bg-slate-50/50 p-3 rounded-lg border border-slate-100">
+              <div className="text-xs font-bold text-slate-800 mb-0.5">
+                Agency Margin Health
+              </div>
+              <div className="text-[11px] text-slate-500 mb-2">
+                P&L Status & Extra Costs Audit
+              </div>
+              <div className="w-full h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={marginHealthDistributionData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={35}
+                      outerRadius={55}
+                      paddingAngle={4}
+                    >
+                      {marginHealthDistributionData.map((entry, index) => (
+                        <Cell key={`cell-margin-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={renderCustomPieTooltip} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="w-full space-y-1 mt-2 text-[11px]">
+                {marginHealthDistributionData.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 truncate text-slate-600">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="truncate">{item.name}</span>
+                    </span>
+                    <span className="font-mono font-bold text-slate-900 shrink-0">
+                      {item.pct}% ({item.value} weddings)
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </CardContent>
@@ -479,9 +824,8 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                   type="button"
                   onClick={() => setProfitViewMode('table')}
                   title="Table View"
-                  className={`p-1 rounded text-xs transition ${
-                    profitViewMode === 'table' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600'
-                  }`}
+                  className={`p-1 rounded text-xs transition ${profitViewMode === 'table' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600'
+                    }`}
                 >
                   <TableIcon className="w-3.5 h-3.5" />
                 </button>
@@ -489,9 +833,8 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                   type="button"
                   onClick={() => setProfitViewMode('chart')}
                   title="Chart View"
-                  className={`p-1 rounded text-xs transition ${
-                    profitViewMode === 'chart' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600'
-                  }`}
+                  className={`p-1 rounded text-xs transition ${profitViewMode === 'chart' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600'
+                    }`}
                 >
                   <BarChart3 className="w-3.5 h-3.5" />
                 </button>
@@ -636,54 +979,6 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
         </CardContent>
       </Card>
 
-      {/* Operational KPI Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {metrics.length === 0 && loading ? (
-          <div className="col-span-4 p-8 text-center text-slate-500 bg-white border border-slate-200 rounded">
-            <RefreshCw className="w-5 h-5 animate-spin mx-auto text-slate-400 mb-2" />
-            Loading real financial metrics from PostgreSQL...
-          </div>
-        ) : (
-          metrics.map((m, i) => {
-            const Icon = m.icon || TrendingUp;
-            return (
-              <Card key={i} className="border border-slate-200 shadow-2xs rounded bg-white">
-                <CardContent className="p-3.5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                      {m.label}
-                    </span>
-                    <div className="p-1 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                      <Icon className="w-3.5 h-3.5" />
-                    </div>
-                  </div>
-
-                  <div className="text-2xl font-bold font-mono text-slate-900 tracking-tight">
-                    {m.value}
-                  </div>
-
-                  <div className="flex items-center gap-1.5 text-xs pt-1 border-t border-slate-100">
-                    <span
-                      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold border ${m.positive
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                        : 'bg-slate-100 text-slate-700 border-slate-300'
-                        }`}
-                    >
-                      {m.positive ? (
-                        <ArrowUpRight className="w-3 h-3 mr-0.5" />
-                      ) : (
-                        <ArrowDownRight className="w-3 h-3 mr-0.5" />
-                      )}
-                      {m.change}
-                    </span>
-                    <span className="text-slate-500 text-[11px] truncate">{m.sub}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })
-        )}
-      </div>
       {/* SECTION 2: Cash Flow Forecast */}
       <Card className="border border-slate-200 shadow-2xs rounded bg-white">
         <CardHeader className="p-3.5 border-b border-slate-200 bg-slate-50/70">
