@@ -549,9 +549,9 @@ export async function billingRoutes(fastify: FastifyInstance) {
 
       const vendorBillsList: VendorDisbursementItem[] = billsRows.map((r) => {
         const baseNum = parseFloat(r.agreedBaseAmount) || 0;
-        const extrasNum = parseFloat(r.extraChargesAmount) || 0;
+        const extrasNum = parseFloat(r.extraChargesAmount || '0') || 0;
         const payableNum = parseFloat(r.totalPayable) || (baseNum + extrasNum);
-        const advNum = parseFloat(r.advancePaid) || 0;
+        const advNum = parseFloat(r.advancePaid || '0') || 0;
         const balNum = parseFloat(r.balanceDue) || Math.max(0, payableNum - advNum);
 
         return {
@@ -608,16 +608,23 @@ export async function billingRoutes(fastify: FastifyInstance) {
 
       const invoices: ClientInvoiceItem[] = invoicesRows.map((r) => {
         let pct = 30;
-        if (r.stageKey === 'BOOKING_DEPOSIT') pct = 20;
-        else if (r.stageKey === 'PRE_WEDDING_ADVANCE') pct = 50;
-
-        const stageLabel =
-          stageLabelMap.get(r.stageKey) ||
-          (r.stageKey === 'BOOKING_DEPOSIT'
-            ? 'Booking Deposit (20%)'
-            : r.stageKey === 'PRE_WEDDING_ADVANCE'
-            ? '30-Day Pre-Wedding Advance (50%)'
-            : 'Post-Event Final Settlement (30% + Extras)');
+        let stageLabel = stageLabelMap.get(r.stageKey);
+        if (r.stageKey === 'BOOKING_DEPOSIT') {
+          stageLabel = stageLabel || 'Booking Deposit (20%)';
+          pct = 20;
+        } else if (r.stageKey === 'PRE_WEDDING_ADVANCE') {
+          stageLabel = stageLabel || '30-Day Pre-Wedding Advance (50%)';
+          pct = 50;
+        } else if (r.stageKey === 'FINAL_SETTLEMENT') {
+          stageLabel = stageLabel || 'Post-Event Final Settlement (30% + Extras)';
+          pct = 30;
+        } else if (r.stageKey === 'DAY_OF_EXTRA' || (typeof r.stageKey === 'string' && r.stageKey.startsWith('EXTRA'))) {
+          stageLabel = r.paymentReference ? `Day-of Extra: ${r.paymentReference}` : 'Day-of Addition Extra Charge';
+          pct = 0;
+        } else {
+          stageLabel = stageLabel || (r.paymentReference ? `Extra: ${r.paymentReference}` : (r.stageKey || 'Additional Invoice'));
+          pct = 0;
+        }
 
         const dueNum = parseFloat(r.amountDue) || 0;
         const paidNum = parseFloat(r.paidAmount || '0') || 0;
@@ -987,7 +994,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
           return { success: false, message: `Bill ${billId} not found` };
         }
 
-        const currentAdvance = parseFloat(existingBill.advancePaid) || 0;
+        const currentAdvance = parseFloat(existingBill.advancePaid || '0') || 0;
         const totalPayable = parseFloat(existingBill.totalPayable) || 0;
         const additionalPay = Number(paymentAmount) || 0;
 
@@ -1114,7 +1121,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
             .limit(1);
 
           if (matchingBill) {
-            const currentExtras = parseFloat(matchingBill.extraChargesAmount) || 0;
+            const currentExtras = parseFloat(matchingBill.extraChargesAmount || '0') || 0;
             const currentTotal = parseFloat(matchingBill.totalPayable) || 0;
             const currentBal = parseFloat(matchingBill.balanceDue) || 0;
 

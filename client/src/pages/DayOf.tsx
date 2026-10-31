@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   CheckCircle2, 
   MapPin, 
@@ -85,8 +86,17 @@ interface VendorCheckin {
 }
 
 export const DayOf: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { weddings, selectedWeddingId, setSelectedWeddingId } = useWeddingStore();
+
+  // Read weddingId from URL if passed via "Go to Day-Of Ops Module"
+  useEffect(() => {
+    const urlWeddingId = searchParams.get('weddingId');
+    if (urlWeddingId) {
+      setSelectedWeddingId(urlWeddingId);
+    }
+  }, [searchParams, setSelectedWeddingId]);
 
   // Active Tab: Minute-by-Minute Run Sheet vs Vendor Arrival Telemetry
   const [activeTab, setActiveTab] = useState<'run-sheet' | 'vendor-arrivals'>('run-sheet');

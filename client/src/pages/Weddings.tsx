@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Plus, 
   Search, 
@@ -48,13 +48,30 @@ import {
 
 export const Weddings: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { weddings, loading, fetchWeddings, createWedding, setSelectedWeddingId } = useWeddingStore();
 
-  // Filters & View Mode
-  const [stageFilter, setStageFilter] = useState<string>('ALL');
-  const [cityFilter, setCityFilter] = useState<string>('ALL');
-  const [searchTerm, setSearchTerm] = useState<string>('');
+  // Filters & View Mode initialized from URL search params
+  const [stageFilter, setStageFilter] = useState<string>(
+    () => searchParams.get('stage') || searchParams.get('status') || 'ALL'
+  );
+  const [cityFilter, setCityFilter] = useState<string>(
+    () => searchParams.get('city') || 'ALL'
+  );
+  const [searchTerm, setSearchTerm] = useState<string>(
+    () => searchParams.get('search') || ''
+  );
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+
+  // Sync state if URL query params change
+  useEffect(() => {
+    const urlStage = searchParams.get('stage') || searchParams.get('status');
+    const urlCity = searchParams.get('city');
+    const urlSearch = searchParams.get('search');
+    if (urlStage) setStageFilter(urlStage);
+    if (urlCity) setCityFilter(urlCity);
+    if (urlSearch) setSearchTerm(urlSearch);
+  }, [searchParams]);
 
   // New Wedding Modal
   const [newModalOpen, setNewModalOpen] = useState<boolean>(false);
