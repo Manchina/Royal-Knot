@@ -100,6 +100,26 @@ export interface VendorScoreItem {
   reliability: 'High Reliability' | 'Satisfactory' | 'Watchlist';
 }
 
+export interface MetricCardItem {
+  label?: string;
+  title?: string;
+  value: string;
+  change?: string;
+  positive?: boolean;
+  isPositive?: boolean;
+  sub?: string;
+  subtext?: string;
+  icon?: React.ComponentType<{ className?: string }>;
+}
+
+export interface SeasonSummaryResponse {
+  success: boolean;
+  metrics?: MetricCardItem[];
+  weddingProfits?: WeddingProfit[];
+  cashFlowForecast?: CashFlowPeriod[];
+  vendorScorecard?: VendorScoreItem[];
+}
+
 interface ExecutiveDashboardProps {
   selectedCouple?: string;
 }
@@ -124,7 +144,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
   // Live PostgreSQL States
   const [loading, setLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<string>('');
-  const [metrics, setMetrics] = useState<any[]>([]);
+  const [metrics, setMetrics] = useState<MetricCardItem[]>([]);
   const [weddingProfits, setWeddingProfits] = useState<WeddingProfit[]>([]);
   const [cashFlowForecast, setCashFlowForecast] = useState<CashFlowPeriod[]>([]);
   const [vendorScorecard, setVendorScorecard] = useState<VendorScoreItem[]>([]);
@@ -133,10 +153,10 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
   const fetchSeasonSummary = async () => {
     try {
       setLoading(true);
-      const res = await api.get<any>('/api/analytics/season-summary');
+      const res = await api.get<SeasonSummaryResponse>('/api/analytics/season-summary');
       if (res && res.success) {
         const iconMap = [TrendingUp, DollarSign, Calendar, Users];
-        const mappedMetrics = (res.metrics || []).map((m: any, i: number) => ({
+        const mappedMetrics = (res.metrics || []).map((m, i: number) => ({
           ...m,
           icon: iconMap[i % iconMap.length],
         }));
@@ -388,7 +408,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
 
               {/* Margin Status Filter */}
               <div className="w-40">
-                <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val as any)}>
+                <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val as 'ALL' | 'High Margin' | 'On Target' | 'Audit Extras')}>
                   <SelectTrigger className="h-8 text-xs bg-white border-slate-300">
                     <SelectValue placeholder="All Margins" />
                   </SelectTrigger>
@@ -580,7 +600,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                     <XAxis dataKey="code" tick={{ fontSize: 11, fill: '#64748B' }} />
                     <YAxis tick={{ fontSize: 11, fill: '#64748B' }} tickFormatter={(val) => `₹${val}Cr`} />
                     <Tooltip
-                      content={({ active, payload }: any) => {
+                      content={({ active, payload }) => {
                         if (!active || !payload?.length) return null;
                         const data = payload[0].payload;
                         return (
@@ -776,7 +796,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                     <XAxis dataKey="period" tick={{ fontSize: 11, fill: '#64748B' }} />
                     <YAxis tick={{ fontSize: 11, fill: '#64748B' }} tickFormatter={(val) => `₹${val}L`} />
                     <Tooltip
-                      formatter={(value: any, name: any) => [`₹${value} L`, name]}
+                      formatter={(value, name) => [`₹${String(value)} L`, String(name)]}
                       contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px' }}
                     />
                     <Bar dataKey="inflows" name="Milestone Inflows" fill="#059669" radius={[4, 4, 0, 0]} />
@@ -978,7 +998,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                       <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748B' }} tickFormatter={(val) => `${val}%`} />
                       <YAxis dataKey="name" type="category" tick={{ fontSize: 10, fill: '#334155' }} width={120} />
                       <Tooltip
-                        content={({ active, payload }: any) => {
+                        content={({ active, payload }) => {
                           if (!active || !payload?.length) return null;
                           const d = payload[0].payload;
                           return (
@@ -1038,7 +1058,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                       <XAxis dataKey="category" tick={{ fontSize: 10, fill: '#64748B' }} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#64748B' }} tickFormatter={(val) => `${val}%`} />
                       <Tooltip
-                        formatter={(val: any) => [`${val}%`, 'Avg On-Time']}
+                        formatter={(val) => [`${String(val)}%`, 'Avg On-Time']}
                         contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px' }}
                       />
                       <Bar dataKey="avgOnTime" name="Avg On-Time %" fill="#714B67" radius={[4, 4, 0, 0]} />

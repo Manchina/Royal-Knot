@@ -2,10 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { CreditCard, Receipt, FileText, History } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui';
-import { api } from '../api/client';
 import { useWeddingStore } from '../store/useWeddingStore';
+import { useBillingStore } from '../store/useBillingStore';
 import {
-  type ProjectFinancials,
   type LiveVendorBill,
   type LiveInvoice,
   BillingHeader,
@@ -25,10 +24,18 @@ export const BillingProjectDetail: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { weddings } = useWeddingStore();
+  const {
+    currentProject: project,
+    fetchProjectDossier,
+    syncAwardedQuotes,
+    createExtraCharge,
+    createVendorBill,
+    reconcileVendorBill,
+    recordPayment,
+    finaliseProject,
+  } = useBillingStore();
 
-  const [_loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>('vendorBills');
-  const [project, setProject] = useState<ProjectFinancials | null>(null);
 
   // Modals state
   const [extraModalOpen, setExtraModalOpen] = useState<boolean>(false);
@@ -41,50 +48,22 @@ export const BillingProjectDetail: React.FC = () => {
   const [selectedBill, setSelectedBill] = useState<LiveVendorBill | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<LiveInvoice | null>(null);
 
-  // Fallback target wedding from store
+  // Target wedding from store
   const storeWedding = useMemo(() => {
-    return weddings.find((w) => w.id === projectId || w.code === projectId) || weddings[0];
+    return weddings.find((w) => w.id === projectId || w.code === projectId);
   }, [weddings, projectId]);
 
-  // Fetch full live project dossier
-  const fetchProjectDossier = async () => {
-    const idToFetch = projectId || storeWedding?.id || 'RW-2026-001';
-    try {
-      setLoading(true);
-      const res = await api.get<{ success: boolean; data: ProjectFinancials }>(
-        `/billing/projects/${idToFetch}`
-      );
-      if (res?.success && res.data) {
-        setProject(res.data);
-      }
-    } catch (err) {
-      console.warn('Failed to fetch live project billing dossier:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const idToFetch = projectId || storeWedding?.id || '';
 
   useEffect(() => {
-    fetchProjectDossier();
-  }, [projectId]);
+    if (idToFetch) {
+      fetchProjectDossier(idToFetch);
+    }
+  }, [idToFetch, fetchProjectDossier]);
 
   // Sync Winning Quotes Action
   const handleSyncAwardedQuotes = async () => {
-    const idToFetch = projectId || project?.id;
-    try {
-      setLoading(true);
-      const res = await api.post<{ success: boolean; message: string; syncedCount: number }>(
-        `/billing/projects/${idToFetch}/sync-awarded-quotes`,
-        {}
-      );
-      if (res?.success) {
-        await fetchProjectDossier();
-      }
-    } catch (err) {
-      console.error('Error syncing quotes:', err);
-    } finally {
-      setLoading(false);
-    }
+    await syncAwardedQuotes(idToFetch);
   };
 
   // Submit Extra Charge
@@ -95,12 +74,7 @@ export const BillingProjectDetail: React.FC = () => {
     unitPrice: number;
     vendor: string;
   }) => {
-    const idToFetch = projectId || project?.id;
-    await api.post(`/billing/projects/${idToFetch}/extras`, {
-      ...data,
-      performedBy: 'Devika Sharma (Finance Manager)',
-    });
-    await fetchProjectDossier();
+    await createExtraCharge(idToFetch, data);
   };
 
   // Submit New Vendor Bill
@@ -110,12 +84,12 @@ export const BillingProjectDetail: React.FC = () => {
     advancePaid: number;
     notes: string;
   }) => {
-    const idToFetch = projectId || project?.id;
-    await api.post(`/billing/projects/${idToFetch}/vendor-bills`, {
-      ...data,
-      performedBy: 'Devika Sharma (Finance Manager)',
+    await createVendorBill(idToFetch, {
+      vendorId: data.vendorId,
+      agreedBase: data.agreedBaseAmount,
+      category: 'GENERAL',
+      notes: data.notes,
     });
-    await fetchProjectDossier();
   };
 
   // Submit Reconcile / Record Vendor Bill Payment
@@ -125,13 +99,12 @@ export const BillingProjectDetail: React.FC = () => {
     notes: string;
   }) => {
     if (!selectedBill) return;
-    const idToFetch = projectId || project?.id;
-    await api.put(`/billing/projects/${idToFetch}/vendor-bills/${selectedBill.id}/reconcile`, {
-      ...data,
-      performedBy: 'Devika Sharma (Finance Manager)',
+    await reconcileVendorBill(idToFetch, selectedBill.id, {
+      reconciledAmount: data.paymentAmount,
+      status: 'RECONCILED_MATCHED',
+      notes: data.notes || data.paymentReference,
     });
     setSelectedBill(null);
-    await fetchProjectDossier();
   };
 
   // Submit Pay Invoice
@@ -140,24 +113,19 @@ export const BillingProjectDetail: React.FC = () => {
     paymentReference: string;
   }) => {
     if (!selectedInvoice) return;
-    const idToFetch = projectId || project?.id;
-    await api.put(`/billing/projects/${idToFetch}/pay-invoice`, {
-      invoiceId: selectedInvoice.id,
-      ...data,
-      performedBy: 'Aditya Singhal (Finance Director)',
+    await recordPayment(idToFetch, selectedInvoice.id, {
+      amount: data.paidAmount,
+      reference: data.paymentReference,
     });
     setSelectedInvoice(null);
-    await fetchProjectDossier();
   };
 
   // Submit Finalise Project
   const handleFinaliseProject = async (notes: string) => {
-    const idToFetch = projectId || project?.id;
-    await api.put(`/billing/projects/${idToFetch}/finalise`, {
-      notes,
-      performedBy: 'Aditya Singhal (Super Admin)',
+    await finaliseProject(idToFetch, {
+      finalisedBy: 'Aditya Singhal (Super Admin)',
+      settlementNotes: notes,
     });
-    await fetchProjectDossier();
   };
 
   return (
@@ -166,7 +134,7 @@ export const BillingProjectDetail: React.FC = () => {
       <BillingHeader
         project={project}
         storeWedding={storeWedding}
-        onRefresh={fetchProjectDossier}
+        onRefresh={() => fetchProjectDossier(idToFetch)}
         onOpenExtraModal={() => setExtraModalOpen(true)}
         onOpenBillModal={() => setBillModalOpen(true)}
         onOpenFinaliseModal={() => setFinaliseModalOpen(true)}

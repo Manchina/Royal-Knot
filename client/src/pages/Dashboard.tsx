@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuthStore, type UserRole } from '../store/useAuthStore';
 import { api } from '../api/client';
+import { type WeddingSummary } from '../store/useWeddingStore';
 import {
   PerspectiveSwitcher,
   ExecutiveDashboard,
@@ -29,13 +30,13 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchCouples = async () => {
       try {
-        const res = await api.get<{ success: boolean; data: any[] }>('/api/weddings');
+        const res = await api.get<{ success: boolean; data: WeddingSummary[] }>('/api/weddings');
         if (res?.success && Array.isArray(res.data)) {
-          const formatted: CoupleOption[] = res.data.map((w: any) => ({
+          const formatted: CoupleOption[] = res.data.map((w: WeddingSummary) => ({
             code: w.code,
             couple: w.couple || `${w.brideName || 'Bride'} & ${w.groomName || 'Groom'}`,
-            city: w.destinationCity || w.city,
-            venue: w.primaryVenue || w.venue,
+            city: w.city,
+            venue: w.venue,
           }));
           setCouplesList(formatted);
         }

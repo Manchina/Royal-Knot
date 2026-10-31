@@ -35,6 +35,7 @@ import {
   SelectItem,
 } from '../ui';
 import { api } from '../../api/client';
+import { type WeddingSummary } from '../../store/useWeddingStore';
 
 interface WeddingOverviewItem {
   id: string;
@@ -107,14 +108,14 @@ export const PlannerDashboard: React.FC<PlannerDashboardProps> = ({
       setLoading(true);
 
       const [weddingsRes, enquiriesRes, tasksRes] = await Promise.allSettled([
-        api.get<{ success: boolean; data: any[] }>('/api/weddings'),
-        api.get<{ success: boolean; data: any[] }>('/api/enquiries'),
-        api.get<{ success: boolean; data: any[] }>('/api/tasks'),
+        api.get<{ success: boolean; data: WeddingSummary[] }>('/api/weddings'),
+        api.get<{ success: boolean; data: EnquiryItem[] }>('/api/enquiries'),
+        api.get<{ success: boolean; data: TaskItem[] }>('/api/tasks'),
       ]);
 
       if (weddingsRes.status === 'fulfilled' && weddingsRes.value?.success) {
         setWeddings(
-          (weddingsRes.value.data || []).map((w: any) => ({
+          (weddingsRes.value.data || []).map((w: WeddingSummary & { destinationCity?: string; primaryVenue?: string; estimatedGuestCount?: number; totalBudget?: string }) => ({
             id: w.id,
             code: w.code,
             couple: w.couple || `${w.brideName || 'Bride'} & ${w.groomName || 'Groom'}`,
@@ -123,7 +124,7 @@ export const PlannerDashboard: React.FC<PlannerDashboardProps> = ({
             startDate: w.startDate,
             endDate: w.endDate,
             guestCount: w.estimatedGuestCount || w.guestCount || 400,
-            budget: w.totalBudget ? `₹${(parseFloat(w.totalBudget) / 10000000).toFixed(2)} Cr` : '₹2.50 Cr',
+            budget: w.totalBudget ? `₹${(parseFloat(w.totalBudget) / 10000000).toFixed(2)} Cr` : (w.budget || '₹2.50 Cr'),
             status: w.status || 'IN_PLANNING',
             packageType: w.packageType || 'Full-Service Royal Wedding',
             theme: w.theme || 'Royal Heritage',

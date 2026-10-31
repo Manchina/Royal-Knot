@@ -100,41 +100,42 @@ export const EnquiryDetail: React.FC = () => {
     if (!id) return;
     try {
       setLoading(true);
-      const res = await api.get(`/enquiries/${id}`);
-      if (res.success && res.data) {
+      const res = await api.get<{
+        success: boolean;
+        data?: EnquiryData;
+      }>(`/enquiries/${id}`);
+      if (res?.success && res?.data) {
         const raw = res.data;
-        const budgetRaw = raw.budgetMax || raw.budget_max;
         let budgetStr = '₹2.50 Cr';
-        if (budgetRaw) {
-          const cr = Number(budgetRaw) / 10000000;
+        if (raw.budgetMax) {
+          const cr = Number(raw.budgetMax) / 10000000;
           budgetStr = `₹${cr.toFixed(2)} Cr`;
         }
 
-        const rawAgreement = raw.agreementStatus || raw.agreement_status || 'Drafting Agreement';
         let agreementSt = 'Drafting Agreement';
-        if (String(rawAgreement).includes('Signed')) agreementSt = 'Signed on Mobile';
-        else if (String(rawAgreement).includes('Sent')) agreementSt = 'Sent - Pending Signature';
+        if (raw.agreementStatus?.includes('Signed')) agreementSt = 'Signed on Mobile';
+        else if (raw.agreementStatus?.includes('Sent')) agreementSt = 'Sent - Pending Signature';
 
         setEnquiry({
           id: raw.id,
           code: raw.code || `ENQ-${String(raw.id).slice(0, 8)}`,
-          coupleName: raw.coupleName || raw.couple_name || 'Couple Consultation',
-          primaryContactName: raw.primaryContactName || raw.primary_contact_name,
+          coupleName: raw.coupleName || 'Couple Consultation',
+          primaryContactName: raw.primaryContactName,
           channel: raw.channel || 'Website Consultation',
           phone: raw.phone || '',
           email: raw.email || '',
-          cityPreference: (raw.cityPreference || raw.city_preference) === 'Jaipur' ? 'Jaipur' : 'Udaipur',
-          datesRough: raw.datesRough || raw.dates_rough || 'Winter 2026',
-          guestCount: Number(raw.guestCount || raw.guest_count) || 400,
+          cityPreference: raw.cityPreference === 'Jaipur' ? 'Jaipur' : 'Udaipur',
+          datesRough: raw.datesRough || 'Winter 2026',
+          guestCount: Number(raw.guestCount) || 400,
           theme: raw.theme || 'Royal Heritage Grandeur',
           budgetMax: budgetStr,
-          packagePreference: raw.packagePreference || raw.package_preference || 'FULL_SERVICE',
+          packagePreference: raw.packagePreference || 'FULL_SERVICE',
           agreementStatus: agreementSt,
-          agreementSignedAt: raw.agreementSignedAt || raw.agreement_signed_at,
+          agreementSignedAt: raw.agreementSignedAt,
           status: raw.status || 'Initial Discovery',
-          weddingId: raw.weddingId || raw.wedding_id,
+          weddingId: raw.weddingId,
           notes: raw.notes || '',
-          createdAt: raw.createdAt || raw.created_at,
+          createdAt: raw.createdAt,
         });
 
         fetchLogs(raw.id);
@@ -149,8 +150,8 @@ export const EnquiryDetail: React.FC = () => {
   // Load change logs
   const fetchLogs = async (enquiryId: string) => {
     try {
-      const res = await api.get(`/enquiries/${enquiryId}/logs`);
-      if (res.success && Array.isArray(res.data)) {
+      const res = await api.get<{ success: boolean; data?: ChangeLogItem[] }>(`/enquiries/${enquiryId}/logs`);
+      if (res?.success && Array.isArray(res.data)) {
         setLogs(res.data);
       }
     } catch (err) {
@@ -234,8 +235,8 @@ export const EnquiryDetail: React.FC = () => {
     if (!enquiry) return;
     try {
       setActionLoading(true);
-      const res = await api.post(`/enquiries/${enquiry.id}/convert`);
-      if (res.success && res.wedding) {
+      const res = await api.post<{ success: boolean; wedding?: { code: string; id: string } }>(`/enquiries/${enquiry.id}/convert`);
+      if (res?.success && res?.wedding) {
         setSelectedWeddingId(res.wedding.code);
         navigate('/weddings');
       }
@@ -252,12 +253,12 @@ export const EnquiryDetail: React.FC = () => {
     if (!newNote.trim() || !enquiry) return;
     try {
       setPostingNote(true);
-      const res = await api.post(`/enquiries/${enquiry.id}/logs`, {
+      const res = await api.post<{ success: boolean; data?: ChangeLogItem }>(`/enquiries/${enquiry.id}/logs`, {
         notes: newNote.trim(),
         action: noteActionType,
         performedBy: 'Devika Sharma (Lead Planner)',
       });
-      if (res.success && res.data) {
+      if (res?.success && res?.data) {
         setLogs([res.data, ...logs]);
         setNewNote('');
       }

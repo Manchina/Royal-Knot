@@ -11,10 +11,11 @@ import {
 } from 'lucide-react';
 import { Button, Badge } from '../ui';
 import type { ProjectFinancials } from './types';
+import type { WeddingSummary } from '../../store/useWeddingStore';
 
 interface BillingHeaderProps {
   project: ProjectFinancials | null;
-  storeWedding?: any;
+  storeWedding?: WeddingSummary | null;
   onRefresh: () => void;
   onOpenExtraModal: () => void;
   onOpenBillModal: () => void;

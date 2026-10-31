@@ -94,8 +94,9 @@ export const FinanceDashboard: React.FC<FinanceDashboardProps> = ({
     try {
       setLoading(true);
 
-      const [projectsRes] = await Promise.allSettled([
-        api.get<any>('/api/billing/projects'),
+      const [projectsRes, extrasRes] = await Promise.allSettled([
+        api.get<{ success: boolean; data: BillingProjectItem[] | { ongoing?: BillingProjectItem[]; finalised?: BillingProjectItem[] } }>('/api/billing/projects'),
+        api.get<{ success: boolean; data: ExtraChargeItem[] }>('/api/billing/unbilled-extras'),
       ]);
 
       if (projectsRes.status === 'fulfilled' && projectsRes.value?.success) {
@@ -114,53 +115,9 @@ export const FinanceDashboard: React.FC<FinanceDashboardProps> = ({
         setProjects(list);
       }
 
-      // Live unbilled extras queue
-      setUnbilledExtras([
-        {
-          id: 'ex-1',
-          weddingCode: 'RW-2026-001',
-          category: 'EXTRA_PLATES',
-          description: '60 Extra Banquet Dinner Plates (@ ₹2,100 / plate)',
-          quantity: 60,
-          unitRate: 2100,
-          totalAmount: 126000,
-          isBilledToClient: false,
-          status: 'PENDING_APPROVAL',
-        },
-        {
-          id: 'ex-2',
-          weddingCode: 'RW-2026-001',
-          category: 'DJ_OVERTIME',
-          description: '2 Hours Soundcraft DJ Overtime Post-Midnight',
-          quantity: 2,
-          unitRate: 15000,
-          totalAmount: 30000,
-          isBilledToClient: false,
-          status: 'PENDING_APPROVAL',
-        },
-        {
-          id: 'ex-3',
-          weddingCode: 'RW-2026-002',
-          category: 'GENERATOR_FUEL',
-          description: 'Auxiliary 20kVA Diesel Generator for Mandap Lighting',
-          quantity: 1,
-          unitRate: 18000,
-          totalAmount: 18000,
-          isBilledToClient: false,
-          status: 'PENDING_APPROVAL',
-        },
-        {
-          id: 'ex-4',
-          weddingCode: 'RW-2026-003',
-          category: 'EXTRA_PLATES',
-          description: '35 Extra Banquet High-Tea Plates (@ ₹1,950 / plate)',
-          quantity: 35,
-          unitRate: 1950,
-          totalAmount: 68250,
-          isBilledToClient: false,
-          status: 'PENDING_APPROVAL',
-        },
-      ]);
+      if (extrasRes.status === 'fulfilled' && extrasRes.value?.success) {
+        setUnbilledExtras(extrasRes.value.data || []);
+      }
     } catch (err) {
       console.error('Failed to load finance dashboard data:', err);
     } finally {

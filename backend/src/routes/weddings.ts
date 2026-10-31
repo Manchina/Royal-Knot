@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { db } from '../db';
-import { weddings, clients, users, weddingEvents, rfqRequests, vendorQuotes, vendors } from '../db/schema';
+import { weddings, clients, users, weddingEvents, rfqRequests, vendorQuotes, vendors, clientInvoices } from '../db/schema';
 import { eq, desc, asc, sql, count } from 'drizzle-orm';
 import { isUUID } from '../utils';
 
@@ -108,10 +108,11 @@ export async function weddingRoutes(fastify: FastifyInstance) {
         data,
         total: data.length,
       };
-    } catch (err: any) {
-      fastify.log.error(err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve weddings from database';
+      fastify.log.error(msg);
       reply.status(500);
-      return { success: false, message: 'Failed to retrieve weddings from database', error: err.message };
+      return { success: false, message: 'Failed to retrieve weddings from database', error: msg };
     }
   });
 
@@ -137,9 +138,10 @@ export async function weddingRoutes(fastify: FastifyInstance) {
         success: true,
         data: options,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve options';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -218,9 +220,10 @@ export async function weddingRoutes(fastify: FastifyInstance) {
           rfqs,
         },
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve wedding details';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -324,6 +327,91 @@ export async function weddingRoutes(fastify: FastifyInstance) {
         })
         .returning();
 
+      // 5. Generate Milestone Client Invoices in PostgreSQL (Deposit 20%, Advance 50%, Final Settlement 30%)
+      const depositDue = rawBudget * 0.20;
+      const advanceDue = rawBudget * 0.50;
+      const finalDue = rawBudget * 0.30;
+
+      const startDateObj = new Date(finalStartDate);
+      const depositDueDate = new Date(Math.max(Date.now(), startDateObj.getTime() - 90 * 86400000)).toISOString().split('T')[0];
+      const advanceDueDate = new Date(Math.max(Date.now(), startDateObj.getTime() - 30 * 86400000)).toISOString().split('T')[0];
+      const finalDueDate = finalEndDate;
+
+      await db.insert(clientInvoices).values([
+        {
+          weddingId: createdWedding.id,
+          invoiceNumber: `INV-${createdWedding.code}-A`,
+          stageKey: 'BOOKING_DEPOSIT',
+          amountDue: String(depositDue),
+          dueDate: depositDueDate,
+          status: 'UNPAID',
+        },
+        {
+          weddingId: createdWedding.id,
+          invoiceNumber: `INV-${createdWedding.code}-B`,
+          stageKey: 'PRE_WEDDING_ADVANCE',
+          amountDue: String(advanceDue),
+          dueDate: advanceDueDate,
+          status: 'UNPAID',
+        },
+        {
+          weddingId: createdWedding.id,
+          invoiceNumber: `INV-${createdWedding.code}-C`,
+          stageKey: 'FINAL_SETTLEMENT',
+          amountDue: String(finalDue),
+          dueDate: finalDueDate,
+          status: 'UNPAID',
+        },
+      ]);
+
+      // 6. Generate Default Ceremony Events in PostgreSQL
+      await db.insert(weddingEvents).values([
+        {
+          weddingId: createdWedding.id,
+          ceremonyType: 'HALDI',
+          eventName: 'Phoolon Ki Haldi Ceremony',
+          venueHall: 'Courtyard Lawn',
+          eventDate: finalStartDate,
+          startTime: '10:00:00',
+          endTime: '13:00:00',
+          leadCoordinatorId: leadPlannerId,
+          sortOrder: 1,
+        },
+        {
+          weddingId: createdWedding.id,
+          ceremonyType: 'SANGEET',
+          eventName: 'Royal Sangeet & Musical Night',
+          venueHall: 'Grand Palace Ballroom',
+          eventDate: finalStartDate,
+          startTime: '19:00:00',
+          endTime: '23:30:00',
+          leadCoordinatorId: leadPlannerId,
+          sortOrder: 2,
+        },
+        {
+          weddingId: createdWedding.id,
+          ceremonyType: 'VARMALA_PHERAS',
+          eventName: 'Varmala & Vedic Pheras',
+          venueHall: 'Royal Mandap Pavilion',
+          eventDate: finalEndDate,
+          startTime: '17:30:00',
+          endTime: '20:30:00',
+          leadCoordinatorId: leadPlannerId,
+          sortOrder: 3,
+        },
+        {
+          weddingId: createdWedding.id,
+          ceremonyType: 'RECEPTION',
+          eventName: 'Grand Banquet Reception Dinner',
+          venueHall: 'Main Palace Banquet Hall',
+          eventDate: finalEndDate,
+          startTime: '20:30:00',
+          endTime: '01:00:00',
+          leadCoordinatorId: leadPlannerId,
+          sortOrder: 4,
+        },
+      ]);
+
       return {
         success: true,
         message: 'Wedding project created successfully in database',
@@ -341,9 +429,10 @@ export async function weddingRoutes(fastify: FastifyInstance) {
           budget: `₹${(rawBudget / 10000000).toFixed(2)} Cr`,
         },
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to create wedding project';
       reply.status(500);
-      return { success: false, message: 'Failed to create wedding project', error: err.message };
+      return { success: false, message: 'Failed to create wedding project', error: msg };
     }
   });
 }

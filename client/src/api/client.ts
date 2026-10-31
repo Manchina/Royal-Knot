@@ -1,8 +1,8 @@
 export class ApiError extends Error {
   status: number;
-  data: any;
+  data: unknown;
 
-  constructor(message: string, status: number, data?: any) {
+  constructor(message: string, status: number, data?: unknown) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
@@ -12,7 +12,7 @@ export class ApiError extends Error {
 
 export const BACKEND_URL = 'http://localhost:5000/api';
 
-export async function apiClient<T = any>(
+export async function apiClient<T = unknown>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -56,7 +56,9 @@ export async function apiClient<T = any>(
   const data = isJson ? await res.json() : await res.text();
 
   if (!res.ok) {
-    const errorMessage = isJson && data?.message ? data.message : res.statusText || 'API request failed';
+    const errorMessage = isJson && data && typeof data === 'object' && 'message' in data && typeof (data as { message: unknown }).message === 'string'
+      ? (data as { message: string }).message
+      : res.statusText || 'API request failed';
     throw new ApiError(errorMessage, res.status, data);
   }
 
@@ -64,30 +66,30 @@ export async function apiClient<T = any>(
 }
 
 export const api = {
-  get: <T = any>(url: string, options?: RequestInit) =>
+  get: <T = unknown>(url: string, options?: RequestInit) =>
     apiClient<T>(url, { ...options, method: 'GET' }),
 
-  post: <T = any>(url: string, body?: any, options?: RequestInit) =>
+  post: <T = unknown>(url: string, body?: unknown, options?: RequestInit) =>
     apiClient<T>(url, {
       ...options,
       method: 'POST',
       body: body ? JSON.stringify(body) : undefined,
     }),
 
-  put: <T = any>(url: string, body?: any, options?: RequestInit) =>
+  put: <T = unknown>(url: string, body?: unknown, options?: RequestInit) =>
     apiClient<T>(url, {
       ...options,
       method: 'PUT',
       body: body ? JSON.stringify(body) : undefined,
     }),
 
-  patch: <T = any>(url: string, body?: any, options?: RequestInit) =>
+  patch: <T = unknown>(url: string, body?: unknown, options?: RequestInit) =>
     apiClient<T>(url, {
       ...options,
       method: 'PATCH',
       body: body ? JSON.stringify(body) : undefined,
     }),
 
-  delete: <T = any>(url: string, options?: RequestInit) =>
+  delete: <T = unknown>(url: string, options?: RequestInit) =>
     apiClient<T>(url, { ...options, method: 'DELETE' }),
 };

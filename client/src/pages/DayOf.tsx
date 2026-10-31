@@ -346,7 +346,7 @@ export const DayOf: React.FC = () => {
       </div>
 
       {/* Primary Tabs: Minute-by-Minute Run Sheet & Vendor Arrival Telemetry */}
-      <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full space-y-3">
+      <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as 'run-sheet' | 'vendor-arrivals')} className="w-full space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200 rounded p-2 shadow-2xs">
           <TabsList className="h-8 bg-slate-100 border border-slate-200">
             <TabsTrigger value="run-sheet" className="text-xs px-4 font-semibold gap-1.5">

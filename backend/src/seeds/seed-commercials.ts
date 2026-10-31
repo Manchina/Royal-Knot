@@ -66,8 +66,8 @@ export async function seedCommercialsRealtimeData() {
   `, [wedding1Id, wedding2Id, wedding3Id, wedding4Id, wedding5Id]);
 
   // Fetch actual wedding IDs mapped by code
-  const wedMapRes = await pool.query(`SELECT id, code FROM weddings`);
-  const codeToId = new Map(wedMapRes.rows.map((r: any) => [r.code, r.id]));
+  const wedMapRes = await pool.query<{ id: string; code: string }>(`SELECT id, code FROM weddings`);
+  const codeToId = new Map(wedMapRes.rows.map((r) => [r.code, r.id]));
 
   const w1 = codeToId.get('RW-2026-001')!;
   const w2 = codeToId.get('RW-2026-002')!;

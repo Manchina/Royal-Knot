@@ -52,6 +52,32 @@ interface CatererBid {
   isRecommended?: boolean;
 }
 
+interface ClientPortalInvoice {
+  id?: string;
+  stage?: string;
+  stageLabel?: string;
+  amount?: string;
+  percentage?: number;
+  status?: string;
+  dueDate?: string;
+}
+
+interface ProjectDetailData {
+  couple?: string;
+  brideName?: string;
+  groomName?: string;
+  venue?: string;
+  city?: string;
+  startDate?: string;
+  endDate?: string;
+  guestCount?: number;
+  actualHeadcount?: number;
+  status?: string;
+  budget?: string;
+  invoices?: ClientPortalInvoice[];
+  availableQuotes?: unknown[];
+}
+
 export const ClientPortalView: React.FC<ClientPortalViewProps> = ({
   selectedCouple = 'ALL',
   couplesList = [],
@@ -74,15 +100,67 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({
   }, [selectedCouple, couplesList]);
 
   // Live PostgreSQL project & billing details
-  const [projectData, setProjectData] = useState<any>(null);
+  const [projectData, setProjectData] = useState<ProjectDetailData | null>(null);
+  const [dbQuotes, setDbQuotes] = useState<CatererBid[]>([]);
 
   useEffect(() => {
     let isMounted = true;
     const fetchProjectDetails = async () => {
       try {
-        const res = await api.get<any>(`/api/billing/projects/${activeCouple.code}`);
-        if (isMounted && res?.success && res.data) {
-          setProjectData(res.data);
+        const [projectRes, procurementRes] = await Promise.allSettled([
+          api.get<{ success: boolean; data?: ProjectDetailData }>(`/api/billing/projects/${activeCouple.code}`),
+          api.get<{
+            success: boolean;
+            data?: Array<{
+              code: string;
+              categories?: {
+                CATERER?: {
+                  quotes?: Array<{
+                    id: string;
+                    businessName?: string;
+                    rating?: string;
+                    pricePerPlate?: string;
+                    overtimeHourlyRate?: string;
+                    status?: string;
+                    isWinner?: boolean;
+                  }>;
+                };
+              };
+            }>;
+          }>('/api/procurement/weddings-overview'),
+        ]);
+
+        if (isMounted && projectRes.status === 'fulfilled' && projectRes.value?.success && projectRes.value.data) {
+          setProjectData(projectRes.value.data);
+        }
+
+        if (isMounted && procurementRes.status === 'fulfilled' && procurementRes.value?.success && Array.isArray(procurementRes.value.data)) {
+          const match = procurementRes.value.data.find((w) => w.code === activeCouple.code);
+          const quotesList = match?.categories?.CATERER?.quotes;
+          if (Array.isArray(quotesList) && quotesList.length > 0) {
+            setDbQuotes(
+              quotesList.map((q) => {
+                const p = parseFloat(q.pricePerPlate || '2100') || 2100;
+                const ot = parseFloat(q.overtimeHourlyRate || '15000') || 15000;
+                const isAwarded = q.isWinner || q.status === 'ACCEPTED' || q.status === 'AWARDED';
+                return {
+                  id: q.id,
+                  name: q.businessName || 'Royal Banquet Caterers',
+                  rating: parseFloat(q.rating || '4.9') || 4.9,
+                  pricePerPlate: p,
+                  formattedPrice: `₹${p.toLocaleString('en-IN')}`,
+                  overtimeRate: `₹${ot.toLocaleString('en-IN')} / hr`,
+                  inclusions: [
+                    'Handcrafted royal presentation & stewards',
+                    'Live Chaat & Dessert Stations',
+                    `Overtime: ₹${ot.toLocaleString('en-IN')} / hr`,
+                  ],
+                  status: (isAwarded ? 'AWARDED' : 'EVALUATION') as 'AWARDED' | 'EVALUATION',
+                  isRecommended: isAwarded,
+                };
+              })
+            );
+          }
         }
       } catch (err) {
         console.warn(`Failed to fetch project details for ${activeCouple.code}:`, err);
@@ -184,12 +262,12 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({
 
   // 3. Dynamic Payment Schedule from live PostgreSQL invoices
   const paymentSchedule = useMemo(() => {
-    const invoices = Array.isArray(weddingInfo.invoices) ? weddingInfo.invoices : [];
-    const paidInvoices = invoices.filter((i: any) => i.status === 'PAID');
-    const unpaidInvoices = invoices.filter((i: any) => i.status !== 'PAID');
+    const invoices = Array.isArray(weddingInfo.invoices) ? (weddingInfo.invoices as ClientPortalInvoice[]) : [];
+    const paidInvoices = invoices.filter((i) => i.status === 'PAID');
+    const unpaidInvoices = invoices.filter((i) => i.status !== 'PAID');
 
     let totalPct = 0;
-    paidInvoices.forEach((i: any) => {
+    paidInvoices.forEach((i) => {
       totalPct += Number(i.percentage) || 0;
     });
 
@@ -228,6 +306,8 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({
 
   // 4. Dynamic Couple Decision Room (Banquet Catering Quotes)
   const catererQuotes = useMemo<CatererBid[]>(() => {
+    if (dbQuotes.length > 0) return dbQuotes;
+
     const city = (weddingInfo.city || '').toLowerCase();
     const guests = weddingInfo.guestCount || 400;
 

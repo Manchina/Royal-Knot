@@ -108,10 +108,10 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
       setLoading(true);
 
       const [runSheetRes, checkinsRes, incidentsRes, headcountRes] = await Promise.allSettled([
-        api.get<{ success: boolean; data: any[] }>(`/api/day-of/run-sheet?weddingId=${targetCode}`),
-        api.get<{ success: boolean; data: any[] }>(`/api/day-of/vendor-checkins?weddingId=${targetCode}`),
-        api.get<{ success: boolean; data: any[] }>(`/api/day-of/incidents?weddingId=${targetCode}`),
-        api.get<{ success: boolean; data: any }>(`/api/day-of/headcount?weddingId=${targetCode}`),
+        api.get<{ success: boolean; data: RunSheetItem[] }>(`/api/day-of/run-sheet?weddingId=${targetCode}`),
+        api.get<{ success: boolean; data: VendorCheckinItem[] }>(`/api/day-of/vendor-checkins?weddingId=${targetCode}`),
+        api.get<{ success: boolean; data: IncidentItem[] }>(`/api/day-of/incidents?weddingId=${targetCode}`),
+        api.get<{ success: boolean; data: { contractedCount?: number; actualCount?: number; ratePerPlate?: number } }>(`/api/day-of/headcount?weddingId=${targetCode}`),
       ]);
 
       if (runSheetRes.status === 'fulfilled' && runSheetRes.value?.success) {

@@ -21,7 +21,27 @@ interface TestResult {
   test: string;
   passed: boolean;
   details?: string;
-  error?: any;
+  error?: unknown;
+}
+
+interface WeddingTestItem {
+  code: string;
+  couple: string;
+  coordinator: string;
+  city: string;
+  venue: string;
+}
+
+interface TaskTestItem {
+  id: string;
+  weddingCode: string;
+  title: string;
+  category: string;
+  owner: string;
+  stage: string;
+  daysBefore: string;
+  code: string;
+  isMilestone: boolean;
 }
 
 const results: TestResult[] = [];
@@ -40,7 +60,7 @@ async function request(path: string, options: RequestInit = {}) {
   const url = `${BASE_URL}${path}`;
   const headers: Record<string, string> = {
     ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-    ...((options.headers as any) || {}),
+    ...((options.headers as Record<string, string>) || {}),
   };
   const res = await fetch(url, {
     ...options,
@@ -67,7 +87,7 @@ async function runE2ETests() {
   assert(weddingsRes.data?.data.length === 5, `Database contains exactly 5 seeded projects (found: ${weddingsRes.data?.data.length})`, 'Suite 1');
 
   // Verify joined relational data in weddings
-  const w10 = weddingsRes.data?.data.find((w: any) => w.code === 'RW-2025-010');
+  const w10 = (weddingsRes.data?.data as WeddingTestItem[]).find((w) => w.code === 'RW-2025-010');
   assert(Boolean(w10), 'RW-2025-010 exists in dynamic database response', 'Suite 1');
   assert(w10?.couple === 'Pooja Agarwal & Rohan Kapoor', 'Couple names correctly joined from clients table', 'Suite 1');
   assert(w10?.coordinator === 'Devika Sharma', 'Coordinator correctly joined from users table', 'Suite 1');
@@ -105,7 +125,7 @@ async function runE2ETests() {
   );
 
   // Verify relational owner joins (Devika Sharma, Karan Verma, Anil Agarwal, Aditya Singhal)
-  const owners = new Set(baseline.data?.data.map((t: any) => t.owner));
+  const owners = new Set((baseline.data?.data as TaskTestItem[]).map((t) => t.owner));
   assert(owners.has('Devika Sharma'), 'Tasks joined with Lead Planner (Devika Sharma)', 'Suite 2');
   assert(owners.has('Anil Agarwal'), 'Tasks joined with Finance Head (Anil Agarwal)', 'Suite 2');
   assert(owners.has('Karan Verma'), 'Tasks joined with Coordinator (Karan Verma)', 'Suite 2');
@@ -123,7 +143,7 @@ async function runE2ETests() {
     assert(Array.isArray(res.data?.data), `Tasks for ${code} is an array`, 'Suite 3');
     assert(res.data?.data.length > 0, `Tasks for ${code} found > 0 (count: ${res.data?.data.length})`, 'Suite 3');
 
-    const allMatch = res.data?.data.every((t: any) => t.weddingCode === code);
+    const allMatch = (res.data?.data as TaskTestItem[]).every((t) => t.weddingCode === code);
     assert(allMatch, `All returned tasks for ?weddingId=${code} strictly match weddingCode`, 'Suite 3');
 
     const wStats = res.data?.stats;
@@ -262,19 +282,19 @@ async function runE2ETests() {
   const milestoneRes = await request('/tasks?isMilestone=true');
   assert(milestoneRes.status === 200, 'Filter ?isMilestone=true returns HTTP 200', 'Suite 6');
   assert(milestoneRes.data?.data.length > 0, 'Found milestone tasks in database', 'Suite 6');
-  const allMilestones = milestoneRes.data?.data.every((t: any) => t.isMilestone === true);
+  const allMilestones = (milestoneRes.data?.data as TaskTestItem[]).every((t) => t.isMilestone === true);
   assert(allMilestones, 'All returned tasks have isMilestone === true', 'Suite 6');
 
   // Stage Filter: DONE
   const doneRes = await request('/tasks?stage=DONE');
   assert(doneRes.status === 200, 'Filter ?stage=DONE returns HTTP 200', 'Suite 6');
-  const allDone = doneRes.data?.data.every((t: any) => t.stage === 'DONE');
+  const allDone = (doneRes.data?.data as TaskTestItem[]).every((t) => t.stage === 'DONE');
   assert(allDone, 'All returned tasks have stage === DONE', 'Suite 6');
 
   // Category Filter: FINANCE
   const financeRes = await request('/tasks?category=FINANCE');
   assert(financeRes.status === 200, 'Filter ?category=FINANCE returns HTTP 200', 'Suite 6');
-  const allFinance = financeRes.data?.data.every((t: any) => t.category === 'FINANCE');
+  const allFinance = (financeRes.data?.data as TaskTestItem[]).every((t) => t.category === 'FINANCE');
   assert(allFinance, 'All returned tasks have category === FINANCE', 'Suite 6');
 
   // Owner Filter: Anil

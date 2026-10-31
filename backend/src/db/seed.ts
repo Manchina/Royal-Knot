@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { pool } from '../db';
+import { seedAllBillingData } from './seedBilling';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -364,7 +365,7 @@ export async function seedDatabase() {
           t.days,
           assignedUser,
           t.stage === 'DONE' ? new Date() : null,
-          (t as any).notes || null,
+          ('notes' in t && typeof (t as { notes?: string }).notes === 'string' ? (t as { notes?: string }).notes : null),
         ]
       );
       totalTasksSeeded++;
@@ -429,7 +430,7 @@ export async function seedDatabase() {
 
   for (const rs of runSheets) {
     for (let i = 0; i < rs.slots.length; i++) {
-      const s = rs.slots[i] as any;
+      const s = rs.slots[i];
       const statusTag = `[STATUS:${s.status || 'UPCOMING'}]`;
       await pool.query(
         `INSERT INTO day_of_run_sheet (wedding_id, time_slot, activity_title, location, responsible_user_id, sort_order, notes)
@@ -525,6 +526,7 @@ export async function seedDatabase() {
     [wedding1Id, vendorCaterer2, vendorDecor, vendorDJ]
   );
   console.log(`✨ Seeded Scene 5 Client Invoices, Extra Charges & Vendor Bills`);
+  await seedAllBillingData();
 
   console.log('🎉 Comprehensive database seeding finished successfully!');
 }
@@ -541,8 +543,9 @@ export async function runAutoSeedIfEmpty() {
     } else {
       console.log(`ℹ️ Database already populated with ${userCount} users. Ready!`);
     }
-  } catch (err: any) {
-    console.error('❌ Error during database auto-seed check:', err.message);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('❌ Error during database auto-seed check:', msg);
   }
 }
 

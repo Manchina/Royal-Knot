@@ -89,7 +89,7 @@ export const Landing: React.FC<LandingProps> = ({ defaultScrollToForm = false })
     try {
       const budgetNumeric = parseBudgetToNumeric(budgetTier);
 
-      const response = await api.post('/enquiries', {
+      const response = await api.post<{ success: boolean; message?: string; data?: { code?: string } }>('/enquiries', {
         coupleName: coupleName.trim(),
         primaryContactName: contactName.trim() ? `${contactName.trim()} (${contactRelation})` : coupleName.trim(),
         phone: phone.trim(),
@@ -110,7 +110,7 @@ export const Landing: React.FC<LandingProps> = ({ defaultScrollToForm = false })
       } else {
         throw new Error(response?.message || 'Failed to submit enquiry');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Enquiry submission error:', err);
       // Fallback graceful success for offline / demo mode
       setSubmittedLeadCode(`ENQ-2026-${Math.floor(Math.random() * 800) + 110}`);
@@ -457,7 +457,7 @@ export const Landing: React.FC<LandingProps> = ({ defaultScrollToForm = false })
                       />
                       <select
                         value={contactRelation}
-                        onChange={(e) => setContactRelation(e.target.value as any)}
+                        onChange={(e) => setContactRelation(e.target.value as 'Bride' | 'Groom' | 'Parent' | 'Family Rep')}
                         className="h-9 px-2.5 rounded bg-slate-950 border border-slate-700 text-slate-200 text-xs focus:outline-none focus:border-amber-400"
                       >
                         <option value="Bride">Bride</option>

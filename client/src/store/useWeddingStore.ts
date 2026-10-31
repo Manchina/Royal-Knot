@@ -7,19 +7,26 @@ export interface WeddingSummary {
   uuid?: string;
   code: string;
   couple: string;
+  brideName?: string;
+  groomName?: string;
+  clientPhone?: string;
+  clientEmail?: string;
   city: string;
   venue: string;
   startDate: string;
   endDate?: string;
   guestCount: number;
   packageType: string;
-  status: 'LIVE_BIG_DAY' | 'IN_PLANNING' | 'BOOKED' | 'ENQUIRY' | 'FINALISED' | 'FINALISED_SETTLED';
+  status: 'LIVE_BIG_DAY' | 'IN_PLANNING' | 'BOOKED' | 'ENQUIRY' | 'FINALISED' | 'FINALISED_SETTLED' | string;
   isFinalised?: boolean;
   finalisedDate?: string;
   finalisedBy?: string;
   budget: string;
   rawBudget?: number;
+  agencyFee?: string;
+  theme?: string;
   coordinator: string;
+  coordinatorPhone?: string;
 }
 
 export interface WeddingOption {
@@ -33,50 +40,51 @@ export interface WeddingOption {
   label: string;
 }
 
-export const SYSTEM_WEDDINGS: WeddingSummary[] = [
-  {
-    id: 'RW-2026-001',
-    code: 'RW-2026-001',
-    couple: 'Aanya Singhania & Raghav Mehra',
-    city: 'Udaipur',
-    venue: 'The Oberoi Udaivilas',
-    startDate: 'Dec 10 - 13, 2026',
-    guestCount: 400,
-    packageType: 'Full-Service Royal Wedding',
-    status: 'LIVE_BIG_DAY',
-    isFinalised: false,
-    budget: '₹3.50 Cr',
-    coordinator: 'Karan Verma',
-  },
-  {
-    id: 'RW-2026-002',
-    code: 'RW-2026-002',
-    couple: 'Kriti Maheshwari & Siddharth Jain',
-    city: 'Jaipur',
-    venue: 'Rambagh Palace',
-    startDate: 'Nov 20 - 23, 2026',
-    guestCount: 420,
-    packageType: 'Full-Service Royal Wedding',
-    status: 'IN_PLANNING',
-    isFinalised: false,
-    budget: '₹2.75 Cr',
-    coordinator: 'Devika Sharma',
-  },
-  {
-    id: 'RW-2026-003',
-    code: 'RW-2026-003',
-    couple: 'Simran Bajaj & Armaan Gill',
-    city: 'Jaipur',
-    venue: 'Alila Fort Bishangarh',
-    startDate: 'Jan 14 - 17, 2027',
-    guestCount: 500,
-    packageType: 'Day-of Execution',
-    status: 'BOOKED',
-    isFinalised: false,
-    budget: '₹3.00 Cr',
-    coordinator: 'Karan Verma',
-  },
-];
+export interface CreateWeddingPayload {
+  code?: string;
+  couple?: string;
+  brideName?: string;
+  groomName?: string;
+  phone?: string;
+  email?: string;
+  city: string;
+  venue?: string;
+  startDate?: string;
+  endDate?: string;
+  guestCount?: number;
+  packageType?: string;
+  budget?: string | number;
+  theme?: string;
+  coordinator?: string;
+  notes?: string;
+}
+
+export interface RawWeddingRow {
+  id: string;
+  uuid?: string;
+  code: string;
+  couple?: string;
+  brideName?: string;
+  groomName?: string;
+  clientPhone?: string;
+  clientEmail?: string;
+  city?: string;
+  venue?: string;
+  startDate?: string;
+  endDate?: string;
+  guestCount?: number;
+  packageType?: string;
+  status?: string;
+  isFinalised?: boolean;
+  finalisedDate?: string;
+  finalisedBy?: string;
+  budget?: string | number;
+  rawBudget?: number;
+  agencyFee?: string | number;
+  theme?: string;
+  coordinator?: string;
+  coordinatorPhone?: string;
+}
 
 interface WeddingState {
   weddings: WeddingSummary[];
@@ -90,20 +98,12 @@ interface WeddingState {
   getSelectedWedding: () => WeddingSummary | undefined;
   fetchWeddings: () => Promise<WeddingSummary[]>;
   fetchWeddingOptions: () => Promise<WeddingOption[]>;
+  createWedding: (payload: CreateWeddingPayload) => Promise<WeddingSummary | null>;
 }
 
 export const useWeddingStore = create<WeddingState>((set, get) => ({
-  weddings: SYSTEM_WEDDINGS,
-  weddingOptions: SYSTEM_WEDDINGS.map((w) => ({
-    id: w.id,
-    code: w.code,
-    couple: w.couple,
-    city: w.city,
-    venue: w.venue,
-    guestCount: w.guestCount,
-    status: w.status,
-    label: `${w.code}: ${w.couple} (${w.city} • ${w.guestCount} Guests)`,
-  })),
+  weddings: [],
+  weddingOptions: [],
   selectedWeddingId: '',
   loading: false,
   isLoading: false,
@@ -130,13 +130,17 @@ export const useWeddingStore = create<WeddingState>((set, get) => ({
   fetchWeddings: async () => {
     set({ loading: true, isLoading: true, error: null });
     try {
-      const res = await api.get<{ success: boolean; data: any[] }>('/weddings');
+      const res = await api.get<{ success: boolean; data: RawWeddingRow[] }>('/weddings');
       if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
         const liveWeddings: WeddingSummary[] = res.data.map((w) => ({
           id: w.id || w.code,
           uuid: w.uuid || (isUUID(w.id) ? w.id : undefined),
           code: w.code,
-          couple: w.couple || 'Royal Couple',
+          couple: w.couple || `${w.brideName || 'Bride'} & ${w.groomName || 'Groom'}`,
+          brideName: w.brideName,
+          groomName: w.groomName,
+          clientPhone: w.clientPhone,
+          clientEmail: w.clientEmail,
           city: w.city || 'Jaipur',
           venue: w.venue || 'Luxury Heritage Palace',
           startDate: w.startDate
@@ -155,18 +159,23 @@ export const useWeddingStore = create<WeddingState>((set, get) => ({
             ? (typeof w.budget === 'string' && w.budget.startsWith('₹') ? w.budget : `₹${(Number(w.budget) / 10000000).toFixed(2)} Cr`)
             : '₹2.50 Cr',
           rawBudget: w.rawBudget || (w.budget ? Number(w.budget) : undefined),
+          agencyFee: w.agencyFee
+            ? (typeof w.agencyFee === 'string' && w.agencyFee.startsWith('₹') ? w.agencyFee : `₹${(Number(w.agencyFee) / 100000).toFixed(0)} Lakh`)
+            : undefined,
+          theme: w.theme,
           coordinator: w.coordinator || 'Lead Planner',
+          coordinatorPhone: w.coordinatorPhone,
         }));
 
         const liveOptions: WeddingOption[] = res.data.map((w) => ({
           id: w.id || w.code,
           code: w.code,
-          couple: w.couple || 'Royal Couple',
+          couple: w.couple || `${w.brideName || 'Bride'} & ${w.groomName || 'Groom'}`,
           city: w.city || 'Jaipur',
           venue: w.venue,
           guestCount: w.guestCount,
           status: w.status,
-          label: `${w.code}: ${w.couple} (${w.city} • ${w.guestCount} Guests)`,
+          label: `${w.code}: ${w.couple || `${w.brideName || 'Bride'} & ${w.groomName || 'Groom'}`} (${w.city} • ${w.guestCount} Guests)`,
         }));
 
         set({
@@ -189,13 +198,14 @@ export const useWeddingStore = create<WeddingState>((set, get) => ({
 
         return liveWeddings;
       } else {
-        set({ loading: false, isLoading: false });
-        return get().weddings;
+        set({ weddings: [], weddingOptions: [], loading: false, isLoading: false });
+        return [];
       }
-    } catch (err: any) {
-      console.warn('Using local fallback weddings:', err);
-      set({ loading: false, isLoading: false, error: err.message || 'Failed to fetch weddings' });
-      return get().weddings;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch weddings';
+      console.error('Failed to fetch weddings from database:', err);
+      set({ weddings: [], weddingOptions: [], loading: false, isLoading: false, error: message });
+      return [];
     }
   },
 
@@ -206,10 +216,32 @@ export const useWeddingStore = create<WeddingState>((set, get) => ({
         set({ weddingOptions: res.data });
         return res.data;
       }
-      return get().weddingOptions;
+      return [];
     } catch (err) {
-      console.warn('Failed to fetch options, using store fallback:', err);
-      return get().weddingOptions;
+      console.error('Failed to fetch wedding options from database:', err);
+      return [];
+    }
+  },
+
+  createWedding: async (payload: CreateWeddingPayload) => {
+    set({ loading: true, isLoading: true, error: null });
+    try {
+      const res = await api.post<{ success: boolean; data: RawWeddingRow }>('/weddings', payload);
+      if (res?.success && res.data) {
+        await get().fetchWeddings();
+        await get().fetchWeddingOptions();
+        if (res.data.id || res.data.code) {
+          set({ selectedWeddingId: res.data.id || res.data.code });
+        }
+        return res.data as unknown as WeddingSummary;
+      }
+      return null;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create wedding';
+      set({ error: message });
+      throw err;
+    } finally {
+      set({ loading: false, isLoading: false });
     }
   },
 }));

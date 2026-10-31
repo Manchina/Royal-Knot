@@ -209,9 +209,10 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
         setPendingUnassign(null);
         onRefresh();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to unassign vendor:', err);
-      showToast(err?.message || 'Error removing vendor option.');
+      const msg = err instanceof Error ? err.message : 'Error removing vendor option.';
+      showToast(msg);
     } finally {
       setSubmittingUnassign(false);
     }
@@ -245,9 +246,10 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
         setEditingQuote(null);
         onRefresh();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to edit quote:', err);
-      showToast(err?.message || 'Error updating quote.');
+      const msg = err instanceof Error ? err.message : 'Error updating quote.';
+      showToast(msg);
     } finally {
       setSubmittingQuoteEdit(false);
     }

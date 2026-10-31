@@ -81,7 +81,7 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
         let status: 'COMPLETED' | 'IN_PROGRESS' | 'UPCOMING' = 'UPCOMING';
 
         if (statusMatch && ['COMPLETED', 'IN_PROGRESS', 'UPCOMING'].includes(statusMatch[1])) {
-          status = statusMatch[1] as any;
+          status = statusMatch[1] as 'COMPLETED' | 'IN_PROGRESS' | 'UPCOMING';
         } else {
           // If no explicit tag, resolve contextual status based on wedding date
           const todayStr = now.toISOString().split('T')[0];
@@ -132,10 +132,11 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
         data,
         total: data.length,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       fastify.log.error(err);
       reply.status(500);
-      return { success: false, message: 'Failed to fetch run sheet', error: err.message };
+      return { success: false, message: 'Failed to fetch run sheet', error: msg };
     }
   });
 
@@ -223,10 +224,11 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
         message: 'Run sheet item created successfully',
         data: created,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       fastify.log.error(err);
       reply.status(500);
-      return { success: false, message: 'Failed to create run sheet item', error: err.message };
+      return { success: false, message: 'Failed to create run sheet item', error: msg };
     }
   });
 
@@ -251,7 +253,7 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const updateData: Record<string, any> = {};
+      const updateData: Partial<typeof dayOfRunSheet.$inferInsert> = {};
       if (timeSlot !== undefined) {
         updateData.timeSlot = timeSlot.length === 5 ? `${timeSlot}:00` : timeSlot;
       }
@@ -289,10 +291,11 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
       }
 
       return { success: true, message: 'Run sheet item updated', data: updated };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       fastify.log.error(err);
       reply.status(500);
-      return { success: false, message: 'Failed to update run sheet item', error: err.message };
+      return { success: false, message: 'Failed to update run sheet item', error: msg };
     }
   });
 
@@ -317,9 +320,10 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
       }
 
       return { success: true, message: 'Run sheet item deleted', data: deleted };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       reply.status(500);
-      return { success: false, message: 'Failed to delete run sheet item', error: err.message };
+      return { success: false, message: 'Failed to delete run sheet item', error: msg };
     }
   });
 
@@ -397,10 +401,11 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
         data,
         total: data.length,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       fastify.log.error(err);
       reply.status(500);
-      return { success: false, message: 'Failed to fetch vendor check-ins', error: err.message };
+      return { success: false, message: 'Failed to fetch vendor check-ins', error: msg };
     }
   });
 
@@ -419,9 +424,10 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
         .orderBy(asc(vendors.businessName));
 
       return { success: true, data: rows };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       reply.status(500);
-      return { success: false, message: 'Failed to fetch vendors', error: err.message };
+      return { success: false, message: 'Failed to fetch vendors', error: msg };
     }
   });
 
@@ -495,10 +501,11 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
         .returning();
 
       return { success: true, message: 'Vendor check-in scheduled', data: created };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       fastify.log.error(err);
       reply.status(500);
-      return { success: false, message: 'Failed to schedule check-in', error: err.message };
+      return { success: false, message: 'Failed to schedule check-in', error: msg };
     }
   });
 
@@ -521,7 +528,7 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const updateData: Record<string, any> = {};
+      const updateData: Partial<typeof dayOfVendorCheckins.$inferInsert> = {};
       if (status !== undefined) updateData.status = status;
       if (delayMinutes !== undefined) updateData.delayMinutes = delayMinutes;
       if (remarks !== undefined) updateData.remarks = remarks;
@@ -544,10 +551,11 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
       }
 
       return { success: true, message: 'Vendor check-in telemetry updated', data: updated };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       fastify.log.error(err);
       reply.status(500);
-      return { success: false, message: 'Failed to update check-in', error: err.message };
+      return { success: false, message: 'Failed to update check-in', error: msg };
     }
   });
 
@@ -612,10 +620,11 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
         data,
         total: data.length,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       fastify.log.error(err);
       reply.status(500);
-      return { success: false, message: 'Failed to fetch incidents', error: err.message };
+      return { success: false, message: 'Failed to fetch incidents', error: msg };
     }
   });
 
@@ -670,10 +679,11 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
         .returning();
 
       return { success: true, message: 'Operational incident logged', data: created };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       fastify.log.error(err);
       reply.status(500);
-      return { success: false, message: 'Failed to log incident', error: err.message };
+      return { success: false, message: 'Failed to log incident', error: msg };
     }
   });
 
@@ -695,7 +705,7 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const updateData: Record<string, any> = {};
+      const updateData: Partial<typeof dayOfIncidents.$inferInsert> = {};
       if (status !== undefined) {
         updateData.status = status;
         if (status === 'RESOLVED') {
@@ -719,10 +729,11 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
       }
 
       return { success: true, message: 'Incident status updated', data: updated };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       fastify.log.error(err);
       reply.status(500);
-      return { success: false, message: 'Failed to update incident', error: err.message };
+      return { success: false, message: 'Failed to update incident', error: msg };
     }
   });
 
@@ -747,9 +758,10 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
       }
 
       return { success: true, message: 'Incident deleted', data: deleted };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       reply.status(500);
-      return { success: false, message: 'Failed to delete incident', error: err.message };
+      return { success: false, message: 'Failed to delete incident', error: msg };
     }
   });
 }

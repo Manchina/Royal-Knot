@@ -18,11 +18,11 @@ import {
   ComboboxMultiSelect,
   type ComboboxOption,
 } from '../components/ui';
-import { WeddingSourcingView, type WeddingOverviewItem } from '../components/procurement/WeddingSourcingView';
+import { WeddingSourcingView } from '../components/procurement/WeddingSourcingView';
 import { VendorDirectoryView, type VendorItem } from '../components/procurement/VendorDirectoryView';
 import { useWeddingStore } from '../store/useWeddingStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { api } from '../api/client';
+import { useProcurementStore } from '../store/useProcurementStore';
 
 export const Procurement: React.FC = () => {
   const { user } = useAuthStore();
@@ -39,11 +39,16 @@ export const Procurement: React.FC = () => {
   // Check permissions to create vendors
   const canCreateVendor = ['SUPER_ADMIN', 'LEAD_PLANNER', 'FOUNDER'].includes(user?.role || '');
 
-  // Live data from backend
-  const [vendorsList, setVendorsList] = useState<VendorItem[]>([]);
-  const [vendorCounts, setVendorCounts] = useState<Record<string, number>>({});
-  const [weddingsOverview, setWeddingsOverview] = useState<WeddingOverviewItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  // Live procurement store data & actions
+  const {
+    vendorsList,
+    vendorCounts,
+    weddingsOverview,
+    loading,
+    fetchProcurementData,
+    createVendor,
+    assignVendorOptions,
+  } = useProcurementStore();
 
   // Modals for Create Vendor & Assign Options
   const [createVendorOpen, setCreateVendorOpen] = useState<boolean>(false);
@@ -74,43 +79,21 @@ export const Procurement: React.FC = () => {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Fetch live procurement data
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [vendorsRes, overviewRes] = await Promise.all([
-        api.get<{ success: boolean; data: VendorItem[]; counts: Record<string, number> }>('/api/procurement/vendors'),
-        api.get<{ success: boolean; data: WeddingOverviewItem[] }>('/api/procurement/weddings-overview'),
-      ]);
-
-      if (vendorsRes?.data) {
-        setVendorsList(vendorsRes.data);
-        if (vendorsRes.counts) setVendorCounts(vendorsRes.counts);
-      }
-      if (overviewRes?.data) {
-        setWeddingsOverview(overviewRes.data);
-        if (overviewRes.data.length > 0) {
-          const match = overviewRes.data.find(
-            (w) => w.id === selectedWeddingId || w.code === selectedWeddingId
-          );
-          if (match) {
-            setSelectedWeddingId(match.id);
-          } else {
-            setSelectedWeddingId(overviewRes.data[0].id);
-          }
+  useEffect(() => {
+    fetchProcurementData().then((res) => {
+      if (res.weddingsOverview.length > 0) {
+        const match = res.weddingsOverview.find(
+          (w) => w.id === selectedWeddingId || w.code === selectedWeddingId
+        );
+        if (match) {
+          setSelectedWeddingId(match.id);
+        } else {
+          setSelectedWeddingId(res.weddingsOverview[0].id);
         }
       }
-    } catch (err) {
-      console.error('Error fetching procurement data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
+    });
     fetchWeddingOptions();
-  }, []);
+  }, [fetchProcurementData, fetchWeddingOptions, selectedWeddingId, setSelectedWeddingId]);
 
   // Currently selected wedding in Weddings tab
   const currentWedding = useMemo(() => {
@@ -125,7 +108,7 @@ export const Procurement: React.FC = () => {
 
     setSubmittingVendor(true);
     try {
-      const res = await api.post<{ success: boolean; message: string; data: VendorItem }>('/api/procurement/vendors', {
+      const created = await createVendor({
         businessName: newVendorName,
         category: newVendorCategory,
         contactPerson: newVendorContact,
@@ -136,7 +119,7 @@ export const Procurement: React.FC = () => {
         specialties: newVendorSpecialties,
       });
 
-      if (res?.success) {
+      if (created) {
         showToast(`Vendor "${newVendorName}" registered successfully.`);
         setCreateVendorOpen(false);
         setNewVendorName('');
@@ -145,7 +128,6 @@ export const Procurement: React.FC = () => {
         setNewVendorEmail('');
         setNewVendorPrice('');
         setNewVendorSpecialties('');
-        fetchData();
       }
     } catch (err) {
       console.error('Failed to create vendor:', err);
@@ -162,17 +144,16 @@ export const Procurement: React.FC = () => {
 
     setSubmittingAssign(true);
     try {
-      const res = await api.post<{ success: boolean; message: string }>('/api/procurement/assign-options', {
+      const success = await assignVendorOptions({
         weddingId: assignWeddingId,
         category: assignCategory,
         vendorIds: selectedVendorIds,
       });
 
-      if (res?.success) {
+      if (success) {
         showToast(`Assigned ${selectedVendorIds.length} vendor options to wedding.`);
         setAssignOptionsOpen(false);
         setSelectedVendorIds([]);
-        fetchData();
       }
     } catch (err) {
       console.error('Failed to assign vendor options:', err);
@@ -205,7 +186,7 @@ export const Procurement: React.FC = () => {
   const handleAssignVendorFromDirectory = (vendor: VendorItem) => {
     setAssignWeddingId(currentWedding?.id || '');
     if (vendor.category === 'CATERER' || vendor.category === 'DJ' || vendor.category === 'DECORATOR') {
-      setAssignCategory(vendor.category as any);
+      setAssignCategory(vendor.category as 'CATERER' | 'DJ' | 'DECORATOR');
     }
     setSelectedVendorIds([vendor.id]);
     setAssignOptionsOpen(true);
@@ -308,7 +289,7 @@ export const Procurement: React.FC = () => {
           selectedWeddingId={selectedWeddingId}
           setSelectedWeddingId={setSelectedWeddingId}
           onOpenAssignModal={openAssignModalForCategory}
-          onRefresh={fetchData}
+          onRefresh={fetchProcurementData}
           showToast={showToast}
           loading={loading}
         />
@@ -376,7 +357,7 @@ export const Procurement: React.FC = () => {
               <select
                 value={assignCategory}
                 onChange={(e) => {
-                  const newCat = e.target.value as any;
+                  const newCat = e.target.value as 'CATERER' | 'DJ' | 'DECORATOR';
                   setAssignCategory(newCat);
                   const targetWed = weddingsOverview.find((w) => w.id === assignWeddingId);
                   const existing = targetWed?.categories[newCat]?.quotes || [];
@@ -463,7 +444,7 @@ export const Procurement: React.FC = () => {
                 <Label className="text-xs font-semibold text-slate-700">Category *</Label>
                 <select
                   value={newVendorCategory}
-                  onChange={(e) => setNewVendorCategory(e.target.value as any)}
+                  onChange={(e) => setNewVendorCategory(e.target.value as 'CATERER' | 'DJ' | 'DECORATOR')}
                   className="mt-1 w-full h-8 text-xs bg-white border border-slate-200 rounded px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
                 >
                   <option value="CATERER">Catering & Banquets</option>

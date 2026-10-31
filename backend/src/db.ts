@@ -12,7 +12,7 @@ export const pool = new Pool({
 });
 
 // Initialize Drizzle ORM instance with full typed schema
-export const db = drizzle(pool as any, { schema });
+export const db = drizzle(pool, { schema });
 
 export async function checkDatabaseConnection(): Promise<{ connected: boolean; version?: string; error?: string }> {
   try {
@@ -23,10 +23,11 @@ export async function checkDatabaseConnection(): Promise<{ connected: boolean; v
       connected: true,
       version: result.rows[0]?.version,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown database connection error';
     return {
       connected: false,
-      error: err.message || 'Unknown database connection error',
+      error: msg,
     };
   }
 }

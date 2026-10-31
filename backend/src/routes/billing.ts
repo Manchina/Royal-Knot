@@ -85,6 +85,20 @@ export interface BillingChangelogItem {
   createdAt: string;
 }
 
+export interface AvailableQuoteItem {
+  quoteId: string;
+  rfqId: string;
+  serviceCategory: string;
+  description: string | null;
+  vendorId: string;
+  vendorName: string;
+  baseCost: string;
+  pricePerPlate: string | null;
+  quoteStatus: string;
+  isBilled: boolean;
+  formattedCost: string;
+}
+
 export interface ProjectBillingData {
   id: string;
   code: string;
@@ -125,7 +139,7 @@ export interface ProjectBillingData {
   extraCharges: ExtraChargeItem[];
   vendorBills: VendorDisbursementItem[];
   invoices: ClientInvoiceItem[];
-  availableQuotes?: any[];
+  availableQuotes?: AvailableQuoteItem[];
   changelog?: BillingChangelogItem[];
 }
 
@@ -153,9 +167,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
 
       reply.header('Cache-Control', 'public, max-age=60');
       return { success: true, data };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -235,6 +250,18 @@ export async function billingRoutes(fastify: FastifyInstance) {
           ])
         );
 
+        // Fetch changelog entries for finalised sign-offs strictly from DB
+        const finalLogRows = await db
+          .select({
+            weddingId: billingChangeLogs.weddingId,
+            performedBy: billingChangeLogs.performedBy,
+            createdAt: billingChangeLogs.createdAt,
+          })
+          .from(billingChangeLogs)
+          .where(eq(billingChangeLogs.action, 'PROJECT_FINALISED'));
+
+        const finalLogMap = new Map(finalLogRows.map((l) => [l.weddingId, l]));
+
         // Format all projects
         const allProjects: ProjectBillingData[] = weddingRows.map((w) => {
           const baseContractNum = parseFloat(w.totalBudget) || 0;
@@ -245,14 +272,22 @@ export async function billingRoutes(fastify: FastifyInstance) {
           const billData = billsMap.get(w.id) || { payable: 0, advance: 0, balance: 0, count: 0 };
           const isFinal = w.status === 'FINALISED' || w.status === 'FINALISED_SETTLED';
           const grossMarginNum =
-            totalInvoicedNum > 0 ? ((totalInvoicedNum - billData.payable) / totalInvoicedNum) * 100 : 22.5;
+            totalInvoicedNum > 0 ? ((totalInvoicedNum - billData.payable) / totalInvoicedNum) * 100 : 0;
 
           const coupleStr =
             w.brideName && w.groomName ? `${w.brideName} & ${w.groomName}` : 'Royal Couple';
 
           const formattedStart = w.startDate
             ? new Date(w.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-            : 'Winter 2026';
+            : 'Scheduled 2026';
+
+          const finalLog = finalLogMap.get(w.id);
+          const finalisedDate = isFinal
+            ? finalLog?.createdAt
+              ? new Date(finalLog.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+              : 'Concluded'
+            : undefined;
+          const finalisedBy = isFinal ? finalLog?.performedBy || 'Finance Director' : undefined;
 
           return {
             id: w.id,
@@ -271,11 +306,11 @@ export async function billingRoutes(fastify: FastifyInstance) {
             packageType: w.packageType || 'Full-Service Royal Wedding',
             status: w.status,
             isFinalised: isFinal,
-            finalisedDate: isFinal ? 'Feb 2026' : undefined,
-            finalisedBy: isFinal ? 'Aditya Singhal (Super Admin)' : undefined,
+            finalisedDate,
+            finalisedBy,
             budget: `₹${(baseContractNum / 10000000).toFixed(2)} Cr`,
             rawBudget: baseContractNum,
-            coordinator: w.coordinator || (w.city === 'Jaipur' ? 'Devika Sharma' : 'Karan Verma'),
+            coordinator: w.coordinator || 'Lead Planner',
             baseContract: formatInr(baseContractNum),
             rawBaseContract: baseContractNum,
             totalExtras: extrasNum > 0 ? `+${extrasCount} (${formatInr(extrasNum)})` : 'None',
@@ -303,11 +338,6 @@ export async function billingRoutes(fastify: FastifyInstance) {
         const counts: Record<string, number> = {
           ALL_ONGOING: 0,
           ALL_FINALISED: 0,
-          LIVE_BIG_DAY: 0,
-          IN_PLANNING: 0,
-          BOOKED: 0,
-          FINALISED: 0,
-          FINALISED_SETTLED: 0,
         };
 
         for (const p of allProjects) {
@@ -335,17 +365,36 @@ export async function billingRoutes(fastify: FastifyInstance) {
           }
         }
 
+        // Fetch dynamic status options from master_options in DB
+        const masterStatusRows = await db
+          .select({
+            key: masterOptions.optionKey,
+            label: masterOptions.label,
+          })
+          .from(masterOptions)
+          .where(and(eq(masterOptions.category, 'WEDDING_STATUS'), eq(masterOptions.isActive, true)))
+          .orderBy(asc(masterOptions.sortOrder));
+
         const ongoingStatusTabs = [
           { id: 'ALL', label: 'All Projects', count: counts.ALL_ONGOING },
-          { id: 'LIVE_BIG_DAY', label: 'Live Big Day', count: counts.LIVE_BIG_DAY || 0 },
-          { id: 'IN_PLANNING', label: 'In Planning', count: counts.IN_PLANNING || 0 },
-          { id: 'BOOKED', label: 'Booked', count: counts.BOOKED || 0 },
+          ...masterStatusRows
+            .filter((s) => !['FINALISED', 'FINALISED_SETTLED'].includes(s.key))
+            .map((s) => ({
+              id: s.key,
+              label: s.label,
+              count: counts[s.key] || 0,
+            })),
         ];
 
         const finalisedStatusTabs = [
           { id: 'ALL', label: 'All Projects', count: counts.ALL_FINALISED },
-          { id: 'FINALISED', label: 'Finalised', count: counts.FINALISED || 0 },
-          { id: 'FINALISED_SETTLED', label: 'Finalised & Settled', count: counts.FINALISED_SETTLED || 0 },
+          ...masterStatusRows
+            .filter((s) => ['FINALISED', 'FINALISED_SETTLED'].includes(s.key))
+            .map((s) => ({
+              id: s.key,
+              label: s.label,
+              count: counts[s.key] || 0,
+            })),
         ];
 
         let activeList = tab === 'ongoing' ? ongoingAll : finalisedAll;
@@ -363,7 +412,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
         const totalInvoicedSum = allProjects.reduce((sum, p) => sum + p.rawTotalInvoiced, 0);
         const totalVendorCommitmentsSum = allProjects.reduce((sum, p) => sum + p.rawVendorCommitments, 0);
         const avgGrossMargin =
-          totalInvoicedSum > 0 ? ((totalInvoicedSum - totalVendorCommitmentsSum) / totalInvoicedSum) * 100 : 23.4;
+          totalInvoicedSum > 0 ? ((totalInvoicedSum - totalVendorCommitmentsSum) / totalInvoicedSum) * 100 : 0;
 
         reply.header('Cache-Control', 'private, max-age=2');
         return {
@@ -384,12 +433,54 @@ export async function billingRoutes(fastify: FastifyInstance) {
             activeList,
           },
         };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
         reply.status(500);
-        return { success: false, error: err.message };
+        return { success: false, error: msg };
       }
     }
   );
+
+  // 2.5 GET /api/billing/unbilled-extras - Queue of live unbilled extras across active weddings
+  fastify.get('/unbilled-extras', async (_request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const rows = await db
+        .select({
+          id: weddingExtraCharges.id,
+          weddingId: weddings.id,
+          weddingCode: weddings.code,
+          category: weddingExtraCharges.category,
+          description: weddingExtraCharges.description,
+          quantity: weddingExtraCharges.quantity,
+          unitRate: weddingExtraCharges.unitRate,
+          totalAmount: weddingExtraCharges.totalAmount,
+          isBilledToClient: weddingExtraCharges.isBilledToClient,
+          createdAt: weddingExtraCharges.createdAt,
+        })
+        .from(weddingExtraCharges)
+        .innerJoin(weddings, eq(weddingExtraCharges.weddingId, weddings.id))
+        .orderBy(desc(weddingExtraCharges.createdAt));
+
+      const data = rows.map((r) => ({
+        id: r.id,
+        weddingCode: r.weddingCode,
+        category: r.category,
+        description: r.description,
+        quantity: parseFloat(r.quantity) || 1,
+        unitRate: parseFloat(r.unitRate) || 0,
+        totalAmount: parseFloat(r.totalAmount) || 0,
+        isBilledToClient: !!r.isBilledToClient,
+        status: r.isBilledToClient ? 'BILLED' : 'PENDING_APPROVAL',
+      }));
+
+      return { success: true, count: data.length, data };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      fastify.log.error(`Fetch unbilled extras error: ${msg}`);
+      reply.status(500);
+      return { success: false, error: msg };
+    }
+  });
 
   // 3. GET /api/billing/projects/:id - Full Financial Dossier (Bills, Extras, Invoices, Changelog, Awarded Quotes)
   fastify.get('/projects/:id', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
@@ -468,7 +559,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
           vendorId: r.vendorId || undefined,
           isBilledToClient: !!r.isBilledToClient,
           status: 'ADDED_TO_CLIENT_INVOICE',
-          approvedBy: r.approvedByName || 'Devika Sharma',
+          approvedBy: r.approvedByName || w.coordinator || 'Lead Planner',
           createdAt: r.createdAt ? new Date(r.createdAt).toLocaleString('en-IN') : undefined,
         };
       });
@@ -521,7 +612,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
           rawAdvancePaid: advNum,
           balanceDue: formatInr(balNum),
           rawBalanceDue: balNum,
-          status: r.status as any,
+          status: (r.status as VendorDisbursementItem['status']) || 'PENDING',
           awardedQuoteId: r.awardedQuoteId || undefined,
           settledAt: r.settledAt ? new Date(r.settledAt).toLocaleDateString('en-IN') : undefined,
           createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : undefined,
@@ -545,23 +636,34 @@ export async function billingRoutes(fastify: FastifyInstance) {
         .where(eq(clientInvoices.weddingId, weddingUuid))
         .orderBy(asc(clientInvoices.dueDate));
 
+      // Fetch dynamic payment stages from master_options in DB
+      const masterPaymentStages = await db
+        .select({
+          key: masterOptions.optionKey,
+          label: masterOptions.label,
+        })
+        .from(masterOptions)
+        .where(eq(masterOptions.category, 'PAYMENT_STAGE'));
+
+      const stageLabelMap = new Map(masterPaymentStages.map((s) => [s.key, s.label]));
+
       const invoices: ClientInvoiceItem[] = invoicesRows.map((r) => {
-        let stageLabel = 'Milestone Payment';
         let pct = 30;
+        let stageLabel = stageLabelMap.get(r.stageKey);
         if (r.stageKey === 'BOOKING_DEPOSIT') {
-          stageLabel = 'Booking Deposit (20%)';
+          stageLabel = stageLabel || 'Booking Deposit (20%)';
           pct = 20;
         } else if (r.stageKey === 'PRE_WEDDING_ADVANCE') {
-          stageLabel = '30-Day Pre-Wedding Advance (50%)';
+          stageLabel = stageLabel || '30-Day Pre-Wedding Advance (50%)';
           pct = 50;
         } else if (r.stageKey === 'FINAL_SETTLEMENT') {
-          stageLabel = 'Post-Event Final Settlement (30% + Extras)';
+          stageLabel = stageLabel || 'Post-Event Final Settlement (30% + Extras)';
           pct = 30;
         } else if (r.stageKey === 'DAY_OF_EXTRA' || (typeof r.stageKey === 'string' && r.stageKey.startsWith('EXTRA'))) {
           stageLabel = r.paymentReference ? `Day-of Extra: ${r.paymentReference}` : 'Day-of Addition Extra Charge';
           pct = 0;
         } else {
-          stageLabel = r.paymentReference ? `Extra: ${r.paymentReference}` : (r.stageKey || 'Additional Invoice');
+          stageLabel = stageLabel || (r.paymentReference ? `Extra: ${r.paymentReference}` : (r.stageKey || 'Additional Invoice'));
           pct = 0;
         }
 
@@ -577,7 +679,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
           amountDue: formatInr(dueNum),
           rawAmountDue: dueNum,
           dueDate: r.dueDate ? new Date(r.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Due on Event',
-          status: r.status as any,
+          status: (r.status as ClientInvoiceItem['status']) || 'UNPAID',
           paidAmount: formatInr(paidNum),
           rawPaidAmount: paidNum,
           paidAt: r.paidAt ? new Date(r.paidAt).toLocaleString('en-IN') : undefined,
@@ -636,6 +738,9 @@ export async function billingRoutes(fastify: FastifyInstance) {
         createdAt: c.createdAt ? new Date(c.createdAt).toLocaleString('en-IN') : new Date().toLocaleString('en-IN'),
       }));
 
+      // Extract final signoff from changelog if project finalised
+      const finalSignoffLog = changelogRows.find((c) => c.action === 'PROJECT_FINALISED');
+
       // Aggregations
       const baseContractNum = parseFloat(w.totalBudget) || 0;
       const totalExtrasNum = extraCharges.reduce((sum, e) => sum + e.rawTotal, 0);
@@ -646,10 +751,17 @@ export async function billingRoutes(fastify: FastifyInstance) {
 
       const isFinal = w.status === 'FINALISED' || w.status === 'FINALISED_SETTLED';
       const grossMarginNum =
-        totalInvoicedNum > 0 ? ((totalInvoicedNum - totalVendorPayable) / totalInvoicedNum) * 100 : 22.4;
+        totalInvoicedNum > 0 ? ((totalInvoicedNum - totalVendorPayable) / totalInvoicedNum) * 100 : 0;
 
       const coupleStr =
         w.brideName && w.groomName ? `${w.brideName} & ${w.groomName}` : 'Royal Couple';
+
+      const finalisedDate = isFinal
+        ? finalSignoffLog?.createdAt
+          ? new Date(finalSignoffLog.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+          : 'Concluded'
+        : undefined;
+      const finalisedBy = isFinal ? finalSignoffLog?.performedBy || 'Finance Director' : undefined;
 
       const project: ProjectBillingData = {
         id: w.id,
@@ -663,18 +775,18 @@ export async function billingRoutes(fastify: FastifyInstance) {
         venue: w.venue || 'Palace Venue',
         startDate: w.startDate
           ? new Date(w.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-          : 'Winter 2026',
+          : 'Scheduled',
         endDate: w.endDate ? String(w.endDate) : undefined,
         guestCount: w.actualHeadcount || w.guestCount || 400,
         actualHeadcount: w.actualHeadcount || undefined,
         packageType: w.packageType || 'Full-Service Royal Wedding',
         status: w.status,
         isFinalised: isFinal,
-        finalisedDate: isFinal ? 'Feb 2026' : undefined,
-        finalisedBy: isFinal ? 'Aditya Singhal (Super Admin)' : undefined,
+        finalisedDate,
+        finalisedBy,
         budget: `₹${(baseContractNum / 10000000).toFixed(2)} Cr`,
         rawBudget: baseContractNum,
-        coordinator: w.coordinator || 'Devika Sharma',
+        coordinator: w.coordinator || 'Lead Planner',
         baseContract: formatInr(baseContractNum),
         rawBaseContract: baseContractNum,
         totalExtras: formatInr(totalExtrasNum),
@@ -701,9 +813,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
         success: true,
         data: project,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -780,9 +893,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
           message: 'Vendor bill added to ledger successfully',
           data: createdBill,
         };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
         reply.status(500);
-        return { success: false, error: err.message };
+        return { success: false, error: msg };
       }
     }
   );
@@ -874,9 +988,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
           syncedCount: createdCount,
           message: `Successfully synchronized ${createdCount} winning vendor quote(s) into billing ledger.`,
         };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
         reply.status(500);
-        return { success: false, error: err.message };
+        return { success: false, error: msg };
       }
     }
   );
@@ -963,9 +1078,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
           message: 'Vendor disbursement successfully reconciled',
           data: updatedBill,
         };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
         reply.status(500);
-        return { success: false, error: err.message };
+        return { success: false, error: msg };
       }
     }
   );
@@ -1077,9 +1193,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
           message: 'Extra charge audited and added to client billing and vendor ledger',
           data: createdExtra,
         };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
         reply.status(500);
-        return { success: false, error: err.message };
+        return { success: false, error: msg };
       }
     }
   );
@@ -1157,9 +1274,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
           message: 'Client milestone invoice payment successfully recorded',
           data: updatedInvoice,
         };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
         reply.status(500);
-        return { success: false, error: err.message };
+        return { success: false, error: msg };
       }
     }
   );
@@ -1219,9 +1337,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
           message: `Project ${w.code} has been finalised and locked in the financial registry.`,
           data: updatedWedding,
         };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
         reply.status(500);
-        return { success: false, error: err.message };
+        return { success: false, error: msg };
       }
     }
   );
@@ -1252,9 +1371,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
           dateFormatted: l.createdAt ? new Date(l.createdAt).toLocaleString('en-IN') : undefined,
         })),
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 }

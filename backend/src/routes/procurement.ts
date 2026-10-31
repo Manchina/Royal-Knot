@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { db } from '../db';
-import { vendors, rfqRequests, vendorQuotes, weddings, clients } from '../db/schema';
-import { eq, desc, ilike, and, ne, sql, count } from 'drizzle-orm';
+import { vendors, rfqRequests, vendorQuotes, weddings, clients, masterOptions } from '../db/schema';
+import { eq, desc, ilike, and, ne, sql, count, type SQL } from 'drizzle-orm';
 import { isUUID } from '../utils';
 
 interface CreateVendorBody {
@@ -28,13 +28,48 @@ interface SelectWinnerBody {
   reason?: string;
 }
 
+interface QuoteOverviewItem {
+  id: string;
+  rfqId: string;
+  vendorId: string | null;
+  businessName: string | null;
+  rating: string | null;
+  phone: string | null;
+  city: string | null;
+  baseCost: string | null;
+  pricePerPlate: string | null;
+  overtimeHourlyRate: string | null;
+  status: string | null;
+  decisionReason: string | null;
+  isWinner: boolean;
+}
+
+interface CategoryOverview {
+  status: string;
+  quotes: QuoteOverviewItem[];
+  winner: QuoteOverviewItem | null;
+}
+
+interface WeddingOverviewGroup {
+  id: string;
+  code: string;
+  couple_name: string | null;
+  destination_city: string;
+  primary_venue: string | null;
+  start_date: string;
+  estimated_guest_count: number;
+  total_budget: string;
+  wedding_status: string;
+  categories: Record<string, CategoryOverview>;
+}
+
 export async function procurementRoutes(fastify: FastifyInstance) {
   // 1. Get All Vendors (with optional category & search filter) - Drizzle ORM
   fastify.get('/vendors', async (request: FastifyRequest<{ Querystring: { category?: string; search?: string; city?: string } }>, reply: FastifyReply) => {
     try {
       const { category, search, city } = request.query || {};
 
-      const conditions: any[] = [];
+      const conditions: SQL[] = [];
       if (category && category !== 'ALL') {
         conditions.push(eq(vendors.category, category.toUpperCase()));
       }
@@ -58,14 +93,20 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         .from(vendors)
         .groupBy(vendors.category);
 
+      const categoryRows = await db
+        .select({
+          key: masterOptions.optionKey,
+        })
+        .from(masterOptions)
+        .where(eq(masterOptions.category, 'VENDOR_CATEGORY'));
+
       const countsMap: Record<string, number> = {
         ALL: allVendors.length,
-        CATERER: 0,
-        DJ: 0,
-        DECORATOR: 0,
-        PHOTOGRAPHY: 0,
-        DRUMMERS: 0,
       };
+
+      for (const cat of categoryRows) {
+        countsMap[cat.key] = 0;
+      }
 
       for (const row of countsResult) {
         countsMap[row.category] = Number(row.total);
@@ -76,9 +117,10 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         data: allVendors,
         counts: countsMap,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve vendors';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -129,9 +171,10 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         message: 'Vendor registered successfully.',
         data: created,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to register vendor';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -203,9 +246,10 @@ export async function procurementRoutes(fastify: FastifyInstance) {
           },
         },
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve vendor details';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -230,7 +274,7 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         specialties,
       } = request.body || {};
 
-      const updateData: any = {};
+      const updateData: Partial<typeof vendors.$inferInsert> = {};
       if (businessName) updateData.businessName = businessName;
       if (category) updateData.category = category.toUpperCase();
       if (contactPerson !== undefined) updateData.contactPerson = contactPerson;
@@ -261,9 +305,10 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         message: 'Vendor profile updated successfully.',
         data: updated,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update vendor';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -311,7 +356,7 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         .leftJoin(vendors, eq(vendorQuotes.vendorId, vendors.id))
         .orderBy(rfqRequests.createdAt);
 
-      const weddingMap: Record<string, any> = {};
+      const weddingMap: Record<string, WeddingOverviewGroup> = {};
       for (const w of weddingsRows) {
         weddingMap[w.id] = {
           ...w,
@@ -341,7 +386,7 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         if (row.quote_id) {
           const isWinner = row.quote_status === 'ACCEPTED' || row.quote_status === 'AWARDED';
 
-          const quoteObj = {
+          const quoteObj: QuoteOverviewItem = {
             id: row.quote_id,
             rfqId: row.rfq_id,
             vendorId: row.vendor_id,
@@ -369,9 +414,10 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         success: true,
         data: Object.values(weddingMap),
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve weddings overview';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -485,9 +531,10 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         message: `Successfully updated assigned vendor options for this wedding category.`,
         rfqId: rfq.id,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update vendor options';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -517,9 +564,10 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         success: true,
         message: 'Vendor option successfully removed from this wedding.',
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to unassign quote';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -532,7 +580,7 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         return { success: false, message: 'Quote ID is required.' };
       }
 
-      const updateData: any = {};
+      const updateData: Partial<typeof vendorQuotes.$inferInsert> = {};
       if (baseCost !== undefined) updateData.baseCost = String(baseCost);
       if (pricePerPlate !== undefined) updateData.pricePerPlate = pricePerPlate ? String(pricePerPlate) : null;
       if (overtimeHourlyRate !== undefined) updateData.overtimeHourlyRate = overtimeHourlyRate ? String(overtimeHourlyRate) : null;
@@ -543,9 +591,10 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         success: true,
         message: 'Vendor quote pricing successfully updated.',
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to edit quote';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -598,9 +647,10 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         quoteId,
         rfqId: quote.rfqId,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to select winner';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 }

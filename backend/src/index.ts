@@ -52,9 +52,10 @@ async function buildServer() {
     try {
       const json = JSON.parse(body);
       done(null, json);
-    } catch (err: any) {
-      err.statusCode = 400;
-      done(err, undefined);
+    } catch (err: unknown) {
+      const parseError = err instanceof Error ? err : new Error('Invalid JSON');
+      (parseError as Error & { statusCode?: number }).statusCode = 400;
+      done(parseError, undefined);
     }
   });
 
@@ -87,11 +88,12 @@ async function buildServer() {
         success: true,
         data: res.rows[0],
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       reply.status(500);
       return {
         success: false,
-        error: err.message,
+        error: msg,
       };
     }
   });

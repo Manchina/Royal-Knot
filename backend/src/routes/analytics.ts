@@ -1,80 +1,100 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { pool } from '../db';
+import { eq, sql, desc, asc, count } from 'drizzle-orm';
+import { db } from '../db';
+import {
+  weddings,
+  clients,
+  users,
+  weddingExtraCharges,
+  vendorBills,
+  clientInvoices,
+  vendors,
+  dayOfVendorCheckins,
+} from '../db/schema';
 
 export async function analyticsRoutes(fastify: FastifyInstance) {
-  // GET /api/analytics/season-summary - Live PostgreSQL queries for Season Profitability, Cash Flow & Vendor Scorecard
+  // GET /api/analytics/season-summary - Live Drizzle ORM queries for Season Profitability, Cash Flow & Vendor Scorecard
   fastify.get('/season-summary', async (_request: FastifyRequest, reply: FastifyReply) => {
     try {
-      // 1. Fetch all weddings with clients
-      const weddingsRes = await pool.query(`
-        SELECT 
-          w.id,
-          w.code,
-          c.bride_name || ' & ' || c.groom_name as couple,
-          w.primary_venue as venue,
-          w.destination_city as city,
-          w.estimated_guest_count as guests,
-          w.actual_banquet_headcount as "actualHeadcount",
-          w.package_type as "packageType",
-          w.total_budget as "totalBudget",
-          w.agency_fee as "agencyFee",
-          w.status,
-          TO_CHAR(w.start_date, 'Mon DD') || ' - ' || TO_CHAR(w.end_date, 'DD, YYYY') as date,
-          w.season_year as "seasonYear"
-        FROM weddings w
-        JOIN clients c ON w.client_id = c.id
-        ORDER BY w.start_date ASC
-      `);
+      // 1. Fetch all weddings with clients and lead planner via Drizzle
+      const weddingsRows = await db
+        .select({
+          id: weddings.id,
+          code: weddings.code,
+          couple: sql<string>`${clients.brideName} || ' & ' || ${clients.groomName}`,
+          venue: sql<string>`COALESCE(${weddings.primaryVenue}, 'Palace Lawns')`,
+          city: weddings.destinationCity,
+          guests: weddings.estimatedGuestCount,
+          actualHeadcount: weddings.actualBanquetHeadcount,
+          packageType: weddings.packageType,
+          totalBudget: weddings.totalBudget,
+          agencyFee: weddings.agencyFee,
+          status: weddings.status,
+          leadPlanner: sql<string>`COALESCE(${users.fullName}, 'Lead Planner')`,
+          date: sql<string>`TO_CHAR(${weddings.startDate}, 'Mon DD') || ' - ' || TO_CHAR(${weddings.endDate}, 'DD, YYYY')`,
+          seasonYear: weddings.seasonYear,
+        })
+        .from(weddings)
+        .innerJoin(clients, eq(weddings.clientId, clients.id))
+        .leftJoin(users, eq(weddings.leadPlannerId, users.id))
+        .orderBy(asc(weddings.startDate));
 
-      // 2. Fetch extra charges grouped by wedding
-      const extrasRes = await pool.query(`
-        SELECT 
-          wedding_id,
-          COALESCE(SUM(total_amount), 0) as total_extras,
-          COUNT(*) as extras_count
-        FROM wedding_extra_charges
-        GROUP BY wedding_id
-      `);
-      const extrasMap = new Map(extrasRes.rows.map((r: any) => [r.wedding_id, parseFloat(r.total_extras) || 0]));
-      const extrasCountMap = new Map(extrasRes.rows.map((r: any) => [r.wedding_id, parseInt(r.extras_count, 10) || 0]));
+      // 2. Fetch extra charges grouped by wedding via Drizzle
+      const extrasRows = await db
+        .select({
+          weddingId: weddingExtraCharges.weddingId,
+          totalExtras: sql<string>`COALESCE(SUM(${weddingExtraCharges.totalAmount}), 0)`,
+          extrasCount: count(weddingExtraCharges.id),
+        })
+        .from(weddingExtraCharges)
+        .groupBy(weddingExtraCharges.weddingId);
 
-      // 3. Fetch vendor bills grouped by wedding
-      const billsRes = await pool.query(`
-        SELECT 
-          wedding_id,
-          COALESCE(SUM(total_payable), 0) as total_vendor_costs,
-          COALESCE(SUM(advance_paid), 0) as total_advance_paid,
-          COALESCE(SUM(balance_due), 0) as total_balance_due
-        FROM vendor_bills
-        GROUP BY wedding_id
-      `);
-      const billsMap = new Map(billsRes.rows.map((r: any) => [r.wedding_id, {
-        totalCosts: parseFloat(r.total_vendor_costs) || 0,
-        advancePaid: parseFloat(r.total_advance_paid) || 0,
-        balanceDue: parseFloat(r.total_balance_due) || 0,
-      }]));
+      const extrasMap = new Map(extrasRows.map((r) => [r.weddingId, parseFloat(r.totalExtras) || 0]));
+      const extrasCountMap = new Map(extrasRows.map((r) => [r.weddingId, Number(r.extrasCount) || 0]));
 
-      // 4. Fetch Client Invoices for Cash Flow Inflows
-      const invoicesRes = await pool.query(`
-        SELECT 
-          id,
-          wedding_id,
-          invoice_number,
-          stage_key,
-          amount_due,
-          status,
-          paid_amount,
-          due_date,
-          TO_CHAR(due_date, 'Mon YYYY') as month_year
-        FROM client_invoices
-        ORDER BY due_date ASC
-      `);
+      // 3. Fetch vendor bills grouped by wedding via Drizzle
+      const billsRows = await db
+        .select({
+          weddingId: vendorBills.weddingId,
+          totalCosts: sql<string>`COALESCE(SUM(${vendorBills.totalPayable}), 0)`,
+          advancePaid: sql<string>`COALESCE(SUM(${vendorBills.advancePaid}), 0)`,
+          balanceDue: sql<string>`COALESCE(SUM(${vendorBills.balanceDue}), 0)`,
+        })
+        .from(vendorBills)
+        .groupBy(vendorBills.weddingId);
+
+      const billsMap = new Map(
+        billsRows.map((r) => [
+          r.weddingId,
+          {
+            totalCosts: parseFloat(r.totalCosts) || 0,
+            advancePaid: parseFloat(r.advancePaid) || 0,
+            balanceDue: parseFloat(r.balanceDue) || 0,
+          },
+        ])
+      );
+
+      // 4. Fetch Client Invoices for Cash Flow Inflows via Drizzle
+      const invoicesRows = await db
+        .select({
+          id: clientInvoices.id,
+          weddingId: clientInvoices.weddingId,
+          invoiceNumber: clientInvoices.invoiceNumber,
+          stageKey: clientInvoices.stageKey,
+          amountDue: clientInvoices.amountDue,
+          status: clientInvoices.status,
+          paidAmount: clientInvoices.paidAmount,
+          dueDate: clientInvoices.dueDate,
+          monthYear: sql<string>`TO_CHAR(${clientInvoices.dueDate}, 'Mon YYYY')`,
+        })
+        .from(clientInvoices)
+        .orderBy(asc(clientInvoices.dueDate));
 
       // 5. Build Wedding-by-Wedding P&L Matrix
       let totalSeasonRevenue = 0;
       let totalSeasonVendorCosts = 0;
 
-      const weddingProfits = weddingsRes.rows.map((w: any) => {
+      const weddingProfits = weddingsRows.map((w) => {
         const baseBudget = parseFloat(w.totalBudget) || 0;
         const extras = extrasMap.get(w.id) || 0;
         const clientBilled = baseBudget + extras;
@@ -110,7 +130,7 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
           marginPct: `${marginPctNum.toFixed(1)}%`,
           marginPctNum,
           status: profitStatus,
-          leadPlanner: w.city === 'Jaipur' ? 'Devika Sharma' : 'Karan Verma',
+          leadPlanner: w.leadPlanner || 'Lead Planner',
           date: w.date,
         };
       });
@@ -120,39 +140,39 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
 
       // 6. Cash Flow Calculations (Pending Inflows vs Outflows)
       let pendingInflowsTotal = 0;
-      invoicesRes.rows.forEach((inv: any) => {
+      invoicesRows.forEach((inv) => {
         if (inv.status === 'UNPAID') {
-          pendingInflowsTotal += parseFloat(inv.amount_due) || 0;
+          pendingInflowsTotal += parseFloat(inv.amountDue) || 0;
         }
       });
 
       let pendingDisbursementsTotal = 0;
-      billsRes.rows.forEach((b: any) => {
-        pendingDisbursementsTotal += parseFloat(b.total_balance_due) || 0;
+      billsRows.forEach((b) => {
+        pendingDisbursementsTotal += parseFloat(b.balanceDue) || 0;
       });
 
-      // 7. Vendor Scorecard from day_of_vendor_checkins
-      const vendorScorecardRes = await pool.query(`
-        SELECT 
-          v.id,
-          v.business_name as vendor,
-          v.category,
-          v.city,
-          v.rating_score as rating,
-          COUNT(vc.id) as total_checkins,
-          COALESCE(SUM(CASE WHEN vc.delay_minutes = 0 THEN 1 ELSE 0 END), 0) as on_time_checkins,
-          COALESCE(AVG(vc.delay_minutes), 0) as avg_delay_minutes
-        FROM vendors v
-        LEFT JOIN day_of_vendor_checkins vc ON v.id = vc.vendor_id
-        GROUP BY v.id, v.business_name, v.category, v.city, v.rating_score
-        ORDER BY v.rating_score DESC
-      `);
+      // 7. Vendor Scorecard from day_of_vendor_checkins via Drizzle
+      const vendorScorecardRows = await db
+        .select({
+          id: vendors.id,
+          vendor: vendors.businessName,
+          category: vendors.category,
+          city: vendors.city,
+          rating: vendors.ratingScore,
+          totalCheckins: count(dayOfVendorCheckins.id),
+          onTimeCheckins: sql<string>`COALESCE(SUM(CASE WHEN ${dayOfVendorCheckins.delayMinutes} = 0 THEN 1 ELSE 0 END), 0)`,
+          avgDelayMinutes: sql<string>`COALESCE(AVG(${dayOfVendorCheckins.delayMinutes}), 0)`,
+        })
+        .from(vendors)
+        .leftJoin(dayOfVendorCheckins, eq(vendors.id, dayOfVendorCheckins.vendorId))
+        .groupBy(vendors.id, vendors.businessName, vendors.category, vendors.city, vendors.ratingScore)
+        .orderBy(desc(vendors.ratingScore));
 
-      const vendorScorecard = vendorScorecardRes.rows.map((v: any) => {
-        const total = parseInt(v.total_checkins, 10) || 1;
-        const onTime = parseInt(v.on_time_checkins, 10) || 1;
+      const vendorScorecard = vendorScorecardRows.map((v) => {
+        const total = Number(v.totalCheckins) || 1;
+        const onTime = Number(v.onTimeCheckins) || 1;
         const onTimePct = Math.min(100, Math.round((onTime / total) * 100));
-        const rating = parseFloat(v.rating) || 4.8;
+        const rating = parseFloat(v.rating || '4.8') || 4.8;
 
         let reliabilityStatus: 'High Reliability' | 'Satisfactory' | 'Watchlist' = 'High Reliability';
         if (onTimePct < 85 || rating < 4.75) {
@@ -169,41 +189,41 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
           rating: rating.toFixed(1),
           onTimeArrivalPct: `${onTimePct}%`,
           eventsDelivered: total + 3, // includes historic season events
-          avgDelayMins: Math.round(parseFloat(v.avg_delay_minutes) || 0),
+          avgDelayMins: Math.round(parseFloat(v.avgDelayMinutes) || 0),
           reliability: reliabilityStatus,
         };
       });
 
-      // 8. Compute Monthly Cash Flow Forecast from PostgreSQL client_invoices and vendor_bills
-      const monthlyInflowsRes = await pool.query(`
-        SELECT 
-          TO_CHAR(due_date, 'Mon YYYY') as period,
-          DATE_TRUNC('month', due_date) as month_date,
-          COALESCE(SUM(amount_due), 0) as total_inflows
-        FROM client_invoices
-        GROUP BY period, month_date
-        ORDER BY month_date ASC
-      `);
+      // 8. Compute Monthly Cash Flow Forecast from client_invoices and vendor_bills via Drizzle
+      const monthlyInflowsRows = await db
+        .select({
+          period: sql<string>`TO_CHAR(${clientInvoices.dueDate}, 'Mon YYYY')`,
+          monthDate: sql<string>`DATE_TRUNC('month', ${clientInvoices.dueDate})`,
+          totalInflows: sql<string>`COALESCE(SUM(${clientInvoices.amountDue}), 0)`,
+        })
+        .from(clientInvoices)
+        .groupBy(sql`TO_CHAR(${clientInvoices.dueDate}, 'Mon YYYY')`, sql`DATE_TRUNC('month', ${clientInvoices.dueDate})`)
+        .orderBy(sql`DATE_TRUNC('month', ${clientInvoices.dueDate}) ASC`);
 
-      const monthlyPayablesRes = await pool.query(`
-        SELECT 
-          TO_CHAR(w.start_date, 'Mon YYYY') as period,
-          DATE_TRUNC('month', w.start_date) as month_date,
-          COALESCE(SUM(vb.total_payable), 0) as total_payables
-        FROM vendor_bills vb
-        JOIN weddings w ON vb.wedding_id = w.id
-        GROUP BY period, month_date
-        ORDER BY month_date ASC
-      `);
+      const monthlyPayablesRows = await db
+        .select({
+          period: sql<string>`TO_CHAR(${weddings.startDate}, 'Mon YYYY')`,
+          monthDate: sql<string>`DATE_TRUNC('month', ${weddings.startDate})`,
+          totalPayables: sql<string>`COALESCE(SUM(${vendorBills.totalPayable}), 0)`,
+        })
+        .from(vendorBills)
+        .innerJoin(weddings, eq(vendorBills.weddingId, weddings.id))
+        .groupBy(sql`TO_CHAR(${weddings.startDate}, 'Mon YYYY')`, sql`DATE_TRUNC('month', ${weddings.startDate})`)
+        .orderBy(sql`DATE_TRUNC('month', ${weddings.startDate}) ASC`);
 
       const payablesByPeriod = new Map(
-        monthlyPayablesRes.rows.map((r: any) => [r.period, parseFloat(r.total_payables) || 0])
+        monthlyPayablesRows.map((r) => [r.period, parseFloat(r.totalPayables) || 0])
       );
 
-      const cashFlowForecast = monthlyInflowsRes.rows
-        .filter((r: any) => new Date(r.month_date).getTime() >= new Date('2026-08-01').getTime())
-        .map((r: any) => {
-          const inflows = parseFloat(r.total_inflows) || 0;
+      const cashFlowForecast = monthlyInflowsRows
+        .filter((r) => new Date(r.monthDate).getTime() >= new Date('2026-08-01').getTime())
+        .map((r) => {
+          const inflows = parseFloat(r.totalInflows) || 0;
           const payables = payablesByPeriod.get(r.period) || 0;
           const delta = inflows - payables;
           return {
@@ -223,7 +243,7 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
             value: `₹${(totalSeasonNetProfit / 10000000).toFixed(2)} Cr`,
             change: `${seasonMarginPct.toFixed(1)}% Gross Margin`,
             positive: true,
-            sub: `${weddingsRes.rows.length} Destination Weddings (2026 Season)`,
+            sub: `${weddingsRows.length} Destination Weddings (2026 Season)`,
           },
           {
             label: 'Contracted Client Revenue',
@@ -235,7 +255,7 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
           {
             label: 'Pending Inflows (Next 30 Days)',
             value: `₹${(pendingInflowsTotal / 10000000).toFixed(2)} Cr`,
-            change: `${invoicesRes.rows.filter((i: any) => i.status === 'UNPAID').length} Milestone Invoices Due`,
+            change: `${invoicesRows.filter((i) => i.status === 'UNPAID').length} Milestone Invoices Due`,
             positive: true,
             sub: 'Client Scheduled Payments',
           },
@@ -251,11 +271,13 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
         cashFlowForecast,
         vendorScorecard,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      fastify.log.error(`Analytics season summary error: ${msg}`);
       reply.status(500);
       return {
         success: false,
-        error: err.message,
+        error: msg,
       };
     }
   });
