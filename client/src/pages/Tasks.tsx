@@ -86,9 +86,7 @@ export const Tasks: React.FC = () => {
   // Modal State for adding Day-Of Wedding Task (accepts time instead of date)
   const [dayOfModalOpen, setDayOfModalOpen] = useState<boolean>(false);
   const [dayOfType, setDayOfType] = useState<'MINUTE_TO_MINUTE' | 'VENDOR_TELEMETRY'>('MINUTE_TO_MINUTE');
-  const [dayOfTaskWeddingId, setDayOfTaskWeddingId] = useState<string>(
-    selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'
-  );
+  const [dayOfTaskWeddingId, setDayOfTaskWeddingId] = useState<string>('');
   const [dayOfTitle, setDayOfTitle] = useState('');
   const [dayOfTime, setDayOfTime] = useState('14:30');
   const [dayOfOwner, setDayOfOwner] = useState('Karan Verma');
@@ -97,9 +95,7 @@ export const Tasks: React.FC = () => {
   const [dayOfGate, setDayOfGate] = useState('Palace North Service Gate');
   const [dayOfRemarks, setDayOfRemarks] = useState('');
   const [dayOfIsMilestone, setDayOfIsMilestone] = useState(false);
-  const [newTaskWeddingId, setNewTaskWeddingId] = useState<string>(
-    selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'
-  );
+  const [newTaskWeddingId, setNewTaskWeddingId] = useState<string>('');
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState<string>('VENUE');
   const [newOwner, setNewOwner] = useState('Devika Sharma');
@@ -387,7 +383,7 @@ export const Tasks: React.FC = () => {
             variant="default"
             size="sm"
             onClick={() => {
-              setNewTaskWeddingId(selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001');
+              setNewTaskWeddingId(selectedWeddingId && selectedWeddingId !== 'ALL' ? selectedWeddingId : '');
               createMutation.reset();
               setModalOpen(true);
             }}
@@ -401,7 +397,7 @@ export const Tasks: React.FC = () => {
             variant="secondary"
             size="sm"
             onClick={() => {
-              setDayOfTaskWeddingId(selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001');
+              setDayOfTaskWeddingId(selectedWeddingId && selectedWeddingId !== 'ALL' ? selectedWeddingId : '');
               createDayOfTaskMutation.reset();
               setDayOfModalOpen(true);
             }}
@@ -961,6 +957,10 @@ export const Tasks: React.FC = () => {
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              if (!dayOfTaskWeddingId) {
+                alert('Please select a wedding project.');
+                return;
+              }
               if (dayOfType === 'MINUTE_TO_MINUTE') {
                 if (!dayOfTitle.trim()) return;
                 createDayOfTaskMutation.mutate({
@@ -1066,8 +1066,10 @@ export const Tasks: React.FC = () => {
                 id="dayof_wedding"
                 value={dayOfTaskWeddingId}
                 onChange={(e) => setDayOfTaskWeddingId(e.target.value)}
+                required
                 className="w-full h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
               >
+                <option value="">-- Select a Wedding Project --</option>
                 {weddings.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.code}: {w.couple} ({w.city})
