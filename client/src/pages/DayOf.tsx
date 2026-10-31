@@ -96,11 +96,13 @@ export const DayOf: React.FC = () => {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
 
   // Form states for Incident
+  const [incidentWeddingId, setIncidentWeddingId] = useState<string>('RW-2026-001');
   const [newTitle, setNewTitle] = useState('');
   const [newSeverity, setNewSeverity] = useState<'HIGH' | 'MEDIUM' | 'LOW'>('HIGH');
   const [newAssignee, setNewAssignee] = useState('Karan Verma');
 
   // Form states for Schedule Item
+  const [scheduleWeddingId, setScheduleWeddingId] = useState<string>('RW-2026-001');
   const [newScheduleTime, setNewScheduleTime] = useState('14:30');
   const [newScheduleTitle, setNewScheduleTitle] = useState('');
   const [newScheduleVenue, setNewScheduleVenue] = useState('Palace Courtyard');
@@ -228,7 +230,7 @@ export const DayOf: React.FC = () => {
     if (!newTitle.trim()) return;
 
     reportIncidentMutation.mutate({
-      weddingId: selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001',
+      weddingId: incidentWeddingId || (selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'),
       title: newTitle.trim(),
       severity: newSeverity,
       ownerName: newAssignee,
@@ -240,7 +242,7 @@ export const DayOf: React.FC = () => {
     if (!newScheduleTitle.trim()) return;
 
     createScheduleMutation.mutate({
-      weddingId: selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001',
+      weddingId: scheduleWeddingId || (selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'),
       timeSlot: newScheduleTime,
       activityTitle: newScheduleTitle.trim(),
       location: newScheduleVenue.trim(),
@@ -290,7 +292,7 @@ export const DayOf: React.FC = () => {
           <Button
             variant="destructive"
             size="sm"
-            onClick={() => setReportModalOpen(true)}
+            onClick={() => { setIncidentWeddingId(selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'); setReportModalOpen(true); }}
             className="gap-1.5 h-8 text-xs"
           >
             <AlertTriangle className="w-3.5 h-3.5" />
@@ -334,6 +336,7 @@ export const DayOf: React.FC = () => {
                   >
                     {inc.severity}
                   </Badge>
+                  <Badge variant="outline" className="text-[10px] font-mono text-[#714B67] bg-[#714B67]/5 border-[#714B67]/20">{inc.weddingCode || 'RW-2026-001'}</Badge>
                   <span className="font-bold text-slate-900">{inc.title}</span>
                 </div>
 
@@ -381,7 +384,7 @@ export const DayOf: React.FC = () => {
             <Button
               variant="default"
               size="sm"
-              onClick={() => setScheduleModalOpen(true)}
+              onClick={() => { setScheduleWeddingId(selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'); setScheduleModalOpen(true); }}
               className="gap-1.5 h-8 text-xs font-semibold"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -639,6 +642,22 @@ export const DayOf: React.FC = () => {
 
           <form onSubmit={handleReportIncident} className="space-y-3 py-2">
             <div className="space-y-1">
+              <Label htmlFor="inc_wedding">Target Wedding Project</Label>
+              <select
+                id="inc_wedding"
+                value={incidentWeddingId}
+                onChange={(e) => setIncidentWeddingId(e.target.value)}
+                className="w-full h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67] cursor-pointer"
+              >
+                {weddings.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.code}: {w.couple} ({w.city})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
               <Label htmlFor="inc_title">Incident Description</Label>
               <Input
                 id="inc_title"
@@ -714,6 +733,22 @@ export const DayOf: React.FC = () => {
           </DialogHeader>
 
           <form onSubmit={handleCreateScheduleItem} className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="sched_wedding">Target Wedding Project</Label>
+              <select
+                id="sched_wedding"
+                value={scheduleWeddingId}
+                onChange={(e) => setScheduleWeddingId(e.target.value)}
+                className="w-full h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67] cursor-pointer"
+              >
+                {weddings.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.code}: {w.couple} ({w.city})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="grid grid-cols-2 gap-2.5">
               <div className="space-y-1">
                 <Label htmlFor="sched_time">Time Slot (HH:MM)</Label>
