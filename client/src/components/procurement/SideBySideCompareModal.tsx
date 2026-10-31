@@ -1,19 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import {
-  FileText,
-  Printer,
-  Sparkles,
-  Award,
-  DollarSign,
-  Clock,
   X,
-  Check,
-  Info,
   Plus,
   Star,
-  CheckCircle2,
-  ChevronDown,
-  Layers
+  Printer,
+  FileText,
 } from 'lucide-react';
 import {
   Dialog,
@@ -59,13 +50,11 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
     });
   }, [quotes]);
 
-  // Chrome Tabs: openQuoteIds tracks which vendor tabs are currently active in the comparison
-  // By default, open the first 2 or 3 distinct vendors so it's clean and uncluttered
+  // Chrome Tabs: openQuoteIds tracks which vendor tabs are currently active in comparison
+  // By default, open the first 2 or 3 distinct vendors
   const [openQuoteIds, setOpenQuoteIds] = useState<string[]>(() => {
     return uniqueQuotes.slice(0, Math.min(uniqueQuotes.length, 3)).map((q) => q.id);
   });
-
-  const [addMenuOpen, setAddMenuOpen] = useState(false);
 
   // Active quotes corresponding to open tabs
   const activeQuotes = useMemo(() => {
@@ -88,19 +77,16 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
     if (!openQuoteIds.includes(id)) {
       setOpenQuoteIds((prev) => [...prev, id]);
     }
-    setAddMenuOpen(false);
   };
 
   // Handle opening all quotes
   const handleOpenAll = () => {
     setOpenQuoteIds(uniqueQuotes.map((q) => q.id));
-    setAddMenuOpen(false);
   };
 
   // Handle reset to top 2 quotes
   const handleResetTop2 = () => {
     setOpenQuoteIds(uniqueQuotes.slice(0, 2).map((q) => q.id));
-    setAddMenuOpen(false);
   };
 
   const guestCount = currentWedding?.estimated_guest_count || 400;
@@ -122,21 +108,14 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl bg-slate-100 p-0 overflow-hidden max-h-[94vh] flex flex-col rounded-xl shadow-2xl border border-slate-300">
+      <DialogContent className="max-w-6xl bg-slate-100 p-0 overflow-hidden max-h-[94vh] flex flex-col rounded-xl shadow-2xl border border-slate-300 [&>button]:text-white [&>button]:opacity-80 hover:[&>button]:opacity-100">
         {/* ========================================================================= */}
         {/* 1. CHROME BROWSER WINDOW TITLEBAR & TAB STRIP                             */}
         {/* ========================================================================= */}
         <div className="bg-slate-900 text-white select-none">
-          {/* Top Window Meta Bar */}
-          <div className="px-5 py-2.5 flex items-center justify-between border-b border-slate-800">
-            <div className="flex items-center gap-2">
-              {/* Window Controls Dots */}
-              <div className="flex items-center gap-1.5 mr-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block" />
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
-              </div>
-
+          {/* Top Window Meta Bar (pr-12 leaves space for single top-right close 'X') */}
+          <div className="px-5 py-2.5 flex items-center justify-between border-b border-slate-800 pr-12">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[10px] uppercase font-bold tracking-wider text-amber-300 bg-white/10 px-2 py-0.5 rounded">
                 Comparison Workspace
               </span>
@@ -145,7 +124,7 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
                 {currentWedding?.code}: {currentWedding?.couple_name}
               </span>
               <span className="text-slate-500">•</span>
-              <span className="text-xs text-amber-200/90 font-mono">
+              <span className="text-xs text-amber-200 font-mono">
                 {categoryTitle} ({guestCount} Guests)
               </span>
               {categorySubtitle && (
@@ -166,138 +145,87 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
                 <Printer className="w-3 h-3" />
                 <span>Print</span>
               </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer transition"
-                title="Close comparison window"
-              >
-                <X className="w-4 h-4" />
-              </button>
             </div>
           </div>
 
-          {/* Chrome Tabs Strip */}
-          <div className="px-3 pt-2 flex items-center gap-1 overflow-x-auto border-b border-slate-700/60 bg-slate-950/40">
+          {/* Chrome Tabs Strip: Wide, spacious tabs without cramped scrolling */}
+          <div className="px-4 pt-2.5 flex items-center gap-1.5 flex-wrap border-b border-slate-700/60 bg-slate-950/40">
+            {/* Active Open Tabs */}
             {activeQuotes.map((q) => {
               const isThisWinner = q.isWinner || q.status === 'ACCEPTED' || q.status === 'AWARDED';
 
               return (
                 <div
                   key={q.id}
-                  className="group relative flex items-center gap-2 px-3.5 py-2 bg-slate-100 text-slate-900 rounded-t-lg text-xs font-medium border-t-2 border-t-[#714B67] shadow-sm max-w-[240px] shrink-0 transition"
+                  className="group relative flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-900 rounded-t-lg text-xs font-medium border-t-2 border-t-[#714B67] shadow-sm transition"
                 >
-                  <FileText className="w-3.5 h-3.5 text-[#714B67] shrink-0" />
-                  <span className="truncate font-semibold text-slate-800 text-[11px]">
+                  <span className="font-semibold text-slate-800 text-xs">
                     {q.businessName}
                   </span>
 
                   {isThisWinner ? (
-                    <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1 py-0.2 rounded shrink-0">
+                    <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded">
                       Winner
                     </span>
                   ) : q.pricePerPlate ? (
-                    <span className="text-[10px] font-mono text-slate-500 shrink-0">
-                      ₹{Number(q.pricePerPlate).toLocaleString('en-IN')}
+                    <span className="text-[10px] font-mono text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                      ₹{Number(q.pricePerPlate).toLocaleString('en-IN')}/pl
                     </span>
                   ) : null}
 
-                  {/* Close Tab Button (x) */}
+                  {/* Close Tab Button */}
                   <button
                     type="button"
                     onClick={(e) => handleCloseTab(q.id, e)}
-                    className="p-0.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-200 transition cursor-pointer ml-0.5"
+                    className="p-0.5 rounded-full text-slate-400 hover:text-slate-900 hover:bg-slate-300 transition cursor-pointer ml-1"
                     title={`Close tab for ${q.businessName}`}
                   >
-                    <X className="w-3 h-3" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               );
             })}
 
-            {/* Chrome "+" Add Tab Button */}
-            <div className="relative">
+            {/* Unadded Vendor Tabs: Direct 1-click addition without small dropdowns or scrolling */}
+            {unaddedQuotes.map((q) => (
               <button
+                key={q.id}
                 type="button"
-                onClick={() => setAddMenuOpen(!addMenuOpen)}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium transition cursor-pointer border border-slate-700"
-                title="Add vendor proposal tab to compare"
+                onClick={() => handleAddTab(q.id)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-t-lg bg-slate-800/90 hover:bg-slate-700/90 text-slate-300 hover:text-white text-xs font-medium border border-dashed border-slate-700 transition cursor-pointer"
+                title={`Click to add ${q.businessName} to comparison`}
               >
-                <Plus className="w-3.5 h-3.5 text-amber-300" />
-                <span className="text-[11px]">Add Tab</span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
+                <Plus className="w-3 h-3 text-amber-300" />
+                <span>Add {q.businessName}</span>
+                {q.pricePerPlate && (
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    (₹{Number(q.pricePerPlate).toLocaleString('en-IN')})
+                  </span>
+                )}
               </button>
+            ))}
 
-              {/* Dropdown Menu for Adding Tabs */}
-              {addMenuOpen && (
-                <div className="absolute left-0 top-full mt-1 w-72 bg-white rounded-lg shadow-xl border border-slate-200 py-1 z-50 text-slate-800">
-                  <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                    <span>Available Proposals</span>
-                    <span>{unaddedQuotes.length} unadded</span>
-                  </div>
-
-                  {unaddedQuotes.length === 0 ? (
-                    <div className="p-3 text-center text-xs text-slate-400 italic">
-                      All {uniqueQuotes.length} vendor options are currently open in tabs.
-                    </div>
-                  ) : (
-                    unaddedQuotes.map((q) => (
-                      <button
-                        key={q.id}
-                        type="button"
-                        onClick={() => handleAddTab(q.id)}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center justify-between transition cursor-pointer"
-                      >
-                        <div className="truncate mr-2">
-                          <p className="font-semibold text-slate-800 truncate">{q.businessName}</p>
-                          <p className="text-[10px] text-slate-400 font-mono">
-                            {q.quoteReference || q.city} • {q.rating} ★
-                          </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          {q.pricePerPlate && (
-                            <span className="font-mono text-[11px] font-bold text-[#714B67]">
-                              ₹{Number(q.pricePerPlate).toLocaleString('en-IN')}/pl
-                            </span>
-                          )}
-                          <span className="block text-[9px] text-emerald-600 font-bold">+ Open Tab</span>
-                        </div>
-                      </button>
-                    ))
-                  )}
-
-                  <div className="border-t border-slate-100 p-1.5 bg-slate-50 flex items-center justify-between gap-1 text-[10px]">
-                    <button
-                      type="button"
-                      onClick={handleOpenAll}
-                      className="px-2 py-1 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-200 transition font-medium cursor-pointer"
-                    >
-                      Open All ({uniqueQuotes.length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleResetTop2}
-                      className="px-2 py-1 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-200 transition font-medium cursor-pointer"
-                    >
-                      Reset to Top 2
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right side tab strip info */}
-            <div className="ml-auto flex items-center gap-2 text-[11px] text-slate-400 py-1 pr-2">
-              <span className="hidden sm:inline font-medium">
-                {activeQuotes.length} of {uniqueQuotes.length} tabs open
+            {/* Quick Batch Actions */}
+            <div className="ml-auto flex items-center gap-2 text-[11px] text-slate-400 py-1.5 pl-2">
+              <span className="hidden sm:inline">
+                {activeQuotes.length} of {uniqueQuotes.length} vendors in view
               </span>
               {activeQuotes.length < uniqueQuotes.length && (
                 <button
                   type="button"
                   onClick={handleOpenAll}
-                  className="text-amber-300 hover:underline text-[11px] cursor-pointer"
+                  className="text-amber-300 hover:underline font-medium cursor-pointer"
                 >
-                  Show All
+                  Show All ({uniqueQuotes.length})
+                </button>
+              )}
+              {activeQuotes.length > 2 && (
+                <button
+                  type="button"
+                  onClick={handleResetTop2}
+                  className="text-slate-400 hover:text-white hover:underline cursor-pointer"
+                >
+                  Reset to 2
                 </button>
               )}
             </div>
@@ -306,12 +234,9 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
 
         {/* Informative Sub-banner */}
         <div className="bg-amber-50/80 border-b border-amber-200/60 px-5 py-2 text-xs text-amber-900 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Info className="w-4 h-4 text-amber-700 shrink-0" />
-            <span>
-              Comparing {activeQuotes.length} vendor proposal{activeQuotes.length === 1 ? '' : 's'} side-by-side line by line and price per plate. Awarding a winning vendor links them straight to this wedding and auto-closes competing requests.
-            </span>
-          </div>
+          <span>
+            Comparing {activeQuotes.length} vendor proposal{activeQuotes.length === 1 ? '' : 's'} side by side. Awarding a winning vendor links them straight to this wedding and closes competing requests.
+          </span>
           {hasWinner && (
             <Badge variant="success" className="text-[10px] shrink-0">
               Contract Awarded to {winnerQuote?.businessName}
@@ -326,13 +251,10 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
           {activeQuotes.length === 0 ? (
             /* Empty State when all tabs closed */
             <div className="bg-white border border-slate-200 rounded-lg p-12 text-center max-w-md mx-auto my-6 space-y-4 shadow-sm">
-              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-[#714B67] mx-auto">
-                <Layers className="w-6 h-6" />
-              </div>
               <div className="space-y-1">
-                <h3 className="text-sm font-bold text-slate-900">No Vendor Proposal Tabs Open</h3>
+                <h3 className="text-sm font-bold text-slate-900">No Vendor Tabs Open</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Add tabs based on your interest to compare vendors side by side without clutter.
+                  Select which vendor proposals you want to compare side by side:
                 </p>
               </div>
               <div className="pt-2 flex flex-wrap justify-center gap-2">
@@ -342,7 +264,7 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
                     variant="outline"
                     size="sm"
                     onClick={() => handleAddTab(q.id)}
-                    className="text-xs h-7"
+                    className="text-xs h-8"
                   >
                     <Plus className="w-3 h-3 mr-1 text-[#714B67]" />
                     {q.businessName}
@@ -352,7 +274,7 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Columns Header (1, 2, or 3 columns matching open tabs) */}
+              {/* Columns Header (matching open tabs) */}
               <div
                 className="grid gap-4"
                 style={{
@@ -366,13 +288,12 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
                   return (
                     <div
                       key={q.id}
-                      className={`rounded-lg border p-4 transition-all flex flex-col justify-between ${
-                        isThisWinner
-                          ? 'border-emerald-600 bg-emerald-50/40 ring-2 ring-emerald-600 shadow-sm'
-                          : isClosed
+                      className={`rounded-lg border p-4 transition-all flex flex-col justify-between ${isThisWinner
+                        ? 'border-emerald-600 bg-emerald-50/40 ring-2 ring-emerald-600 shadow-sm'
+                        : isClosed
                           ? 'border-slate-200 bg-slate-100/70 opacity-75'
                           : 'border-slate-300 bg-white shadow-xs'
-                      }`}
+                        }`}
                     >
                       <div>
                         {/* Top Badges */}
@@ -383,7 +304,6 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
 
                           {isThisWinner ? (
                             <Badge variant="success" className="text-[10px]">
-                              <Award className="w-3 h-3 mr-1" />
                               Awarded Winner
                             </Badge>
                           ) : isClosed ? (
@@ -413,7 +333,7 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Proposal PDF Action (No edit clutter!) */}
+                      {/* Proposal PDF Action */}
                       <div className="pt-2 border-t border-slate-200/80">
                         <Button
                           type="button"
@@ -433,8 +353,7 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
 
               {/* Section 1: Financial Overview Comparison Cards */}
               <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-2xs space-y-3">
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
-                  <DollarSign className="w-4 h-4 text-[#714B67]" />
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2">
                   1. Commercial Terms & Pricing (for {guestCount} Guests)
                 </h3>
 
@@ -457,9 +376,8 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
                           <div>
                             <span className="text-[11px] text-slate-500 block font-medium">Rate Per Plate</span>
                             {isLowestPlate && activeQuotes.length > 1 && (
-                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded mt-0.5">
-                                <Sparkles className="w-2.5 h-2.5 text-emerald-700" />
-                                Best Value Plate
+                              <span className="text-[9px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded mt-0.5 inline-block">
+                                Lowest Plate Rate
                               </span>
                             )}
                           </div>
@@ -481,8 +399,7 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
                           <div>
                             <span className="text-[11px] text-slate-500 font-medium">Overtime / Hour</span>
                             {isLowestOvertime && activeQuotes.length > 1 && (
-                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded mt-0.5">
-                                <Clock className="w-2.5 h-2.5 text-emerald-700" />
+                              <span className="text-[9px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded mt-0.5 inline-block">
                                 Lowest Overtime
                               </span>
                             )}
@@ -499,8 +416,7 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
 
               {/* Section 2: Line-by-Line Menu & Service Breakdown */}
               <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-2xs space-y-3">
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
-                  <FileText className="w-4 h-4 text-[#714B67]" />
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2">
                   2. Line-by-Line Menu & Scope Breakdown
                 </h3>
 
@@ -547,8 +463,7 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
 
               {/* Section 3: Inclusions Comparison */}
               <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-2xs space-y-3">
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2">
                   3. Equipment, Chinaware & Staffing Inclusions
                 </h3>
 
@@ -570,8 +485,7 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
 
               {/* Section 4: Exclusions Comparison */}
               <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-2xs space-y-3">
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
-                  <Clock className="w-4 h-4 text-rose-600" />
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2">
                   4. Exclusions & Disclaimers
                 </h3>
 
@@ -593,12 +507,11 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
 
               {/* Section 5: Selection & Contract Award Action Row */}
               <div className="bg-slate-100/90 rounded-lg border border-slate-300 p-4 space-y-2">
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <Award className="w-4 h-4 text-[#714B67]" />
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
                   5. Selection & Contract Award
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Pick the preferred vendor proposal below. The system will automatically link them straight to this wedding and auto-close the other quotes.
+                  Pick the preferred vendor proposal below. The system will automatically link them straight to this wedding and auto-close competing quotes.
                 </p>
 
                 <div
@@ -614,9 +527,8 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
                     return (
                       <div key={q.id}>
                         {isThisWinner ? (
-                          <div className="w-full h-9 bg-emerald-600 text-white rounded flex items-center justify-center gap-1.5 text-xs font-bold shadow-xs">
-                            <Check className="w-4 h-4" />
-                            <span>Awarded Partner</span>
+                          <div className="w-full h-9 bg-emerald-600 text-white rounded flex items-center justify-center text-xs font-bold shadow-xs">
+                            Awarded Partner
                           </div>
                         ) : isClosed ? (
                           <div className="w-full h-9 bg-slate-200 text-slate-500 rounded flex items-center justify-center text-xs font-medium border border-slate-300">
@@ -643,22 +555,16 @@ export const SideBySideCompareModal: React.FC<SideBySideCompareModalProps> = ({
           )}
         </div>
 
-        {/* Modal Bottom Close */}
-        <div className="bg-white border-t border-slate-200 px-6 py-3 flex items-center justify-between">
-          <span className="text-xs text-slate-500">
+        {/* Modal Bottom Status Bar */}
+        <div className="bg-white border-t border-slate-200 px-6 py-2.5 flex items-center justify-between text-xs text-slate-500">
+          <span>
             {hasWinner
               ? `Decision locked for ${currentWedding?.code}. Winner is linked to project.`
               : 'Reviewing proposals for client confirmation.'}
           </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-            className="text-xs h-8"
-          >
-            Close Comparison
-          </Button>
+          <span className="font-mono text-[11px] text-slate-400">
+            {activeQuotes.length} of {uniqueQuotes.length} active in comparison
+          </span>
         </div>
       </DialogContent>
     </Dialog>

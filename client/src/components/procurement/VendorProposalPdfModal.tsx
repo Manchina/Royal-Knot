@@ -12,7 +12,6 @@ import {
   Clock,
   Sparkles,
   ShieldCheck,
-  X,
   MapPin,
   Phone
 } from 'lucide-react';
@@ -97,9 +96,9 @@ Verification: Verified by Royal Knot Luxury Weddings Concierge
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl bg-slate-100 p-0 overflow-hidden max-h-[92vh] flex flex-col rounded-lg shadow-2xl border border-slate-300">
+      <DialogContent className="max-w-4xl bg-slate-100 p-0 overflow-hidden max-h-[92vh] flex flex-col rounded-lg shadow-2xl border border-slate-300 [&>button]:text-white [&>button]:opacity-80 hover:[&>button]:opacity-100">
         {/* Top Control Bar (Screen only) */}
-        <div className="bg-[#714B67] text-white px-5 py-3 flex items-center justify-between print:hidden">
+        <div className="bg-[#714B67] text-white px-5 py-3 pr-12 flex items-center justify-between print:hidden">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-amber-300">
               <FileText className="w-4 h-4" />
@@ -152,14 +151,6 @@ Verification: Verified by Royal Knot Luxury Weddings Concierge
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Export</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1 rounded text-white/70 hover:text-white hover:bg-white/10 cursor-pointer transition ml-1"
-            >
-              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -396,16 +387,6 @@ Verification: Verified by Royal Knot Luxury Weddings Concierge
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onClose}
-              className="text-xs h-8"
-            >
-              Close
-            </Button>
-
             {onSelectWinner && quote.status !== 'ACCEPTED' && quote.status !== 'AWARDED' && (
               <Button
                 type="button"
