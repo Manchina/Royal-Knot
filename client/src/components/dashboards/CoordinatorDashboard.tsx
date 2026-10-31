@@ -260,22 +260,6 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
             </span>
           )}
 
-          <div className="w-56">
-            <Select
-              value={activeWeddingCode}
-              onValueChange={(val) => setActiveWeddingCode(val)}
-            >
-              <SelectTrigger className="h-8 text-xs bg-white border-slate-300 font-bold">
-                <SelectValue placeholder="Select Wedding" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="RW-2026-001">RW-2026-001: Singhania & Mehra</SelectItem>
-                <SelectItem value="RW-2026-002">RW-2026-002: Oberoi & Kapoor</SelectItem>
-                <SelectItem value="RW-2026-003">RW-2026-003: Rajput & Bhati</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           <Button
             variant="default"
             size="sm"
