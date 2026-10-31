@@ -264,7 +264,7 @@ export const CoordinatorDashboard: React.FC<CoordinatorDashboardProps> = ({
             variant="default"
             size="sm"
             onClick={handleGoToDayOfModule}
-            className="text-xs gap-1.5 h-8 bg-rose-700 hover:bg-rose-800 text-white shadow-2xs"
+            className="text-xs gap-1.5 h-8 bg-[#714B67] hover:bg-[#5b3c53] text-white font-semibold shadow-2xs"
             title="Open Day-Of Operations Module with active wedding project"
           >
             <span>Go to Day-Of Module</span>

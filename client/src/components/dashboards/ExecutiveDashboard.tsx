@@ -17,6 +17,7 @@ import {
   Table as TableIcon,
   BarChart3,
   ShieldCheck,
+  Filter,
   ArrowRight,
 } from 'lucide-react';
 import {
@@ -347,7 +348,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
             variant="default"
             size="sm"
             onClick={handleGoToBillingModule}
-            className="text-xs gap-1.5 h-8 bg-emerald-800 hover:bg-emerald-900 text-white shadow-2xs"
+            className="text-xs gap-1.5 h-8 bg-[#714B67] hover:bg-[#5b3c53] text-white font-semibold shadow-2xs"
             title="Open Billing & Extra Charges Module with current filters"
           >
             <span>Go to Billing Module</span>
@@ -356,7 +357,82 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
         </div>
       </div>
 
+      {/* Module-Aligned Filter Toolbar */}
+      <Card className="border border-slate-200 shadow-2xs rounded bg-white">
+        <CardContent className="p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2">
+              <div className="p-1 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                <Filter className="w-3.5 h-3.5 text-[#714B67]" />
+              </div>
+              <span className="text-xs font-bold text-slate-800">
+                Executive Filters:
+              </span>
+            </div>
 
+            <div className="flex flex-wrap items-center gap-2">
+              {/* City Filter */}
+              <div className="w-32">
+                <Select value={cityFilter} onValueChange={(val) => setCityFilter(val)}>
+                  <SelectTrigger className="h-8 text-xs bg-white border-slate-300">
+                    <SelectValue placeholder="City: All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Cities</SelectItem>
+                    <SelectItem value="Udaipur">Udaipur</SelectItem>
+                    <SelectItem value="Jaipur">Jaipur</SelectItem>
+                    <SelectItem value="Jodhpur">Jodhpur</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Margin Status Filter */}
+              <div className="w-40">
+                <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val as any)}>
+                  <SelectTrigger className="h-8 text-xs bg-white border-slate-300">
+                    <SelectValue placeholder="All Margins" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Margins</SelectItem>
+                    <SelectItem value="High Margin">High Margin (&gt;30%)</SelectItem>
+                    <SelectItem value="On Target">On Target</SelectItem>
+                    <SelectItem value="Audit Extras">Audit Extras</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Search input */}
+              <div className="relative w-44 sm:w-56">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Input
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search code, couple, city..."
+                  className="h-8 text-xs pl-8 bg-white border-slate-300"
+                />
+              </div>
+
+              {(cityFilter !== 'ALL' || statusFilter !== 'ALL' || searchTerm.trim() !== '') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCityFilter('ALL');
+                    setStatusFilter('ALL');
+                    setSearchTerm('');
+                  }}
+                  className="text-xs text-[#714B67] hover:underline font-semibold cursor-pointer px-1"
+                >
+                  Reset
+                </button>
+              )}
+
+              <Badge variant="outline" className="text-xs font-mono">
+                {filteredWeddings.length} Weddings
+              </Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* SECTION 1: Wedding-by-Wedding Profitability Matrix (Read-Only) */}
       <Card className="border border-slate-200 shadow-2xs rounded bg-white">
@@ -376,55 +452,11 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
               </div>
             </div>
 
-            {/* Filter, Search & Local Section View Toggle */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="w-32">
-                <Select
-                  value={cityFilter}
-                  onValueChange={(val) => setCityFilter(val)}
-                >
-                  <SelectTrigger className="h-8 text-xs bg-white border-slate-300">
-                    <SelectValue placeholder="All Cities" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">All Cities</SelectItem>
-                    <SelectItem value="Udaipur">Udaipur</SelectItem>
-                    <SelectItem value="Jaipur">Jaipur</SelectItem>
-                    <SelectItem value="Jodhpur">Jodhpur</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="w-36">
-                <Select
-                  value={statusFilter}
-                  onValueChange={(val) => setStatusFilter(val as any)}
-                >
-                  <SelectTrigger className="h-8 text-xs bg-white border-slate-300">
-                    <SelectValue placeholder="All Margins" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">All Margins</SelectItem>
-                    <SelectItem value="High Margin">High Margin (&gt;30%)</SelectItem>
-                    <SelectItem value="On Target">On Target</SelectItem>
-                    <SelectItem value="Audit Extras">Audit Extras</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="relative w-44 sm:w-56">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <Input
-                  placeholder="Search code, couple, city..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 h-8 text-xs bg-white border-slate-300"
-                />
-              </div>
-
+            <div className="flex items-center gap-2">
               {/* Local View Toggle */}
-              {/* <div className="flex items-center bg-slate-200/70 p-0.5 rounded border border-slate-300">
+              <div className="flex items-center bg-slate-200/70 p-0.5 rounded border border-slate-300">
                 <button
+                  type="button"
                   onClick={() => setProfitViewMode('table')}
                   title="Table View"
                   className={`p-1 rounded text-xs transition ${
@@ -434,6 +466,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                   <TableIcon className="w-3.5 h-3.5" />
                 </button>
                 <button
+                  type="button"
                   onClick={() => setProfitViewMode('chart')}
                   title="Chart View"
                   className={`p-1 rounded text-xs transition ${
@@ -442,7 +475,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                 >
                   <BarChart3 className="w-3.5 h-3.5" />
                 </button>
-              </div> */}
+              </div>
 
               <Badge variant="outline" className="text-xs font-mono py-1">
                 {filteredWeddings.length} Weddings
