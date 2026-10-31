@@ -8,7 +8,10 @@ import {
   SlidersHorizontal,
   Trash2,
   Edit2,
-  Loader2
+  Loader2,
+  Columns,
+  FileText,
+  Paperclip,
 } from 'lucide-react';
 import {
   Card,
@@ -35,6 +38,8 @@ import {
   Label,
 } from '../ui';
 import { api } from '../../api/client';
+import { VendorProposalPdfModal } from './VendorProposalPdfModal';
+import { SideBySideCompareModal } from './SideBySideCompareModal';
 
 export interface QuoteItem {
   id: string;
@@ -47,6 +52,11 @@ export interface QuoteItem {
   baseCost: string;
   pricePerPlate?: string;
   overtimeHourlyRate?: string;
+  quoteReference?: string;
+  lineItems?: Array<{ item: string; cost: number }>;
+  inclusions?: string;
+  exclusions?: string;
+  pdfUrl?: string;
   status: string;
   decisionReason?: string;
   isWinner: boolean;
@@ -128,12 +138,26 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
   } | null>(null);
   const [submittingUnassign, setSubmittingUnassign] = useState<boolean>(false);
 
-  // Edit Quote Pricing Modal
+  // Viewing Proposal PDF Modal
+  const [viewingPdfQuote, setViewingPdfQuote] = useState<QuoteItem | null>(null);
+
+  // Side-by-Side Comparison Modal
+  const [compareCategoryData, setCompareCategoryData] = useState<{
+    key: string;
+    title: string;
+    subtitle?: string;
+    quotes: QuoteItem[];
+  } | null>(null);
+
+  // Edit Quote Pricing & Proposal Document Modal
   const [editQuoteOpen, setEditQuoteOpen] = useState<boolean>(false);
   const [editingQuote, setEditingQuote] = useState<QuoteItem | null>(null);
   const [editBaseCost, setEditBaseCost] = useState<string>('');
   const [editPricePerPlate, setEditPricePerPlate] = useState<string>('');
   const [editOvertimeRate, setEditOvertimeRate] = useState<string>('');
+  const [editPdfUrl, setEditPdfUrl] = useState<string>('');
+  const [editInclusions, setEditInclusions] = useState<string>('');
+  const [editExclusions, setEditExclusions] = useState<string>('');
   const [submittingQuoteEdit, setSubmittingQuoteEdit] = useState<boolean>(false);
 
   // Handle Card Click (select card for that category)
@@ -220,16 +244,39 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
     }
   };
 
-  // Trigger Edit Quote Pricing
+  // Trigger Edit Quote Pricing & Proposal Document
   const handleOpenEditQuote = (q: QuoteItem) => {
     setEditingQuote(q);
     setEditBaseCost(q.baseCost || '');
     setEditPricePerPlate(q.pricePerPlate || '');
     setEditOvertimeRate(q.overtimeHourlyRate || '');
+    setEditPdfUrl(q.pdfUrl || '');
+    setEditInclusions(q.inclusions || '');
+    setEditExclusions(q.exclusions || '');
     setEditQuoteOpen(true);
   };
 
-  // Save Edit Quote Pricing
+  // Upload or attach PDF document file
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf' && !file.name.endsWith('.pdf')) {
+      showToast('Please select a valid PDF file.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setEditPdfUrl(reader.result);
+        showToast(`Loaded ${file.name} successfully.`);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Save Edit Quote Pricing & Proposal
   const handleSaveQuoteEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingQuote) return;
@@ -240,10 +287,13 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
         baseCost: editBaseCost,
         pricePerPlate: editPricePerPlate || undefined,
         overtimeHourlyRate: editOvertimeRate || undefined,
+        pdfUrl: editPdfUrl || undefined,
+        inclusions: editInclusions || undefined,
+        exclusions: editExclusions || undefined,
       });
 
       if (res?.success) {
-        showToast(`Updated negotiated pricing for ${editingQuote.businessName}.`);
+        showToast(`Updated negotiated pricing & proposal for ${editingQuote.businessName}.`);
         setEditQuoteOpen(false);
         setEditingQuote(null);
         onRefresh();
@@ -503,8 +553,20 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
                     <p className="text-[11px] text-slate-500">{subtitle}</p>
                   </div>
 
-                  {!isClient && (
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    {quotes.length >= 2 && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => setCompareCategoryData({ key, title, subtitle, quotes })}
+                        className="h-7 text-xs font-semibold bg-[#714B67] hover:bg-[#5b3c53] text-white shadow-xs cursor-pointer"
+                      >
+                        <Columns className="w-3.5 h-3.5 mr-1" />
+                        Compare Quotes Side-by-Side
+                      </Button>
+                    )}
+
+                    {!isClient && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -514,8 +576,8 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
                         <SlidersHorizontal className="w-3 h-3 mr-1 text-[#714B67]" />
                         {quotes.length > 0 ? 'Edit Assigned Vendors' : 'Assign Vendors'}
                       </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </CardHeader>
 
                 <CardContent className="p-4">
@@ -580,7 +642,7 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
                                       <div className="flex items-center gap-1 ml-1" onClick={(e) => e.stopPropagation()}>
                                         <button
                                           type="button"
-                                          title="Edit negotiated pricing"
+                                          title="Edit negotiated pricing & proposal document"
                                           onClick={() => handleOpenEditQuote(q)}
                                           className="p-1 text-slate-400 hover:text-[#714B67] hover:bg-slate-100 rounded cursor-pointer"
                                         >
@@ -619,6 +681,27 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
                                       <span className="font-sans">Overtime / hr:</span>
                                       <span>₹{Number(q.overtimeHourlyRate).toLocaleString('en-IN')}</span>
                                     </div>
+                                  )}
+                                </div>
+
+                                {/* Proposal PDF sheet link */}
+                                <div className="mb-2 flex items-center justify-between gap-1 pt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setViewingPdfQuote(q);
+                                    }}
+                                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#714B67] hover:text-[#5b3c53] bg-[#714B67]/8 hover:bg-[#714B67]/15 px-2 py-1 rounded transition border border-[#714B67]/20 cursor-pointer"
+                                  >
+                                    <FileText className="w-3 h-3" />
+                                    <span>View Proposal PDF</span>
+                                  </button>
+
+                                  {q.quoteReference && (
+                                    <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1 py-0.5 rounded border border-slate-200">
+                                      {q.quoteReference}
+                                    </span>
                                   )}
                                 </div>
                               </div>
@@ -744,15 +827,15 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* 7. Modal for Editing Negotiated Quote Pricing */}
+      {/* 7. Modal for Editing Negotiated Quote Pricing & Proposal Document */}
       <Dialog open={editQuoteOpen} onOpenChange={setEditQuoteOpen}>
         <DialogContent className="max-w-md bg-white p-5">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900">
-              Edit Negotiated Quote Pricing
+              Edit Negotiated Quote & Proposal
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Update base cost, per-plate rates, and overtime charges for <strong className="text-slate-800">{editingQuote?.businessName}</strong>.
+              Update commercial terms, attach proposal PDF, and configure inclusions for <strong className="text-slate-800">{editingQuote?.businessName}</strong>.
             </DialogDescription>
           </DialogHeader>
 
@@ -769,25 +852,78 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
               />
             </div>
 
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs font-semibold text-slate-700">Price Per Plate (₹)</Label>
+                <Input
+                  type="number"
+                  value={editPricePerPlate}
+                  onChange={(e) => setEditPricePerPlate(e.target.value)}
+                  placeholder="e.g. 2200"
+                  className="mt-1 h-8 text-xs font-mono"
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold text-slate-700">Overtime / hr (₹)</Label>
+                <Input
+                  type="number"
+                  value={editOvertimeRate}
+                  onChange={(e) => setEditOvertimeRate(e.target.value)}
+                  placeholder="e.g. 15000"
+                  className="mt-1 h-8 text-xs font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Proposal PDF Attachment */}
             <div>
-              <Label className="text-xs font-semibold text-slate-700">Price Per Plate (₹, Optional)</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-slate-700">Proposal PDF Document</Label>
+                <label className="text-[11px] font-semibold text-[#714B67] hover:underline cursor-pointer flex items-center gap-1">
+                  <Paperclip className="w-3 h-3" />
+                  <span>Attach PDF File</span>
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
               <Input
-                type="number"
-                value={editPricePerPlate}
-                onChange={(e) => setEditPricePerPlate(e.target.value)}
-                placeholder="e.g. 2200"
+                type="text"
+                value={editPdfUrl}
+                onChange={(e) => setEditPdfUrl(e.target.value)}
+                placeholder="/proposals/sample-quote.pdf or external URL"
                 className="mt-1 h-8 text-xs font-mono"
+              />
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                Paste proposal PDF link or click "Attach PDF File" to upload quotation.
+              </p>
+            </div>
+
+            {/* Inclusions */}
+            <div>
+              <Label className="text-xs font-semibold text-slate-700">Contract Inclusions</Label>
+              <textarea
+                value={editInclusions}
+                onChange={(e) => setEditInclusions(e.target.value)}
+                rows={2}
+                placeholder="Equipment, chinaware, staff count, live counters included"
+                className="w-full mt-1 rounded border border-slate-300 p-2 text-xs focus:ring-1 focus:ring-[#714B67] focus:outline-none"
               />
             </div>
 
+            {/* Exclusions */}
             <div>
-              <Label className="text-xs font-semibold text-slate-700">Overtime Hourly Rate (₹, Optional)</Label>
-              <Input
-                type="number"
-                value={editOvertimeRate}
-                onChange={(e) => setEditOvertimeRate(e.target.value)}
-                placeholder="e.g. 15000"
-                className="mt-1 h-8 text-xs font-mono"
+              <Label className="text-xs font-semibold text-slate-700">Exclusions & Surcharges</Label>
+              <textarea
+                value={editExclusions}
+                onChange={(e) => setEditExclusions(e.target.value)}
+                rows={2}
+                placeholder="Permits, alcohol licenses, electricity surcharges"
+                className="w-full mt-1 rounded border border-slate-300 p-2 text-xs focus:ring-1 focus:ring-[#714B67] focus:outline-none"
               />
             </div>
 
@@ -807,12 +943,44 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
                 size="sm"
                 className="text-xs h-8 bg-[#714B67] hover:bg-[#5b3c53] text-white"
               >
-                {submittingQuoteEdit ? 'Saving...' : 'Save Pricing'}
+                {submittingQuoteEdit ? 'Saving...' : 'Save Pricing & PDF'}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* 8. Vendor Proposal PDF Sheet Modal */}
+      <VendorProposalPdfModal
+        isOpen={!!viewingPdfQuote}
+        onClose={() => setViewingPdfQuote(null)}
+        quote={viewingPdfQuote}
+        currentWedding={currentWedding}
+        onSelectWinner={(quoteId, vendorName, categoryTitle) => {
+          handleRequestAward(quoteId, vendorName, categoryTitle);
+        }}
+        isClient={isClient}
+      />
+
+      {/* 9. Side-by-Side Comparison Matrix Modal */}
+      <SideBySideCompareModal
+        isOpen={!!compareCategoryData}
+        onClose={() => setCompareCategoryData(null)}
+        categoryTitle={compareCategoryData?.title || 'Vendor Category'}
+        categorySubtitle={compareCategoryData?.subtitle}
+        quotes={compareCategoryData?.quotes || []}
+        currentWedding={currentWedding}
+        onSelectWinner={(quoteId, vendorName, categoryTitle) => {
+          handleRequestAward(quoteId, vendorName, categoryTitle);
+        }}
+        onViewPdf={(q) => {
+          setViewingPdfQuote(q);
+        }}
+        onEditQuote={(q) => {
+          handleOpenEditQuote(q);
+        }}
+        isClient={isClient}
+      />
     </div>
   );
 };

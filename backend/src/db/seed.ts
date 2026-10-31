@@ -243,24 +243,27 @@ export async function seedDatabase() {
   );
 
   await pool.query(
-    `INSERT INTO vendor_quotes (rfq_id, vendor_id, quote_reference, base_cost, price_per_plate, overtime_hourly_rate, line_items, inclusions, exclusions, status, decision_reason)
+    `INSERT INTO vendor_quotes (rfq_id, vendor_id, quote_reference, base_cost, price_per_plate, overtime_hourly_rate, line_items, inclusions, exclusions, pdf_url, status, decision_reason)
      VALUES
       ($1, $2, 'RR-2026-CAT-09', 740000.00, 1850.00, 15000.00, 
        '[{"item":"Welcome Mocktails (4 types)","cost":40000},{"item":"Live Rajasthani Chaat Counters","cost":120000},{"item":"Royal Thali Main Course","cost":480000},{"item":"Artisanal Kulfi & Mithai Station","cost":100000}]'::jsonb,
        'Cutlery, bone china, buffet warmer units, 30 uniform banquet stewards included',
        'Alcohol license, ice bar carving',
+       '/proposals/RR-2026-CAT-09.pdf',
        'PENDING', 'Under evaluation by client'),
       
       ($1, $3, 'MK-2026-ROYAL-88', 840000.00, 2100.00, 12000.00, 
        '[{"item":"Royal Saffron Kahwa Welcome","cost":60000},{"item":"Signature Jodhpur & Mewar Thali (Gold rim chinaware)","cost":580000},{"item":"Live Continental Woodfire Pizza & Pasta","cost":110000},{"item":"Shahi Halwa & Nitrogen Rabdi Bar","cost":90000}]'::jsonb,
        'All imported chinaware, silver cutlery, chef-supervised live counters, 45 trained stewards',
        'Liquor permits',
+       '/proposals/MK-2026-ROYAL-88.pdf',
        'ACCEPTED', 'Selected as winner: Superior heritage menu & lower overtime rate'),
       
       ($1, $4, 'RF-2026-EXP-12', 780000.00, 1950.00, 20000.00, 
        '[{"item":"Heritage Appetizers on Wheels","cost":90000},{"item":"Traditional Rajputana Banquet","cost":520000},{"item":"Dessert Pavilion","cost":170000}]'::jsonb,
        'Standard buffet warmers, 25 servers',
        'Live tandoor setups, overtime staff charges',
+       '/proposals/RF-2026-EXP-12.pdf',
        'AUTO_REJECTED', 'Auto-closed after client awarded Marwar Heritage Kitchens')
      ON CONFLICT DO NOTHING`,
     [rfq1Id, vendorCaterer1, vendorCaterer2, vendorCaterer3]
