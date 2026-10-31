@@ -40,7 +40,7 @@ export interface ProjectBillingData {
   startDate: string;
   guestCount: number;
   packageType: string;
-  status: 'LIVE_BIG_DAY' | 'IN_PLANNING' | 'BOOKED' | 'FINALISED';
+  status: 'LIVE_BIG_DAY' | 'IN_PLANNING' | 'BOOKED' | 'FINALISED' | 'FINALISED_SETTLED';
   isFinalised: boolean;
   finalisedDate?: string;
   finalisedBy?: string;

@@ -216,12 +216,9 @@ export const Billing: React.FC = () => {
           </div>
         </div>
 
-        {/* PeopleFirst Sub-Tabs: Status Breakdown (Live Big Day, In Planning, Booked) */}
+        {/* PeopleFirst Sub-Tabs: Status Breakdown */}
         <div className="bg-white border border-slate-200 rounded-lg p-1.5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-2">
           <div className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar py-0.5">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 shrink-0">
-              Status Tabs:
-            </span>
             {currentStatusTabs.map((tab) => {
               const isActive = statusFilter === tab.id;
               return (
@@ -394,7 +391,11 @@ export const Billing: React.FC = () => {
 
                           {/* Status */}
                           <TableCell className="py-3 text-center">
-                            {p.isFinalised || finalisedProjects[p.id] ? (
+                            {p.status === 'FINALISED_SETTLED' ? (
+                              <Badge variant="success" className="text-[10px] gap-1 bg-emerald-600 text-white">
+                                <CheckCircle2 className="w-2.5 h-2.5" /> Finalised & Settled
+                              </Badge>
+                            ) : p.isFinalised || p.status === 'FINALISED' || finalisedProjects[p.id] ? (
                               <Badge variant="success" className="text-[10px] gap-1">
                                 <CheckCircle2 className="w-2.5 h-2.5" /> Finalised
                               </Badge>
