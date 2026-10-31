@@ -5,9 +5,11 @@ import { Landing } from '../pages/Landing';
 import { Login } from '../pages/Login';
 import { Dashboard } from '../pages/Dashboard';
 import { Weddings } from '../pages/Weddings';
+import { WeddingDetail } from '../pages/WeddingDetail';
 import { Enquiries } from '../pages/Enquiries';
 import { EnquiryDetail } from '../pages/EnquiryDetail';
 import { Procurement } from '../pages/Procurement';
+import { VendorDetail } from '../pages/VendorDetail';
 import { Tasks } from '../pages/Tasks';
 import { DayOf } from '../pages/DayOf';
 import { Billing } from '../pages/Billing';
@@ -31,9 +33,12 @@ export const AppRoutes: React.FC = () => {
         <Route element={<Layout />}>
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="weddings" element={<Weddings />} />
+          <Route path="weddings/:id" element={<WeddingDetail />} />
           <Route path="enquiries" element={<Enquiries />} />
           <Route path="enquiries/:id" element={<EnquiryDetail />} />
           <Route path="procurement" element={<Procurement />} />
+          <Route path="procurement/vendors/:id" element={<VendorDetail />} />
+          <Route path="vendors/:id" element={<VendorDetail />} />
           <Route path="tasks" element={<Tasks />} />
           <Route path="day-of" element={<DayOf />} />
           <Route path="billing" element={<Billing />} />

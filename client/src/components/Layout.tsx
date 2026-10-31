@@ -20,7 +20,6 @@ import {
   Pin
 } from 'lucide-react';
 import { useAuthStore, type UserRole } from '../store/useAuthStore';
-import { useWeddingStore } from '../store/useWeddingStore';
 import {
   Avatar,
   AvatarFallback,
@@ -41,7 +40,6 @@ const SIDEBAR_STORAGE_KEY = 'rk_sidebar_open';
 
 export const Layout: React.FC = () => {
   const { user, logout } = useAuthStore();
-  const { weddings, selectedWeddingId, setSelectedWeddingId } = useWeddingStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -332,34 +330,6 @@ export const Layout: React.FC = () => {
             <span className="font-bold text-xs text-slate-800 tracking-tight shrink-0">
               {currentModule}
             </span>
-
-            <div className="h-3.5 w-px bg-slate-200 shrink-0 hidden sm:block" />
-
-            {/* Global Wedding Context Filter (Replaced by PeopleFirst Tab Navigation on /billing) */}
-            {location.pathname !== '/billing' ? (
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider shrink-0 hidden lg:inline">
-                  Project:
-                </span>
-                <select
-                  value={selectedWeddingId}
-                  onChange={(e) => setSelectedWeddingId(e.target.value)}
-                  className="h-6 text-[11px] font-semibold bg-slate-50 border border-slate-200 rounded px-2 text-slate-700 hover:bg-white focus:outline-none focus:ring-1 focus:ring-[#714B67] cursor-pointer max-w-[190px] sm:max-w-[260px] truncate"
-                  title="Active Wedding Filter"
-                >
-                  <option value="ALL">All Weddings (Agency View)</option>
-                  {weddings.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.code} • {w.couple}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded bg-purple-50 text-[#714B67] text-[10px] font-bold border border-purple-200/60">
-                <span>Ongoing & Finalised Tabs</span>
-              </div>
-            )}
           </div>
 
           {/* Top Right: Season Tracker & User Profile with Sign Out */}

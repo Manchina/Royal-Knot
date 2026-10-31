@@ -1,283 +1,572 @@
-import { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Check, 
+  Plus, 
   CheckCircle2, 
-  Star
+  Send, 
+  Loader2 
 } from 'lucide-react';
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter,
   Button,
-  Badge,
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-  Tabs,
-  TabsList,
-  TabsTrigger,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  Input,
+  Label,
+  ComboboxMultiSelect,
+  type ComboboxOption,
 } from '../components/ui';
+import { WeddingSourcingView, type WeddingOverviewItem } from '../components/procurement/WeddingSourcingView';
+import { VendorDirectoryView, type VendorItem } from '../components/procurement/VendorDirectoryView';
 import { useWeddingStore } from '../store/useWeddingStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { api } from '../api/client';
 
 export const Procurement: React.FC = () => {
-  const { weddings, selectedWeddingId, setSelectedWeddingId } = useWeddingStore();
-  const activeWedding = weddings.find((w) => w.id === selectedWeddingId) || weddings[0];
-  const [selectedWinner, setSelectedWinner] = useState<string | null>('CAT-02');
-  const [activeCategory, setActiveCategory] = useState<string>('catering');
+  const { user } = useAuthStore();
+  const { 
+    selectedWeddingId, 
+    setSelectedWeddingId, 
+    weddingOptions, 
+    fetchWeddingOptions 
+  } = useWeddingStore();
 
-  const quotes = [
-    {
-      id: 'CAT-01',
-      vendor: 'Royal Mewar Banquets & Catering',
-      rating: 4.95,
-      city: 'Udaipur',
-      pricePerPlate: '₹2,250',
-      totalCost400: '₹9,00,000',
-      overtimeRate: '₹15,000 / hr',
-      staffCount: '140 Banquet Staff',
-      menuHighlights: 'Dal Baati Churma, Ker Sangri, Laal Maas, Live Jalebi & Rabri counters, 12 Welcome Drinks',
-      inclusions: '140 uniformed banquet staff, copper royal chafing dishes, mineral water jars, waste management',
-    },
-    {
-      id: 'CAT-02',
-      vendor: 'Marwar Gourmet Kitchens',
-      rating: 4.88,
-      city: 'Jaipur',
-      pricePerPlate: '₹2,100',
-      totalCost400: '₹8,40,000',
-      overtimeRate: '₹12,000 / hr',
-      staffCount: '120 Banquet Staff',
-      menuHighlights: 'Royal Rajputana Thali, Smoked Chaat Island, Wood-fired Italian pizza bar, 18 Artisanal desserts',
-      inclusions: 'Complete glassware, bone china crockery, dedicated bride/groom food butler, welcome detox mocktails',
-    },
-    {
-      id: 'CAT-03',
-      vendor: 'Jaipur Heritage Feast Co.',
-      rating: 4.70,
-      city: 'Jaipur',
-      pricePerPlate: '₹1,950',
-      totalCost400: '₹7,80,000',
-      overtimeRate: '₹18,000 / hr',
-      staffCount: '90 Banquet Staff',
-      menuHighlights: 'Traditional Marwari buffet, live tandoor corner, sweet counter with 6 varieties',
-      inclusions: 'Standard buffet setup, 90 staff, basic paper napkins and standard cutlery',
-    },
-  ];
+  // Active Main Tab: 'weddings' or 'rfcs'
+  const [activeMainTab, setActiveMainTab] = useState<'weddings' | 'rfcs'>('weddings');
+
+  // Check permissions to create vendors
+  const canCreateVendor = ['SUPER_ADMIN', 'LEAD_PLANNER', 'FOUNDER'].includes(user?.role || '');
+
+  // Live data from backend
+  const [vendorsList, setVendorsList] = useState<VendorItem[]>([]);
+  const [vendorCounts, setVendorCounts] = useState<Record<string, number>>({});
+  const [weddingsOverview, setWeddingsOverview] = useState<WeddingOverviewItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Modals for Create Vendor & Assign Options
+  const [createVendorOpen, setCreateVendorOpen] = useState<boolean>(false);
+  const [assignOptionsOpen, setAssignOptionsOpen] = useState<boolean>(false);
+
+  // Create Vendor Form State
+  const [newVendorName, setNewVendorName] = useState('');
+  const [newVendorCategory, setNewVendorCategory] = useState<'CATERER' | 'DJ' | 'DECORATOR'>('CATERER');
+  const [newVendorContact, setNewVendorContact] = useState('');
+  const [newVendorPhone, setNewVendorPhone] = useState('');
+  const [newVendorEmail, setNewVendorEmail] = useState('');
+  const [newVendorCity, setNewVendorCity] = useState('Jaipur');
+  const [newVendorPrice, setNewVendorPrice] = useState('');
+  const [newVendorSpecialties, setNewVendorSpecialties] = useState('');
+  const [submittingVendor, setSubmittingVendor] = useState(false);
+
+  // Assign Options Form State
+  const [assignWeddingId, setAssignWeddingId] = useState<string>('');
+  const [assignCategory, setAssignCategory] = useState<'CATERER' | 'DJ' | 'DECORATOR'>('CATERER');
+  const [selectedVendorIds, setSelectedVendorIds] = useState<string[]>([]);
+  const [submittingAssign, setSubmittingAssign] = useState(false);
+
+  // Bottom-Middle Notification Toast
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  // Fetch live procurement data
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [vendorsRes, overviewRes] = await Promise.all([
+        api.get<{ success: boolean; data: VendorItem[]; counts: Record<string, number> }>('/api/procurement/vendors'),
+        api.get<{ success: boolean; data: WeddingOverviewItem[] }>('/api/procurement/weddings-overview'),
+      ]);
+
+      if (vendorsRes?.data) {
+        setVendorsList(vendorsRes.data);
+        if (vendorsRes.counts) setVendorCounts(vendorsRes.counts);
+      }
+      if (overviewRes?.data) {
+        setWeddingsOverview(overviewRes.data);
+        if (overviewRes.data.length > 0) {
+          const match = overviewRes.data.find(
+            (w) => w.id === selectedWeddingId || w.code === selectedWeddingId
+          );
+          if (match) {
+            setSelectedWeddingId(match.id);
+          } else {
+            setSelectedWeddingId(overviewRes.data[0].id);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching procurement data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    fetchWeddingOptions();
+  }, []);
+
+  // Currently selected wedding in Weddings tab
+  const currentWedding = useMemo(() => {
+    if (!weddingsOverview.length) return null;
+    return weddingsOverview.find((w) => w.id === selectedWeddingId || w.code === selectedWeddingId) || weddingsOverview[0];
+  }, [weddingsOverview, selectedWeddingId]);
+
+  // Handle Create Vendor
+  const handleCreateVendor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newVendorName || !newVendorPhone) return;
+
+    setSubmittingVendor(true);
+    try {
+      const res = await api.post<{ success: boolean; message: string; data: VendorItem }>('/api/procurement/vendors', {
+        businessName: newVendorName,
+        category: newVendorCategory,
+        contactPerson: newVendorContact,
+        phone: newVendorPhone,
+        email: newVendorEmail,
+        city: newVendorCity,
+        pricingEstimate: newVendorPrice,
+        specialties: newVendorSpecialties,
+      });
+
+      if (res?.success) {
+        showToast(`Vendor "${newVendorName}" registered successfully.`);
+        setCreateVendorOpen(false);
+        setNewVendorName('');
+        setNewVendorContact('');
+        setNewVendorPhone('');
+        setNewVendorEmail('');
+        setNewVendorPrice('');
+        setNewVendorSpecialties('');
+        fetchData();
+      }
+    } catch (err) {
+      console.error('Failed to create vendor:', err);
+      showToast('Error registering vendor.');
+    } finally {
+      setSubmittingVendor(false);
+    }
+  };
+
+  // Handle Assign Options
+  const handleAssignOptions = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignWeddingId || !selectedVendorIds.length) return;
+
+    setSubmittingAssign(true);
+    try {
+      const res = await api.post<{ success: boolean; message: string }>('/api/procurement/assign-options', {
+        weddingId: assignWeddingId,
+        category: assignCategory,
+        vendorIds: selectedVendorIds,
+      });
+
+      if (res?.success) {
+        showToast(`Assigned ${selectedVendorIds.length} vendor options to wedding.`);
+        setAssignOptionsOpen(false);
+        setSelectedVendorIds([]);
+        fetchData();
+      }
+    } catch (err) {
+      console.error('Failed to assign vendor options:', err);
+      showToast('Error assigning vendor options.');
+    } finally {
+      setSubmittingAssign(false);
+    }
+  };
+
+  // Available options for Combobox Multi-Select (filtered by assignCategory)
+  const availableComboboxOptions: ComboboxOption[] = useMemo(() => {
+    return vendorsList
+      .filter((v) => v.category === assignCategory)
+      .map((v) => ({
+        value: v.id,
+        label: v.businessName,
+        sublabel: `${v.city || 'Jaipur'} • Rating: ${v.ratingScore} ★ • ${v.phone}`,
+        badge: v.category,
+      }));
+  }, [vendorsList, assignCategory]);
+
+  const openAssignModalForCategory = (cat: 'CATERER' | 'DJ' | 'DECORATOR') => {
+    setAssignWeddingId(currentWedding?.id || '');
+    setAssignCategory(cat);
+    const existingQuotes = currentWedding?.categories[cat]?.quotes || [];
+    setSelectedVendorIds(existingQuotes.map((q) => q.vendorId));
+    setAssignOptionsOpen(true);
+  };
+
+  const handleAssignVendorFromDirectory = (vendor: VendorItem) => {
+    setAssignWeddingId(currentWedding?.id || '');
+    if (vendor.category === 'CATERER' || vendor.category === 'DJ' || vendor.category === 'DECORATOR') {
+      setAssignCategory(vendor.category as any);
+    }
+    setSelectedVendorIds([vendor.id]);
+    setAssignOptionsOpen(true);
+  };
 
   return (
     <div className="space-y-4">
-      {/* Odoo Control Panel */}
+      {/* Toast Notification (Bottom Middle) */}
+      {toastMessage && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#714B67] text-white text-xs px-4 py-2.5 rounded-full shadow-xl flex items-center gap-2 font-medium border border-[#5b3c53] transition-all">
+          <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* 1. Odoo Control Panel Header (Matching Enquiries.tsx) */}
       <div className="bg-white border border-slate-200 rounded p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Vendor Sourcing & RFQ
+              Procurement & Vendor RFQs
             </span>
             <span className="text-slate-300">•</span>
             <span className="text-[11px] font-mono font-bold text-[#714B67]">
-              {activeWedding.code}: {activeWedding.couple}
+              {activeMainTab === 'weddings' ? 'Wedding Sourcing' : 'Vendor Directory'}
             </span>
           </div>
-          <h1 className="text-lg font-bold text-slate-900 tracking-tight">
-            Vendor Quote Comparison & Award
-          </h1>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500 font-medium hidden sm:inline">Project:</span>
-          <select
-            value={activeWedding.id}
-            onChange={(e) => setSelectedWeddingId(e.target.value)}
-            className="h-8 text-xs font-semibold bg-white border border-slate-200 rounded px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67] cursor-pointer"
-          >
-            {weddings.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.code}: {w.couple} ({w.guestCount} Guests, {w.city})
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Odoo Category Tabs */}
-      <Tabs value={activeCategory} onValueChange={setActiveCategory} className="w-full">
-        <TabsList className="h-8 bg-slate-100 border border-slate-200">
-          <TabsTrigger value="catering" className="text-xs px-3 font-semibold">
-            Catering & Banquets (3 Quotes)
-          </TabsTrigger>
-          <TabsTrigger value="decor" className="text-xs px-3 font-semibold">
-            Decor & Mandap (Locked)
-          </TabsTrigger>
-          <TabsTrigger value="sound" className="text-xs px-3 font-semibold">
-            DJ & Truss Lights (Locked)
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {/* Side-by-Side Quote Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {quotes.map((q) => {
-          const isWinner = selectedWinner === q.id;
-          const isRejected = selectedWinner !== null && !isWinner;
-
-          return (
-            <Card
-              key={q.id}
-              className={`relative flex flex-col justify-between border rounded bg-white shadow-2xs transition-all ${
-                isWinner
-                  ? 'border-emerald-600 ring-1 ring-emerald-600'
-                  : isRejected
-                  ? 'border-slate-200 opacity-60 bg-slate-50'
-                  : 'border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              <CardHeader className="p-4 pb-2 border-b border-slate-100 bg-slate-50/50">
-                <div className="flex items-center justify-between text-xs text-slate-500 font-mono">
-                  <span className="font-bold">{q.id}</span>
-                  <div className="flex items-center gap-1 font-bold text-slate-700">
-                    <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-600" />
-                    <span>{q.rating}</span>
-                    <span className="text-slate-500 font-normal">({q.city})</span>
-                  </div>
-                </div>
-                <CardTitle className="text-sm font-bold text-slate-900 pt-1">
-                  {q.vendor}
-                </CardTitle>
-                {isWinner && (
-                  <Badge variant="success" className="text-[10px] w-fit mt-1">
-                    <CheckCircle2 className="w-3 h-3 mr-1" /> Awarded Contract
-                  </Badge>
-                )}
-                {isRejected && (
-                  <Badge variant="secondary" className="text-[10px] w-fit mt-1">
-                    Auto-Closed
-                  </Badge>
-                )}
-              </CardHeader>
-
-              <CardContent className="p-4 space-y-3">
-                {/* Financial Rates */}
-                <div className="p-3 rounded bg-slate-50 border border-slate-200 space-y-1.5 text-xs">
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-slate-500">Price per Plate:</span>
-                    <span className="text-sm font-bold font-mono text-slate-900">{q.pricePerPlate}</span>
-                  </div>
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-slate-500">Total (400 Pax):</span>
-                    <span className="font-semibold font-mono text-slate-800">{q.totalCost400}</span>
-                  </div>
-                  <div className="flex justify-between items-baseline pt-1 border-t border-slate-200 text-[11px]">
-                    <span className="text-slate-500">Overtime Rate:</span>
-                    <span className="font-mono text-slate-700 font-medium">{q.overtimeRate}</span>
-                  </div>
-                </div>
-
-                {/* Details */}
-                <div className="space-y-2 text-xs">
-                  <div>
-                    <span className="font-bold text-slate-700 text-[11px] uppercase tracking-wider block">
-                      Banquet Staffing:
-                    </span>
-                    <p className="text-slate-600">{q.staffCount}</p>
-                  </div>
-                  <div>
-                    <span className="font-bold text-slate-700 text-[11px] uppercase tracking-wider block">
-                      Menu Coverage:
-                    </span>
-                    <p className="text-slate-600 text-[11px] leading-relaxed">{q.menuHighlights}</p>
-                  </div>
-                </div>
-              </CardContent>
-
-              <CardFooter className="p-3 bg-slate-50/80 border-t border-slate-200">
-                {isWinner ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full text-xs font-bold text-emerald-800 border-emerald-300 bg-emerald-50"
-                  >
-                    <Check className="w-3.5 h-3.5 mr-1" />
-                    Contract Executed
-                  </Button>
-                ) : (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => setSelectedWinner(q.id)}
-                    className="w-full text-xs"
-                  >
-                    Award Contract
-                  </Button>
-                )}
-              </CardFooter>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Feature Comparison Table */}
-      <Card className="border border-slate-200 shadow-2xs rounded bg-white">
-        <CardHeader className="p-3.5 border-b border-slate-200 bg-slate-50/70">
-          <CardTitle className="text-sm font-bold text-slate-900">
-            RFQ Specifications Comparison
-          </CardTitle>
-          <div className="text-xs text-slate-500">
-            Head-to-head parameter analysis
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-slate-900 tracking-tight">
+              {activeMainTab === 'weddings' ? 'Wedding Sourcing & Decisions' : 'Vendor RFQs & Master Directory'}
+            </h1>
+            {loading && <Loader2 className="w-4 h-4 text-[#714B67] animate-spin" />}
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-slate-100/80 border-b border-slate-200">
-              <TableRow>
-                <TableHead className="w-1/4 font-bold text-slate-700 text-xs">Specification</TableHead>
-                {quotes.map((q) => (
-                  <TableHead key={q.id} className="w-1/4 font-bold text-slate-700 text-xs">
-                    <div>{q.vendor}</div>
-                    <div className="text-[10px] text-slate-500 font-mono font-normal">{q.id}</div>
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody className="divide-y divide-slate-100">
-              <TableRow>
-                <TableCell className="font-medium text-xs text-slate-700">Base Plate Rate</TableCell>
-                {quotes.map((q) => (
-                  <TableCell key={q.id} className="font-mono font-bold text-xs text-slate-900">
-                    {q.pricePerPlate}
-                  </TableCell>
-                ))}
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium text-xs text-slate-700">Contract Total (400 Pax)</TableCell>
-                {quotes.map((q) => (
-                  <TableCell key={q.id} className="font-mono font-semibold text-xs text-slate-900">
-                    {q.totalCost400}
-                  </TableCell>
-                ))}
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium text-xs text-slate-700">Overtime Penalty Rate</TableCell>
-                {quotes.map((q) => (
-                  <TableCell key={q.id} className="font-mono text-xs text-slate-600">
-                    {q.overtimeRate}
-                  </TableCell>
-                ))}
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium text-xs text-slate-700">Dedicated Butler</TableCell>
-                <TableCell className="text-xs text-slate-500">On request (+₹5,000)</TableCell>
-                <TableCell className="text-xs text-emerald-800 font-bold">Included in Base</TableCell>
-                <TableCell className="text-xs text-slate-400">Not provided</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setAssignWeddingId(currentWedding?.id || '');
+              setAssignCategory('CATERER');
+              setSelectedVendorIds([]);
+              setAssignOptionsOpen(true);
+            }}
+            className="h-8 text-xs font-semibold text-slate-700"
+          >
+            <Send className="w-3.5 h-3.5 mr-1 text-[#714B67]" />
+            Assign Options
+          </Button>
+
+          {canCreateVendor && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setCreateVendorOpen(true)}
+              className="h-8 text-xs bg-[#714B67] hover:bg-[#5b3c53] text-white font-semibold"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              Create Vendor
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* 2. Main Tab Switcher (Weddings Sourcing vs Vendor Directory) */}
+      <div className="flex border-b border-slate-200 bg-white px-2 pt-1">
+        <button
+          type="button"
+          onClick={() => setActiveMainTab('weddings')}
+          className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+            activeMainTab === 'weddings'
+              ? 'border-[#714B67] text-[#714B67]'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          Weddings Sourcing ({weddingsOverview.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveMainTab('rfcs')}
+          className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+            activeMainTab === 'rfcs'
+              ? 'border-[#714B67] text-[#714B67]'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          Vendor RFQs Directory ({vendorsList.length})
+        </button>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* COMPONENT 1: WEDDING SOURCING VIEW                                        */}
+      {/* ========================================================================= */}
+      {activeMainTab === 'weddings' && (
+        <WeddingSourcingView
+          weddingsOverview={weddingsOverview}
+          weddingOptions={weddingOptions}
+          currentWedding={currentWedding}
+          selectedWeddingId={selectedWeddingId}
+          setSelectedWeddingId={setSelectedWeddingId}
+          onOpenAssignModal={openAssignModalForCategory}
+          onRefresh={fetchData}
+          showToast={showToast}
+          loading={loading}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* COMPONENT 2: VENDOR DIRECTORY VIEW                                        */}
+      {/* ========================================================================= */}
+      {activeMainTab === 'rfcs' && (
+        <VendorDirectoryView
+          vendorsList={vendorsList}
+          vendorCounts={vendorCounts}
+          onAssignToWedding={handleAssignVendorFromDirectory}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 1: ASSIGN OPTIONS TO WEDDING (Styled Like New Lead Intake Modal)    */}
+      {/* ========================================================================= */}
+      <Dialog open={assignOptionsOpen} onOpenChange={setAssignOptionsOpen}>
+        <DialogContent className="max-w-lg bg-white p-5">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900">
+              {selectedVendorIds.length > 0 ? 'Edit Assigned Vendor Options' : 'Assign Vendor Options to Wedding'}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              {selectedVendorIds.length > 0
+                ? 'Update or adjust shortlisted options for this category. Deselected vendors will be removed from review.'
+                : 'Select target wedding, category, and multi-select vendor options using the searchable combobox.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleAssignOptions} className="space-y-3.5 pt-2">
+            <div>
+              <Label className="text-xs font-semibold text-slate-700">Target Wedding Project *</Label>
+              <select
+                value={assignWeddingId}
+                onChange={(e) => {
+                  const newWedId = e.target.value;
+                  setAssignWeddingId(newWedId);
+                  const targetWed = weddingsOverview.find((w) => w.id === newWedId);
+                  const existing = targetWed?.categories[assignCategory]?.quotes || [];
+                  setSelectedVendorIds(existing.map((q) => q.vendorId));
+                }}
+                className="mt-1 w-full h-8 text-xs bg-white border border-slate-200 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
+              >
+                {weddingOptions.length > 0 ? (
+                  weddingOptions.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.code}: {w.couple} ({w.city})
+                    </option>
+                  ))
+                ) : (
+                  weddingsOverview.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.code}: {w.couple_name} ({w.destination_city})
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold text-slate-700">Vendor Category *</Label>
+              <select
+                value={assignCategory}
+                onChange={(e) => {
+                  const newCat = e.target.value as any;
+                  setAssignCategory(newCat);
+                  const targetWed = weddingsOverview.find((w) => w.id === assignWeddingId);
+                  const existing = targetWed?.categories[newCat]?.quotes || [];
+                  setSelectedVendorIds(existing.map((q) => q.vendorId));
+                }}
+                className="mt-1 w-full h-8 text-xs bg-white border border-slate-200 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
+              >
+                <option value="CATERER">Catering & Banquets</option>
+                <option value="DJ">DJ & Sound Production</option>
+                <option value="DECORATOR">Palace Decor</option>
+              </select>
+            </div>
+
+            {/* Combobox Multi-Select Component */}
+            <div>
+              <Label className="text-xs font-semibold text-slate-700 block mb-1">
+                Select Vendor Options (Multi-Select) *
+              </Label>
+              <ComboboxMultiSelect
+                options={availableComboboxOptions}
+                selectedValues={selectedVendorIds}
+                onChange={setSelectedVendorIds}
+                placeholder={`Choose ${assignCategory} options...`}
+                searchPlaceholder="Search vendor name, city, or phone..."
+                emptyText={`No ${assignCategory} vendors registered yet.`}
+              />
+              <span className="text-[11px] text-slate-500 mt-1 block">
+                Selected vendors will appear as options in the wedding project view for final award.
+              </span>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setAssignOptionsOpen(false)}
+                className="text-xs h-8"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={submittingAssign || selectedVendorIds.length === 0}
+                size="sm"
+                className="text-xs h-8 bg-[#714B67] hover:bg-[#5b3c53] text-white"
+              >
+                {submittingAssign ? 'Saving Changes...' : selectedVendorIds.length > 0 ? 'Save & Update Options' : 'Assign Options'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ========================================================================= */}
+      {/* MODAL 2: CREATE VENDOR (For Super Admin, Lead Planner, Founder)           */}
+      {/* ========================================================================= */}
+      <Dialog open={createVendorOpen} onOpenChange={setCreateVendorOpen}>
+        <DialogContent className="max-w-md bg-white p-5">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900">
+              Create New Master Vendor
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Add a verified vendor to the master directory for sourcing across all luxury weddings.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateVendor} className="space-y-3 pt-2">
+            <div>
+              <Label className="text-xs font-semibold text-slate-700">Business Name *</Label>
+              <Input
+                type="text"
+                required
+                value={newVendorName}
+                onChange={(e) => setNewVendorName(e.target.value)}
+                placeholder="e.g. Mewar Royal Banquets"
+                className="mt-1 h-8 text-xs"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs font-semibold text-slate-700">Category *</Label>
+                <select
+                  value={newVendorCategory}
+                  onChange={(e) => setNewVendorCategory(e.target.value as any)}
+                  className="mt-1 w-full h-8 text-xs bg-white border border-slate-200 rounded px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
+                >
+                  <option value="CATERER">Catering & Banquets</option>
+                  <option value="DJ">DJ & Sound Production</option>
+                  <option value="DECORATOR">Palace Decor</option>
+                </select>
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold text-slate-700">City *</Label>
+                <select
+                  value={newVendorCity}
+                  onChange={(e) => setNewVendorCity(e.target.value)}
+                  className="mt-1 w-full h-8 text-xs bg-white border border-slate-200 rounded px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
+                >
+                  <option value="Jaipur">Jaipur</option>
+                  <option value="Udaipur">Udaipur</option>
+                  <option value="Jodhpur">Jodhpur</option>
+                  <option value="Jaisalmer">Jaisalmer</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs font-semibold text-slate-700">Contact Person</Label>
+                <Input
+                  type="text"
+                  value={newVendorContact}
+                  onChange={(e) => setNewVendorContact(e.target.value)}
+                  placeholder="Chef Mahendra Singh"
+                  className="mt-1 h-8 text-xs"
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold text-slate-700">Phone Number *</Label>
+                <Input
+                  type="text"
+                  required
+                  value={newVendorPhone}
+                  onChange={(e) => setNewVendorPhone(e.target.value)}
+                  placeholder="+91 98290 00000"
+                  className="mt-1 h-8 text-xs"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold text-slate-700">Email Address</Label>
+              <Input
+                type="email"
+                value={newVendorEmail}
+                onChange={(e) => setNewVendorEmail(e.target.value)}
+                placeholder="contact@vendor.com"
+                className="mt-1 h-8 text-xs"
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold text-slate-700">Estimated Base Price / Rate</Label>
+              <Input
+                type="text"
+                value={newVendorPrice}
+                onChange={(e) => setNewVendorPrice(e.target.value)}
+                placeholder="₹2,100 / plate or ₹8,50,000 base"
+                className="mt-1 h-8 text-xs"
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold text-slate-700">Specialties & Inclusions</Label>
+              <textarea
+                value={newVendorSpecialties}
+                onChange={(e) => setNewVendorSpecialties(e.target.value)}
+                placeholder="Silver chinaware, live counters, certified team..."
+                rows={2}
+                className="mt-1 w-full text-xs bg-white border border-slate-200 rounded p-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setCreateVendorOpen(false)}
+                className="text-xs h-8"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={submittingVendor}
+                size="sm"
+                className="text-xs h-8 bg-[#714B67] hover:bg-[#5b3c53] text-white"
+              >
+                {submittingVendor ? 'Saving...' : 'Register Vendor'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
