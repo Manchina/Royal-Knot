@@ -14,7 +14,6 @@ import { Tasks } from '../pages/Tasks';
 import { DayOf } from '../pages/DayOf';
 import { Billing } from '../pages/Billing';
 import { BillingProjectDetail } from '../pages/BillingProjectDetail';
-import { SettingsPage } from '../pages/Settings';
 import { SignAgreement } from '../pages/SignAgreement';
 
 export const AppRoutes: React.FC = () => {
@@ -43,7 +42,7 @@ export const AppRoutes: React.FC = () => {
           <Route path="day-of" element={<DayOf />} />
           <Route path="billing" element={<Billing />} />
           <Route path="billing/:projectId" element={<BillingProjectDetail />} />
-          <Route path="settings" element={<SettingsPage />} />
+          <Route path="settings" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Route>
 
