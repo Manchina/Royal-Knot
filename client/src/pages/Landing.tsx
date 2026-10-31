@@ -189,11 +189,13 @@ export const Landing: React.FC<LandingProps> = ({ defaultScrollToForm = false })
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
               <button
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate(user?.role === 'CLIENT' ? '/procurement' : '/dashboard')}
                 className="px-3.5 py-1.5 rounded-md text-xs font-semibold bg-white/10 text-slate-200 border border-white/15 hover:bg-white/15 transition flex items-center gap-1.5 cursor-pointer"
               >
                 <UserCheck className="w-3.5 h-3.5 text-[#D9A8CF]" />
-                <span>Dashboard ({user?.role?.replace('_', ' ')})</span>
+                <span>
+                  {user?.role === 'CLIENT' ? 'Wedding Portal (Client)' : `Dashboard (${user?.role?.replace('_', ' ')})`}
+                </span>
                 <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
               </button>
             ) : (

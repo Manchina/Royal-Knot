@@ -14,3 +14,4 @@ export function isUUID(value: string | null | undefined): boolean {
 }
 
 export * from './formatters';
+export * from './authHelper';

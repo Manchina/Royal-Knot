@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { db } from '../db';
 import { weddings, clients, users, weddingEvents, rfqRequests, vendorQuotes, vendors, clientInvoices } from '../db/schema';
 import { eq, desc, asc, sql, count } from 'drizzle-orm';
-import { isUUID } from '../utils';
+import { isUUID, getAuthUser } from '../utils';
 
 interface CreateWeddingBody {
   code?: string;
@@ -25,8 +25,9 @@ interface CreateWeddingBody {
 
 export async function weddingRoutes(fastify: FastifyInstance) {
   // 1. GET /api/weddings - List all weddings with client and coordinator details (Pure Drizzle ORM)
-  fastify.get('/', async (_request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get('/', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
+      const authUser = await getAuthUser(request);
       const rows = await db
         .select({
           id: weddings.id,
@@ -59,7 +60,11 @@ export async function weddingRoutes(fastify: FastifyInstance) {
         .leftJoin(users, eq(weddings.leadPlannerId, users.id))
         .orderBy(desc(weddings.startDate));
 
-      const data = rows.map((r) => {
+      const filteredRows = authUser?.role === 'CLIENT' && authUser.clientWeddingId
+        ? rows.filter((r) => r.id === authUser.clientWeddingId)
+        : rows;
+
+      const data = filteredRows.map((r) => {
         const isFinalised = r.status === 'FINALISED' || r.status === 'FINALISED_SETTLED';
         const numBudget = Number(r.budget) || 0;
         let budgetStr = `₹${numBudget}`;
@@ -117,8 +122,9 @@ export async function weddingRoutes(fastify: FastifyInstance) {
   });
 
   // 2. GET /api/weddings/options - Lightweight options for selects / comboboxes (Drizzle ORM)
-  fastify.get('/options', async (_request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get('/options', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
+      const authUser = await getAuthUser(request);
       const options = await db
         .select({
           id: weddings.id,
@@ -134,9 +140,13 @@ export async function weddingRoutes(fastify: FastifyInstance) {
         .leftJoin(clients, eq(weddings.clientId, clients.id))
         .orderBy(desc(weddings.startDate));
 
+      const filteredOptions = authUser?.role === 'CLIENT' && authUser.clientWeddingId
+        ? options.filter((o) => o.id === authUser.clientWeddingId)
+        : options;
+
       return {
         success: true,
-        data: options,
+        data: filteredOptions,
       };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to retrieve options';
@@ -185,6 +195,14 @@ export async function weddingRoutes(fastify: FastifyInstance) {
         return { success: false, message: `Wedding '${id}' not found` };
       }
 
+      const authUser = await getAuthUser(request);
+      if (authUser?.role === 'CLIENT' && authUser.clientWeddingId) {
+        if (wedding.id !== authUser.clientWeddingId) {
+          reply.status(403);
+          return { success: false, message: 'Access denied: You may only view your own wedding project.' };
+        }
+      }
+
       // Fetch ceremonies / sub-events (Drizzle ORM)
       const events = await db
         .select()
@@ -230,6 +248,12 @@ export async function weddingRoutes(fastify: FastifyInstance) {
   // 4. POST /api/weddings - Create New Wedding Project in PostgreSQL (Drizzle ORM)
   fastify.post('/', async (request: FastifyRequest<{ Body: CreateWeddingBody }>, reply: FastifyReply) => {
     try {
+      const authUser = await getAuthUser(request);
+      if (authUser?.role === 'CLIENT') {
+        reply.status(403);
+        return { success: false, message: 'Access denied: Client accounts cannot create wedding projects.' };
+      }
+
       const {
         code,
         couple,

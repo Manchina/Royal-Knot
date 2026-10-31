@@ -11,11 +11,17 @@ import {
   vendors,
   dayOfVendorCheckins,
 } from '../db/schema';
+import { getAuthUser } from '../utils';
 
 export async function analyticsRoutes(fastify: FastifyInstance) {
   // GET /api/analytics/season-summary - Live Drizzle ORM queries for Season Profitability, Cash Flow & Vendor Scorecard
-  fastify.get('/season-summary', async (_request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get('/season-summary', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
+      const authUser = await getAuthUser(request);
+      if (authUser?.role === 'CLIENT') {
+        reply.status(403);
+        return { success: false, message: 'Access denied: Executive analytics and dashboards are restricted.' };
+      }
       // 1. Fetch all weddings with clients and lead planner via Drizzle
       const weddingsRows = await db
         .select({

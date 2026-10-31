@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { db } from '../db';
 import { vendors, rfqRequests, vendorQuotes, weddings, clients, masterOptions } from '../db/schema';
 import { eq, desc, ilike, and, ne, sql, count, type SQL } from 'drizzle-orm';
-import { isUUID } from '../utils';
+import { isUUID, getAuthUser } from '../utils';
 
 interface CreateVendorBody {
   businessName: string;
@@ -112,6 +112,35 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         countsMap[row.category] = Number(row.total);
       }
 
+      // Check authenticated user
+      const authUser = await getAuthUser(request);
+      if (authUser?.role === 'CLIENT' && authUser.clientWeddingId) {
+        const assignedQuotes = await db
+          .select({ vendorId: vendorQuotes.vendorId })
+          .from(vendorQuotes)
+          .innerJoin(rfqRequests, eq(vendorQuotes.rfqId, rfqRequests.id))
+          .where(eq(rfqRequests.weddingId, authUser.clientWeddingId));
+
+        const clientVendorIds = new Set(assignedQuotes.map((q) => q.vendorId));
+        const filteredVendors = allVendors.filter((v) => clientVendorIds.has(v.id));
+
+        const clientCounts: Record<string, number> = {
+          ALL: filteredVendors.length,
+        };
+        for (const cat of categoryRows) {
+          clientCounts[cat.key] = 0;
+        }
+        for (const v of filteredVendors) {
+          clientCounts[v.category] = (clientCounts[v.category] || 0) + 1;
+        }
+
+        return {
+          success: true,
+          data: filteredVendors,
+          counts: clientCounts,
+        };
+      }
+
       return {
         success: true,
         data: allVendors,
@@ -127,6 +156,11 @@ export async function procurementRoutes(fastify: FastifyInstance) {
   // 2. Create New Vendor (Admin / Lead Planner) - Drizzle ORM
   fastify.post('/vendors', async (request: FastifyRequest<{ Body: CreateVendorBody }>, reply: FastifyReply) => {
     try {
+      const authUser = await getAuthUser(request);
+      if (authUser?.role === 'CLIENT') {
+        reply.status(403);
+        return { success: false, message: 'Access denied: Client accounts cannot register master vendors.' };
+      }
       const {
         businessName,
         category,
@@ -187,6 +221,27 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         return { success: false, message: 'Invalid vendor UUID format.' };
       }
 
+      const authUser = await getAuthUser(request);
+      if (authUser?.role === 'CLIENT' && authUser.clientWeddingId) {
+        // Verify this vendor has a quote/rfq for the client's wedding
+        const vendorInWedding = await db
+          .select({ id: vendorQuotes.id })
+          .from(vendorQuotes)
+          .innerJoin(rfqRequests, eq(vendorQuotes.rfqId, rfqRequests.id))
+          .where(
+            and(
+              eq(vendorQuotes.vendorId, id),
+              eq(rfqRequests.weddingId, authUser.clientWeddingId)
+            )
+          )
+          .limit(1);
+
+        if (!vendorInWedding.length) {
+          reply.status(403);
+          return { success: false, message: 'Access denied: You may only view vendors assigned to your wedding.' };
+        }
+      }
+
       const [vendor] = await db
         .select()
         .from(vendors)
@@ -227,9 +282,14 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         .where(eq(vendorQuotes.vendorId, id))
         .orderBy(desc(vendorQuotes.decidedAt));
 
+      // For clients, sanitize quote history to only show their own wedding's quotes
+      const sanitizedQuotesHistory = authUser?.role === 'CLIENT' && authUser.clientWeddingId
+        ? quotesHistory.filter((q) => q.weddingId === authUser.clientWeddingId)
+        : quotesHistory;
+
       // Metrics
-      const totalQuotes = quotesHistory.length;
-      const awardedQuotes = quotesHistory.filter(
+      const totalQuotes = sanitizedQuotesHistory.length;
+      const awardedQuotes = sanitizedQuotesHistory.filter(
         (q) => q.status === 'ACCEPTED' || q.status === 'AWARDED'
       ).length;
       const winRate = totalQuotes > 0 ? Math.round((awardedQuotes / totalQuotes) * 100) : 0;
@@ -238,7 +298,7 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         success: true,
         data: {
           ...vendor,
-          quotes: quotesHistory,
+          quotes: sanitizedQuotesHistory,
           metrics: {
             totalQuotes,
             awardedQuotes,
@@ -256,6 +316,11 @@ export async function procurementRoutes(fastify: FastifyInstance) {
   // 4. Update Vendor Profile (Drizzle ORM)
   fastify.put('/vendors/:id', async (request: FastifyRequest<{ Params: { id: string }; Body: Partial<CreateVendorBody> }>, reply: FastifyReply) => {
     try {
+      const authUser = await getAuthUser(request);
+      if (authUser?.role === 'CLIENT') {
+        reply.status(403);
+        return { success: false, message: 'Access denied: Clients cannot modify master vendor profiles.' };
+      }
       const { id } = request.params;
       if (!isUUID(id)) {
         reply.status(400);
@@ -356,8 +421,17 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         .leftJoin(vendors, eq(vendorQuotes.vendorId, vendors.id))
         .orderBy(rfqRequests.createdAt);
 
+      const authUser = await getAuthUser(request);
+      const effectiveWeddingsRows = authUser?.role === 'CLIENT' && authUser.clientWeddingId
+        ? weddingsRows.filter((w) => w.id === authUser.clientWeddingId)
+        : weddingsRows;
+
+      const effectiveRfqsRows = authUser?.role === 'CLIENT' && authUser.clientWeddingId
+        ? rfqsRows.filter((r) => r.wedding_id === authUser.clientWeddingId)
+        : rfqsRows;
+
       const weddingMap: Record<string, WeddingOverviewGroup> = {};
-      for (const w of weddingsRows) {
+      for (const w of effectiveWeddingsRows) {
         weddingMap[w.id] = {
           ...w,
           categories: {
@@ -368,7 +442,7 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         };
       }
 
-      for (const row of rfqsRows) {
+      for (const row of effectiveRfqsRows) {
         const wed = weddingMap[row.wedding_id];
         if (!wed) continue;
 
@@ -424,6 +498,12 @@ export async function procurementRoutes(fastify: FastifyInstance) {
   // 4. Assign Vendor Options to a Wedding (Drizzle ORM)
   fastify.post('/assign-options', async (request: FastifyRequest<{ Body: AssignOptionsBody }>, reply: FastifyReply) => {
     try {
+      const authUser = await getAuthUser(request);
+      if (authUser?.role === 'CLIENT') {
+        reply.status(403);
+        return { success: false, message: 'Access denied: Only planning coordinators can assign vendor options.' };
+      }
+
       const { weddingId, category, vendorIds, description } = request.body || {};
 
       if (!weddingId || !category || !vendorIds || !Array.isArray(vendorIds) || vendorIds.length === 0) {
@@ -541,6 +621,12 @@ export async function procurementRoutes(fastify: FastifyInstance) {
   // 5. Unassign / Remove a Single Quote from Wedding Sourcing (Drizzle ORM)
   fastify.post('/unassign-quote', async (request: FastifyRequest<{ Body: { quoteId: string } }>, reply: FastifyReply) => {
     try {
+      const authUser = await getAuthUser(request);
+      if (authUser?.role === 'CLIENT') {
+        reply.status(403);
+        return { success: false, message: 'Access denied: Clients cannot unassign vendor options.' };
+      }
+
       const { quoteId } = request.body || {};
       if (!quoteId) {
         reply.status(400);
@@ -574,6 +660,12 @@ export async function procurementRoutes(fastify: FastifyInstance) {
   // 6. Edit Negotiated Pricing for an Assigned Quote (Drizzle ORM)
   fastify.post('/edit-quote', async (request: FastifyRequest<{ Body: { quoteId: string; baseCost?: string; pricePerPlate?: string; overtimeHourlyRate?: string } }>, reply: FastifyReply) => {
     try {
+      const authUser = await getAuthUser(request);
+      if (authUser?.role === 'CLIENT') {
+        reply.status(403);
+        return { success: false, message: 'Access denied: Clients cannot modify negotiated pricing.' };
+      }
+
       const { quoteId, baseCost, pricePerPlate, overtimeHourlyRate } = request.body || {};
       if (!quoteId) {
         reply.status(400);
@@ -613,6 +705,15 @@ export async function procurementRoutes(fastify: FastifyInstance) {
       if (!quote) {
         reply.status(404);
         return { success: false, message: 'Quote not found.' };
+      }
+
+      const authUser = await getAuthUser(request);
+      if (authUser?.role === 'CLIENT' && authUser.clientWeddingId) {
+        const [rfq] = await db.select().from(rfqRequests).where(eq(rfqRequests.id, quote.rfqId)).limit(1);
+        if (!rfq || rfq.weddingId !== authUser.clientWeddingId) {
+          reply.status(403);
+          return { success: false, message: 'Access denied: You can only select vendors for your own wedding.' };
+        }
       }
 
       // Mark selected quote as ACCEPTED (Drizzle ORM)

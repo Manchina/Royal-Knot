@@ -86,6 +86,7 @@ interface WeddingSourcingViewProps {
   onRefresh: () => void;
   showToast: (msg: string) => void;
   loading?: boolean;
+  isClient?: boolean;
 }
 
 export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
@@ -98,6 +99,7 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
   onRefresh,
   showToast,
   loading = false,
+  isClient = false,
 }) => {
   // Filters for Weddings Sourcing Tab
   const [sourcingCategoryFilter, setSourcingCategoryFilter] = useState<string>('ALL');
@@ -329,16 +331,20 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
         </div>
         <div className="max-w-md mx-auto space-y-1">
           <h2 className="text-base font-bold text-slate-900">
-            {weddingsOverview.length === 0 ? 'No Weddings in Sourcing Pipeline' : 'Select a Wedding Project'}
+            {isClient
+              ? 'Loading Your Wedding Sourcing Dossier...'
+              : (weddingsOverview.length === 0 ? 'No Weddings in Sourcing Pipeline' : 'Select a Wedding Project')}
           </h2>
           <p className="text-xs text-slate-500 leading-relaxed">
-            {weddingsOverview.length === 0
-              ? 'There are currently no active wedding projects loaded in the pipeline. Please create or import weddings to start sourcing caterers, DJs, and decorators.'
-              : 'Choose a wedding project from the selector below to view category pipelines, compare quotes, and award contracts.'}
+            {isClient
+              ? 'Retrieving curated vendor options and contract quotes for your celebration.'
+              : (weddingsOverview.length === 0
+                ? 'There are currently no active wedding projects loaded in the pipeline. Please create or import weddings to start sourcing caterers, DJs, and decorators.'
+                : 'Choose a wedding project from the selector below to view category pipelines, compare quotes, and award contracts.')}
           </p>
         </div>
 
-        {weddingsOverview.length > 0 && (
+        {!isClient && weddingsOverview.length > 0 && (
           <div className="max-w-sm mx-auto pt-2">
             <Select value={selectedWeddingId || ''} onValueChange={setSelectedWeddingId}>
               <SelectTrigger className="w-full h-9 text-xs border-slate-300 bg-white font-medium">
@@ -408,26 +414,35 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
 
         <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
           {/* Target Wedding Project Selector */}
-          <Select value={selectedWeddingId || ''} onValueChange={setSelectedWeddingId}>
-            <SelectTrigger className="w-[280px] h-8 text-xs border-slate-300 bg-white">
-              <SelectValue placeholder="Select Wedding Project" />
-            </SelectTrigger>
-            <SelectContent>
-              {weddingOptions && weddingOptions.length > 0 ? (
-                weddingOptions.map((w) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    {w.code}: {w.couple} ({w.city})
-                  </SelectItem>
-                ))
-              ) : (
-                weddingsOverview.map((w) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    {w.code}: {w.couple_name} ({w.destination_city})
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
+          {!isClient ? (
+            <Select value={selectedWeddingId || ''} onValueChange={setSelectedWeddingId}>
+              <SelectTrigger className="w-[280px] h-8 text-xs border-slate-300 bg-white">
+                <SelectValue placeholder="Select Wedding Project" />
+              </SelectTrigger>
+              <SelectContent>
+                {weddingOptions && weddingOptions.length > 0 ? (
+                  weddingOptions.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.code}: {w.couple} ({w.city})
+                    </SelectItem>
+                  ))
+                ) : (
+                  weddingsOverview.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.code}: {w.couple_name} ({w.destination_city})
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="flex items-center gap-2 px-3 h-8 bg-slate-50 border border-slate-200 rounded text-xs font-semibold text-slate-700 shadow-2xs">
+              <span className="font-mono text-[#714B67] font-bold">{currentWedding?.code}</span>
+              <span>•</span>
+              <span>{currentWedding?.couple_name}</span>
+              <span className="text-slate-400 font-normal">({currentWedding?.destination_city})</span>
+            </div>
+          )}
 
           {/* Status Filter Dropdown */}
           <Select value={sourcingStatusFilter} onValueChange={setSourcingStatusFilter}>
@@ -488,38 +503,49 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
                     <p className="text-[11px] text-slate-500">{subtitle}</p>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onOpenAssignModal(key)}
-                      className="h-7 text-xs font-semibold text-slate-700"
-                    >
-                      <SlidersHorizontal className="w-3 h-3 mr-1 text-[#714B67]" />
-                      {quotes.length > 0 ? 'Edit Assigned Vendors' : 'Assign Vendors'}
-                    </Button>
-                  </div>
+                  {!isClient && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onOpenAssignModal(key)}
+                        className="h-7 text-xs font-semibold text-slate-700"
+                      >
+                        <SlidersHorizontal className="w-3 h-3 mr-1 text-[#714B67]" />
+                        {quotes.length > 0 ? 'Edit Assigned Vendors' : 'Assign Vendors'}
+                      </Button>
+                    </div>
+                  )}
                 </CardHeader>
 
                 <CardContent className="p-4">
                   {quotes.length === 0 ? (
                     <div className="text-center py-6 border border-dashed border-slate-200 rounded bg-slate-50/40">
-                      <p className="text-xs text-slate-500 mb-2">
-                        No vendor options assigned for {title} yet.
+                      <p className="text-xs text-slate-700 font-medium mb-1">
+                        {isClient ? `Shortlisting in Progress for ${title}` : `No vendor options assigned for ${title} yet.`}
                       </p>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => onOpenAssignModal(key)}
-                        className="text-xs h-7 bg-[#714B67] hover:bg-[#5b3c53]"
-                      >
-                        Assign Options Now
-                      </Button>
+                      <p className="text-[11px] text-slate-400 max-w-sm mx-auto mb-2">
+                        {isClient
+                          ? 'Your dedicated planning team is curating bespoke vendors matching your vision and headcount. Shortlisted options will appear here for your review and selection.'
+                          : 'Assign shortlisted vendor options to begin quote comparison.'}
+                      </p>
+                      {!isClient && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => onOpenAssignModal(key)}
+                          className="text-xs h-7 bg-[#714B67] hover:bg-[#5b3c53]"
+                        >
+                          Assign Options Now
+                        </Button>
+                      )}
                     </div>
                   ) : (
                     <div className="space-y-2">
                       <p className="text-[11px] text-slate-400 italic">
-                        Click any card to select and award contract. Use action icons to edit pricing or unassign.
+                        {isClient
+                          ? 'Click any vendor card to compare inclusions and select your preferred partner for your big day.'
+                          : 'Click any card to select and award contract. Use action icons to edit pricing or unassign.'}
                       </p>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                         {quotes.map((q) => {
@@ -550,7 +576,7 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
                                       <span className="text-slate-400 font-normal">({q.city})</span>
                                     </div>
 
-                                    {!isThisWinner && (
+                                    {!isThisWinner && !isClient && (
                                       <div className="flex items-center gap-1 ml-1" onClick={(e) => e.stopPropagation()}>
                                         <button
                                           type="button"

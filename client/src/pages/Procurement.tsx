@@ -40,6 +40,7 @@ export const Procurement: React.FC = () => {
 
   // Check permissions to create vendors
   const canCreateVendor = ['SUPER_ADMIN', 'LEAD_PLANNER', 'FOUNDER'].includes(user?.role || '');
+  const isClient = user?.role === 'CLIENT';
 
   // Live procurement store data & actions
   const {
@@ -238,81 +239,93 @@ export const Procurement: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Procurement & Vendor RFQs
+              {isClient ? 'Royal Couple Portal' : 'Procurement & Vendor RFQs'}
             </span>
             <span className="text-slate-300">•</span>
             <span className="text-[11px] font-mono font-bold text-[#714B67]">
-              {activeMainTab === 'weddings' ? 'Wedding Sourcing' : 'Vendor Directory'}
+              {isClient ? 'My Vendors' : (activeMainTab === 'weddings' ? 'Wedding Sourcing' : 'Vendor Directory')}
             </span>
           </div>
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-bold text-slate-900 tracking-tight">
-              {activeMainTab === 'weddings' ? 'Wedding Sourcing & Decisions' : 'Vendor RFQs & Master Directory'}
+              {isClient ? 'My Wedding Vendors & Curated Decisions' : (activeMainTab === 'weddings' ? 'Wedding Sourcing & Decisions' : 'Vendor RFQs & Master Directory')}
             </h1>
             {loading && <Loader2 className="w-4 h-4 text-[#714B67] animate-spin" />}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setAssignWeddingId(currentWedding?.id || '');
-              setAssignCategory('CATERER');
-              setSelectedVendorIds([]);
-              setAssignOptionsOpen(true);
-            }}
-            className="h-8 text-xs font-semibold text-slate-700"
-          >
-            <Send className="w-3.5 h-3.5 mr-1 text-[#714B67]" />
-            Assign Options
-          </Button>
-
-          {canCreateVendor && (
+        {!isClient ? (
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
-              variant="default"
+              variant="outline"
               size="sm"
-              onClick={() => setCreateVendorOpen(true)}
-              className="h-8 text-xs bg-[#714B67] hover:bg-[#5b3c53] text-white font-semibold"
+              onClick={() => {
+                setAssignWeddingId(currentWedding?.id || '');
+                setAssignCategory('CATERER');
+                setSelectedVendorIds([]);
+                setAssignOptionsOpen(true);
+              }}
+              className="h-8 text-xs font-semibold text-slate-700"
             >
-              <Plus className="w-3.5 h-3.5 mr-1" />
-              Create Vendor
+              <Send className="w-3.5 h-3.5 mr-1 text-[#714B67]" />
+              Assign Options
             </Button>
-          )}
-        </div>
+
+            {canCreateVendor && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setCreateVendorOpen(true)}
+                className="h-8 text-xs bg-[#714B67] hover:bg-[#5b3c53] text-white font-semibold"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                Create Vendor
+              </Button>
+            )}
+          </div>
+        ) : (
+          currentWedding && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs font-semibold text-slate-700 shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>{currentWedding.code}: {currentWedding.couple_name}</span>
+              <span className="text-slate-400 font-normal">({currentWedding.destination_city})</span>
+            </div>
+          )
+        )}
       </div>
 
       {/* 2. Main Tab Switcher (Weddings Sourcing vs Vendor Directory) */}
-      <div className="flex border-b border-slate-200 bg-white px-2 pt-1">
-        <button
-          type="button"
-          onClick={() => setActiveMainTab('weddings')}
-          className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
-            activeMainTab === 'weddings'
-              ? 'border-[#714B67] text-[#714B67]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          Weddings Sourcing ({weddingsOverview.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveMainTab('rfcs')}
-          className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
-            activeMainTab === 'rfcs'
-              ? 'border-[#714B67] text-[#714B67]'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          Vendor RFQs Directory ({vendorsList.length})
-        </button>
-      </div>
+      {!isClient && (
+        <div className="flex border-b border-slate-200 bg-white px-2 pt-1">
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('weddings')}
+            className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+              activeMainTab === 'weddings'
+                ? 'border-[#714B67] text-[#714B67]'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Weddings Sourcing ({weddingsOverview.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('rfcs')}
+            className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+              activeMainTab === 'rfcs'
+                ? 'border-[#714B67] text-[#714B67]'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Vendor RFQs Directory ({vendorsList.length})
+          </button>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* COMPONENT 1: WEDDING SOURCING VIEW                                        */}
       {/* ========================================================================= */}
-      {activeMainTab === 'weddings' && (
+      {(isClient || activeMainTab === 'weddings') && (
         <WeddingSourcingView
           weddingsOverview={weddingsOverview}
           weddingOptions={weddingOptions}
@@ -323,13 +336,14 @@ export const Procurement: React.FC = () => {
           onRefresh={fetchProcurementData}
           showToast={showToast}
           loading={loading}
+          isClient={isClient}
         />
       )}
 
       {/* ========================================================================= */}
       {/* COMPONENT 2: VENDOR DIRECTORY VIEW                                        */}
       {/* ========================================================================= */}
-      {activeMainTab === 'rfcs' && (
+      {!isClient && activeMainTab === 'rfcs' && (
         <VendorDirectoryView
           vendorsList={vendorsList}
           vendorCounts={vendorCounts}
