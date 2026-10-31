@@ -1,11 +1,19 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Plus,
   User,
   CreditCard,
   Search,
-  Check
+  Check,
+  CheckCircle2,
+  Trash2,
+  AlertCircle,
+  Loader2,
+  Filter,
+  X,
+  Bookmark,
 } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Card,
   CardContent,
@@ -35,156 +43,396 @@ import {
   SelectItem,
 } from '../components/ui';
 import { useWeddingStore } from '../store/useWeddingStore';
+import { api } from '../api/client';
 
-interface Task {
+export interface Task {
   id: string;
+  code?: string;
   weddingId: string;
+  weddingCode?: string;
+  weddingTheme?: string;
+  destinationCity?: string;
   title: string;
-  category: 'FINANCE' | 'VENUE' | 'VENDORS' | 'DESIGN' | 'PERMITS' | 'DAY_OF';
+  category: 'FINANCE' | 'VENUE' | 'VENDORS' | 'DESIGN' | 'PERMITS' | 'DAY_OF' | 'CEREMONIES' | string;
   owner: string;
   stage: 'DONE' | 'IN_PROGRESS' | 'TO_PLAN';
   stagePayment?: string;
-  daysBefore: string;
+  daysBefore?: string;
+  dueDate?: string;
+  isMilestone?: boolean;
+  notes?: string;
 }
 
 export const Tasks: React.FC = () => {
-  const { weddings, selectedWeddingId } = useWeddingStore();
-  const [activeStageFilter, setActiveStageFilter] = useState<string>('ALL');
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [modalOpen, setModalOpen] = useState<boolean>(false);
+  const queryClient = useQueryClient();
+  const { weddings, selectedWeddingId, setSelectedWeddingId } = useWeddingStore();
 
-  // New task form state
+  // Filters State
+  const [activeStageFilter, setActiveStageFilter] = useState<string>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  const [ownerFilter, setOwnerFilter] = useState<string>('ALL');
+  const [milestonesOnly, setMilestonesOnly] = useState<boolean>(false);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+
+  // Confirmation Pop-up state for marking as finished
+  const [taskToFinish, setTaskToFinish] = useState<Task | null>(null);
+
+  // Modal State for adding custom task
+  const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [newTaskWeddingId, setNewTaskWeddingId] = useState<string>(
     selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'
   );
   const [newTitle, setNewTitle] = useState('');
-  const [newCategory, setNewCategory] = useState<Task['category']>('VENUE');
+  const [newCategory, setNewCategory] = useState<string>('VENUE');
   const [newOwner, setNewOwner] = useState('Devika Sharma');
   const [newDays, setNewDays] = useState('20 Days');
 
-  const [tasks, setTasks] = useState<Task[]>([
-    { id: 'TSK-01', weddingId: 'RW-2026-001', title: 'Collect Booking Deposit (20%)', category: 'FINANCE', owner: 'Finance Team', stage: 'DONE', stagePayment: 'Stage 1: Booking Deposit', daysBefore: '90 Days' },
-    { id: 'TSK-02', weddingId: 'RW-2026-001', title: 'Lock Palace Venue Contract & Heritage Permits', category: 'VENUE', owner: 'Devika Sharma', stage: 'DONE', daysBefore: '75 Days' },
-    { id: 'TSK-03', weddingId: 'RW-2026-001', title: 'Issue Catering RFQ for 400 Guests', category: 'VENDORS', owner: 'Devika Sharma', stage: 'DONE', daysBefore: '60 Days' },
-    { id: 'TSK-04', weddingId: 'RW-2026-001', title: 'Award Catering Contract & Sign SLA', category: 'VENDORS', owner: 'Devika Sharma', stage: 'DONE', daysBefore: '50 Days' },
-    { id: 'TSK-05', weddingId: 'RW-2026-001', title: 'Collect Pre-Wedding Advance Payment (50%)', category: 'FINANCE', owner: 'Finance Team', stage: 'IN_PROGRESS', stagePayment: 'Stage 2: Advance (1 Mo Before)', daysBefore: '30 Days' },
-    { id: 'TSK-06', weddingId: 'RW-2026-001', title: 'Finalize Mehendi Floral Concept & Folk Dancers', category: 'DESIGN', owner: 'Aarav Mehta', stage: 'IN_PROGRESS', daysBefore: '25 Days' },
-    { id: 'TSK-07', weddingId: 'RW-2026-001', title: 'Sangeet Stage Lighting Truss & DJ Tech Rider', category: 'DESIGN', owner: 'Karan Verma', stage: 'IN_PROGRESS', daysBefore: '20 Days' },
-    { id: 'TSK-08', weddingId: 'RW-2026-001', title: 'Royal Elephant & Drummers Baraat Route Clearance', category: 'PERMITS', owner: 'Karan Verma', stage: 'TO_PLAN', daysBefore: '15 Days' },
-    { id: 'TSK-09', weddingId: 'RW-2026-001', title: 'Mandap Structural & Fire Safety Certification', category: 'VENUE', owner: 'Aarav Mehta', stage: 'TO_PLAN', daysBefore: '10 Days' },
-    { id: 'TSK-10', weddingId: 'RW-2026-001', title: 'Minute-by-Minute Run Sheet Distribution to Family', category: 'DAY_OF', owner: 'Priya Joshi', stage: 'TO_PLAN', daysBefore: '5 Days' },
-    { id: 'TSK-11', weddingId: 'RW-2026-001', title: 'Post-Event Banquet Headcount Audit (+ Extras)', category: 'FINANCE', owner: 'Finance Team', stage: 'TO_PLAN', stagePayment: 'Stage 3: Final Settlement', daysBefore: '+1 Day' },
-    { id: 'TSK-12', weddingId: 'RW-2026-001', title: 'Disburse Final Vendor Balance Payments', category: 'FINANCE', owner: 'Finance Team', stage: 'TO_PLAN', daysBefore: '+3 Days' },
-    // Tasks for Wedding 2 (Jaipur Heritage)
-    { id: 'TSK-13', weddingId: 'RW-2026-002', title: 'Sign Rambagh Palace Lawn Booking Contract', category: 'VENUE', owner: 'Devika Sharma', stage: 'DONE', daysBefore: '80 Days' },
-    { id: 'TSK-14', weddingId: 'RW-2026-002', title: 'Review 3 Caterers Side-by-Side Tasting Notes', category: 'VENDORS', owner: 'Devika Sharma', stage: 'IN_PROGRESS', daysBefore: '45 Days' },
-    { id: 'TSK-15', weddingId: 'RW-2026-002', title: 'Collect Pre-Wedding Advance Payment (50%)', category: 'FINANCE', owner: 'Finance Team', stage: 'TO_PLAN', stagePayment: 'Stage 2: Advance', daysBefore: '30 Days' },
-    // Tasks for Wedding 3 (Fortress Chic)
-    { id: 'TSK-16', weddingId: 'RW-2026-003', title: 'Alila Fort Bishangarh Day-of Logistics & Check-in Desk', category: 'DAY_OF', owner: 'Karan Verma', stage: 'TO_PLAN', daysBefore: '20 Days' },
-  ]);
+  // Check if any non-default filter is currently applied
+  const hasActiveFilters =
+    activeStageFilter !== 'ALL' ||
+    categoryFilter !== 'ALL' ||
+    ownerFilter !== 'ALL' ||
+    milestonesOnly ||
+    searchTerm.trim().length > 0;
 
-  const toggleTaskStatus = (id: string) => {
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === id) {
-          const nextStage: Task['stage'] =
-            t.stage === 'DONE' ? 'TO_PLAN' : t.stage === 'TO_PLAN' ? 'IN_PROGRESS' : 'DONE';
-          return { ...t, stage: nextStage };
-        }
-        return t;
-      })
+  const handleResetFilters = () => {
+    setActiveStageFilter('ALL');
+    setCategoryFilter('ALL');
+    setOwnerFilter('ALL');
+    setMilestonesOnly(false);
+    setSearchTerm('');
+  };
+
+  // Query tasks from backend Fastify API
+  const {
+    data: apiResponse,
+    isLoading,
+    isFetching,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: [
+      'tasks',
+      selectedWeddingId,
+      activeStageFilter,
+      categoryFilter,
+      ownerFilter,
+      milestonesOnly,
+      searchTerm,
+    ],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedWeddingId && selectedWeddingId !== 'ALL') {
+        params.append('weddingId', selectedWeddingId);
+      }
+      if (activeStageFilter && activeStageFilter !== 'ALL') {
+        params.append('stage', activeStageFilter);
+      }
+      if (categoryFilter && categoryFilter !== 'ALL') {
+        params.append('category', categoryFilter);
+      }
+      if (ownerFilter && ownerFilter !== 'ALL') {
+        params.append('owner', ownerFilter);
+      }
+      if (milestonesOnly) {
+        params.append('isMilestone', 'true');
+      }
+      if (searchTerm.trim()) {
+        params.append('search', searchTerm.trim());
+      }
+      return await api.get<{
+        success: boolean;
+        data: Task[];
+        stats: { total: number; toPlan: number; inProgress: number; done: number };
+      }>(`/tasks?${params.toString()}`);
+    },
+    retry: 1,
+  });
+
+  // Explicit stage update mutation (setting stage to DONE, IN_PROGRESS, or TO_PLAN)
+  const updateStageMutation = useMutation({
+    mutationFn: async ({ id, stage }: { id: string; stage: 'DONE' | 'IN_PROGRESS' | 'TO_PLAN' }) => {
+      return await api.patch(`/tasks/${id}`, { stage });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      setTaskToFinish(null);
+    },
+  });
+
+  // Create task mutation
+  const createMutation = useMutation({
+    mutationFn: async (payload: {
+      weddingId: string;
+      title: string;
+      category: string;
+      ownerName: string;
+      daysBefore: string;
+    }) => {
+      return await api.post('/tasks', payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      setModalOpen(false);
+      setNewTitle('');
+      setNewDays('20 Days');
+    },
+  });
+
+  // Delete task mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await api.delete(`/tasks/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+
+  // Resolve tasks list and statistics purely from backend API
+  const tasks: Task[] = useMemo(() => {
+    return apiResponse?.data || [];
+  }, [apiResponse]);
+
+  const stats = useMemo(() => {
+    return (
+      apiResponse?.stats || {
+        total: 0,
+        toPlan: 0,
+        inProgress: 0,
+        done: 0,
+      }
     );
+  }, [apiResponse]);
+
+  // Handle clicking the checkbox in Status column:
+  // - If task is already DONE -> uncheck it (move back to IN_PROGRESS)
+  // - If task is NOT done -> show Confirmation Pop-up before completing
+  const handleCheckboxClick = (task: Task) => {
+    if (task.stage === 'DONE') {
+      // Uncheck task: smoothly move back to In Progress
+      updateStageMutation.mutate({ id: task.id, stage: 'IN_PROGRESS' });
+    } else {
+      // Trigger confirmation dialog
+      setTaskToFinish(task);
+    }
+  };
+
+  // Confirm finish inside pop-up
+  const handleConfirmFinish = () => {
+    if (!taskToFinish) return;
+    updateStageMutation.mutate({ id: taskToFinish.id, stage: 'DONE' });
+  };
+
+  const handleDelete = (id: string) => {
+    if (window.confirm('Are you sure you want to remove this checklist item?')) {
+      deleteMutation.mutate(id);
+    }
   };
 
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle) return;
+    if (!newTitle.trim()) return;
 
-    const newTask: Task = {
-      id: `TSK-${String(tasks.length + 1).padStart(2, '0')}`,
+    createMutation.mutate({
       weddingId: newTaskWeddingId,
-      title: newTitle,
+      title: newTitle.trim(),
       category: newCategory,
-      owner: newOwner,
-      stage: 'TO_PLAN',
-      daysBefore: newDays,
-    };
-
-    setTasks([...tasks, newTask]);
-    setModalOpen(false);
-    setNewTitle('');
+      ownerName: newOwner.trim(),
+      daysBefore: newDays.trim(),
+    });
   };
 
-  const filtered = tasks.filter((t) => {
-    const matchesWedding = selectedWeddingId === 'ALL' || t.weddingId === selectedWeddingId;
-    const matchesStage = activeStageFilter === 'ALL' || t.stage === activeStageFilter;
-    const matchesSearch =
-      t.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.owner.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.id.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesWedding && matchesStage && matchesSearch;
-  });
 
-  const activeWedding = weddings.find((w) => w.id === selectedWeddingId);
 
   return (
     <div className="space-y-4">
-      {/* Odoo Control Panel */}
+      {/* Odoo Control Panel Header */}
       <div className="bg-white border border-slate-200 rounded p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Project Task Management
+              Checklists & Milestones
             </span>
-            <span className="text-slate-300">•</span>
-            <span className="text-[11px] font-mono font-bold text-[#714B67]">
-              {activeWedding ? `${activeWedding.code}: ${activeWedding.couple}` : 'All 25 Weddings'}
-            </span>
+            {isFetching && (
+              <span className="flex items-center gap-1 text-[11px] text-[#714B67] animate-pulse">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>Syncing...</span>
+              </span>
+            )}
           </div>
           <h1 className="text-lg font-bold text-slate-900 tracking-tight">
             Checklists & Stage Milestones
           </h1>
         </div>
 
-        <Button
-          variant="default"
-          size="sm"
-          onClick={() => setModalOpen(true)}
-          className="gap-1.5"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Task</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => {
+              setNewTaskWeddingId(selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001');
+              createMutation.reset();
+              setModalOpen(true);
+            }}
+            className="gap-1.5 h-8 text-xs font-semibold"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Task</span>
+          </Button>
+        </div>
       </div>
 
-      {/* Odoo Filter & Search Toolbar */}
-      <div className="bg-white border border-slate-200 rounded p-2.5 flex flex-col md:flex-row items-center justify-between gap-3 shadow-2xs">
-        <div className="relative w-full md:w-80">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <Input
-            placeholder="Search task, owner, or ID..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 h-8 text-xs border-slate-300"
-          />
+      {/* Backend connection banner if in offline fallback */}
+      {isError && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3.5 py-2 rounded flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              Unable to reach checklist service. Please verify backend connection.
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            className="h-6 text-[11px] border-amber-300 hover:bg-amber-100"
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {/* Filters Toolbar */}
+      <div className="bg-white border border-slate-200 rounded p-2.5 flex flex-col gap-2.5 shadow-2xs">
+        {/* Top Filter Row: Search & Project Selector on Left, Stage Tabs on Right */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 max-w-2xl">
+            {/* Search Input */}
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Input
+                placeholder="Search task, owner, or ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 h-8 text-xs border-slate-300 w-full"
+              />
+            </div>
+
+            {/* Project / Wedding Selector - Positioned directly to the right of Search Bar */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider shrink-0 hidden sm:inline">
+                Project:
+              </span>
+              <select
+                value={selectedWeddingId}
+                onChange={(e) => {
+                  setSelectedWeddingId(e.target.value);
+                  if (e.target.value !== 'ALL') {
+                    setNewTaskWeddingId(e.target.value);
+                  }
+                }}
+                className="h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 hover:border-slate-400 focus:outline-none focus:ring-1 focus:ring-[#714B67] cursor-pointer max-w-[240px] truncate shadow-2xs"
+                title="Filter by Wedding Project"
+              >
+                <option value="ALL">All Weddings (Agency View)</option>
+                {weddings.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.code}: {w.couple}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <Tabs value={activeStageFilter} onValueChange={setActiveStageFilter} className="w-full lg:w-auto shrink-0">
+            <TabsList className="h-8 bg-slate-100 border border-slate-200">
+              <TabsTrigger value="ALL" className="text-xs px-3 font-semibold">
+                All Tasks ({stats.total})
+              </TabsTrigger>
+              <TabsTrigger value="TO_PLAN" className="text-xs px-3 font-semibold">
+                To Plan ({stats.toPlan})
+              </TabsTrigger>
+              <TabsTrigger value="IN_PROGRESS" className="text-xs px-3 font-semibold">
+                In Progress ({stats.inProgress})
+              </TabsTrigger>
+              <TabsTrigger value="DONE" className="text-xs px-3 font-semibold">
+                Completed ({stats.done})
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
-        <Tabs value={activeStageFilter} onValueChange={setActiveStageFilter} className="w-full md:w-auto">
-          <TabsList className="h-8 bg-slate-100 border border-slate-200">
-            <TabsTrigger value="ALL" className="text-xs px-3 font-semibold">
-              All Tasks ({tasks.length})
-            </TabsTrigger>
-            <TabsTrigger value="TO_PLAN" className="text-xs px-3 font-semibold">
-              To Plan ({tasks.filter((t) => t.stage === 'TO_PLAN').length})
-            </TabsTrigger>
-            <TabsTrigger value="IN_PROGRESS" className="text-xs px-3 font-semibold">
-              In Progress ({tasks.filter((t) => t.stage === 'IN_PROGRESS').length})
-            </TabsTrigger>
-            <TabsTrigger value="DONE" className="text-xs px-3 font-semibold">
-              Completed ({tasks.filter((t) => t.stage === 'DONE').length})
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {/* Bottom Filter Row: Category Dropdown, Assignee Dropdown, Milestone Pill & Reset */}
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-1 text-slate-400 text-xs font-semibold mr-1">
+            <Filter className="w-3.5 h-3.5 text-slate-500" />
+            <span>Filters:</span>
+          </div>
+
+          {/* Category Filter */}
+          <div className="w-36">
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="h-7 text-xs border-slate-300 bg-white">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Categories</SelectItem>
+                <SelectItem value="VENUE">Venue & Permits</SelectItem>
+                <SelectItem value="FINANCE">Finance & Invoices</SelectItem>
+                <SelectItem value="VENDORS">Vendors & Catering</SelectItem>
+                <SelectItem value="DESIGN">Design & Theming</SelectItem>
+                <SelectItem value="PERMITS">Permits & Clearances</SelectItem>
+                <SelectItem value="CEREMONIES">Ceremonies Itinerary</SelectItem>
+                <SelectItem value="DAY_OF">Day-of Operations</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Assignee / Owner Filter */}
+          <div className="w-36">
+            <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+              <SelectTrigger className="h-7 text-xs border-slate-300 bg-white">
+                <SelectValue placeholder="Assignee" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Assignees</SelectItem>
+                <SelectItem value="Devika Sharma">Devika Sharma</SelectItem>
+                <SelectItem value="Karan Verma">Karan Verma</SelectItem>
+                <SelectItem value="Finance Team">Finance Team</SelectItem>
+                <SelectItem value="Aarav Mehta">Aarav Mehta</SelectItem>
+                <SelectItem value="Priya Joshi">Priya Joshi</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Milestones Only Toggle Pill */}
+          <button
+            type="button"
+            onClick={() => setMilestonesOnly(!milestonesOnly)}
+            className={`h-7 px-2.5 rounded text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer ${
+              milestonesOnly
+                ? 'bg-[#714B67] text-white border-[#714B67]'
+                : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+            }`}
+          >
+            <Bookmark className={`w-3 h-3 ${milestonesOnly ? 'fill-current' : ''}`} />
+            <span>Milestones Only</span>
+          </button>
+
+          {/* Clear Filters Button (Visible only when filters applied) */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="h-7 px-2 rounded text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 flex items-center gap-1 transition ml-auto cursor-pointer"
+              title="Reset all active filters"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Reset Filters</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tasks Table */}
@@ -193,89 +441,241 @@ export const Tasks: React.FC = () => {
           <Table>
             <TableHeader className="bg-slate-100/80 border-b border-slate-200">
               <TableRow>
-                <TableHead className="w-12 text-center font-bold text-slate-700 text-xs">Status</TableHead>
+                <TableHead className="w-12 text-center font-bold text-slate-700 text-xs">Done</TableHead>
                 <TableHead className="font-bold text-slate-700 text-xs">Task Name & Identifier</TableHead>
                 <TableHead className="font-bold text-slate-700 text-xs">Category</TableHead>
                 <TableHead className="font-bold text-slate-700 text-xs">Owner</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs">Stage Status</TableHead>
                 <TableHead className="font-bold text-slate-700 text-xs">Timeline</TableHead>
-                <TableHead className="font-bold text-slate-700 text-xs">Linked Payment Milestone</TableHead>
-                <TableHead className="font-bold text-slate-700 text-xs text-right">Action</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs">Payment Milestone</TableHead>
+                <TableHead className="w-16 text-center font-bold text-slate-700 text-xs pr-4">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="divide-y divide-slate-100">
-              {filtered.map((t) => {
-                const isDone = t.stage === 'DONE';
-                const isInProgress = t.stage === 'IN_PROGRESS';
-
-                return (
-                  <TableRow key={t.id} className="hover:bg-slate-50 transition">
-                    <TableCell className="text-center py-2.5">
-                      <button
-                        onClick={() => toggleTaskStatus(t.id)}
-                        className={`w-4 h-4 rounded border flex items-center justify-center transition cursor-pointer mx-auto ${isDone
-                          ? 'bg-emerald-700 border-emerald-700 text-white'
-                          : isInProgress
-                            ? 'bg-amber-100 border-amber-500 text-amber-800'
-                            : 'border-slate-300 hover:border-slate-500 bg-white'
-                          }`}
-                      >
-                        {isDone && <Check className="w-3 h-3" />}
-                        {isInProgress && <span className="w-1.5 h-1.5 rounded-full bg-amber-700" />}
-                      </button>
-                    </TableCell>
-
-                    <TableCell className="py-2.5">
-                      <div className={`font-semibold text-xs ${isDone ? 'line-through text-slate-400' : 'text-slate-900'}`}>
-                        {t.title}
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-32 text-center text-slate-500 text-xs">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Loader2 className="w-5 h-5 text-[#714B67] animate-spin" />
+                      <span>Loading wedding checklists from database...</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : tasks.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-32 text-center text-slate-500 text-xs">
+                    <div className="space-y-1">
+                      <div className="text-slate-700 font-medium">No tasks found</div>
+                      <div className="text-slate-400 text-[11px]">
+                        No checklist items match the current filters.
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono">{t.id}</div>
-                    </TableCell>
-
-                    <TableCell className="py-2.5">
-                      <Badge variant="outline" className="text-[10px] font-mono">
-                        {t.category}
-                      </Badge>
-                    </TableCell>
-
-                    <TableCell className="py-2.5">
-                      <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium">
-                        <User className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{t.owner}</span>
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="py-2.5 font-mono text-xs text-slate-600">
-                      {t.daysBefore}
-                    </TableCell>
-
-                    <TableCell className="py-2.5">
-                      {t.stagePayment ? (
-                        <Badge variant="odoo" className="text-[10px] gap-1 font-mono">
-                          <CreditCard className="w-3 h-3 text-[#714B67]" />
-                          {t.stagePayment}
-                        </Badge>
-                      ) : (
-                        <span className="text-xs text-slate-400">—</span>
+                      {hasActiveFilters && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleResetFilters}
+                          className="mt-2 h-7 text-xs"
+                        >
+                          Clear All Filters
+                        </Button>
                       )}
-                    </TableCell>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                tasks.map((t, idx) => {
+                  const isDone = t.stage === 'DONE';
+                  const isInProgress = t.stage === 'IN_PROGRESS';
+                  const displayCode = t.code || `TSK-${String(idx + 1).padStart(2, '0')}`;
 
-                    <TableCell className="py-2.5 text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => toggleTaskStatus(t.id)}
-                        className="h-6 text-xs text-slate-700"
-                      >
-                        {t.stage.replace('_', ' ')}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+                  return (
+                    <TableRow key={t.id} className="hover:bg-slate-50 transition group">
+                      {/* Column 1: Intuitive Completion Checkbox */}
+                      <TableCell className="text-center py-2.5">
+                        <button
+                          type="button"
+                          onClick={() => handleCheckboxClick(t)}
+                          disabled={updateStageMutation.isPending}
+                          className={`w-5 h-5 rounded border flex items-center justify-center transition cursor-pointer mx-auto shadow-2xs ${
+                            isDone
+                              ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
+                              : 'bg-white border-slate-300 hover:border-emerald-600 text-transparent hover:text-slate-300'
+                          }`}
+                          title={isDone ? 'Click to reopen task' : 'Click to mark as finished'}
+                        >
+                          <Check className={`w-3.5 h-3.5 stroke-[2.5] ${isDone ? 'text-white' : ''}`} />
+                        </button>
+                      </TableCell>
+
+                      {/* Column 2: Task Name & Code */}
+                      <TableCell className="py-2.5">
+                        <div
+                          className={`font-semibold text-xs ${
+                            isDone ? 'line-through text-slate-400' : 'text-slate-900'
+                          }`}
+                        >
+                          {t.title}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1.5">
+                          <span>{displayCode}</span>
+                          {t.weddingCode && (
+                            <>
+                              <span>•</span>
+                              <span className="text-[#714B67] font-semibold">{t.weddingCode}</span>
+                            </>
+                          )}
+                          {t.isMilestone && (
+                            <span className="text-amber-700 font-sans font-medium text-[9px] bg-amber-50 px-1 py-0.2 rounded border border-amber-200">
+                              ★ Milestone
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      {/* Column 3: Category */}
+                      <TableCell className="py-2.5">
+                        <Badge variant="outline" className="text-[10px] font-mono">
+                          {t.category}
+                        </Badge>
+                      </TableCell>
+
+                      {/* Column 4: Assignee */}
+                      <TableCell className="py-2.5">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium">
+                          <User className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{t.owner}</span>
+                        </div>
+                      </TableCell>
+
+                      {/* Column 5: Stage Status Badge & Quick Selector */}
+                      <TableCell className="py-2.5">
+                        <div className="inline-block">
+                          <select
+                            value={t.stage}
+                            onChange={(e) => {
+                              const newStage = e.target.value as 'DONE' | 'IN_PROGRESS' | 'TO_PLAN';
+                              if (newStage === 'DONE') {
+                                setTaskToFinish(t);
+                              } else {
+                                updateStageMutation.mutate({ id: t.id, stage: newStage });
+                              }
+                            }}
+                            className={`h-6 text-[11px] font-semibold rounded px-2 border cursor-pointer focus:outline-none transition ${
+                              isDone
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                : isInProgress
+                                ? 'bg-amber-50 text-amber-800 border-amber-300'
+                                : 'bg-slate-100 text-slate-700 border-slate-300'
+                            }`}
+                          >
+                            <option value="TO_PLAN">To Plan</option>
+                            <option value="IN_PROGRESS">In Progress</option>
+                            <option value="DONE">Completed</option>
+                          </select>
+                        </div>
+                      </TableCell>
+
+                      {/* Column 6: Timeline */}
+                      <TableCell className="py-2.5 font-mono text-xs text-slate-600">
+                        {t.daysBefore || (t.dueDate ? t.dueDate.split('T')[0] : '—')}
+                      </TableCell>
+
+                      {/* Column 7: Payment Milestone */}
+                      <TableCell className="py-2.5">
+                        {t.stagePayment ? (
+                          <Badge variant="odoo" className="text-[10px] gap-1 font-mono">
+                            <CreditCard className="w-3 h-3 text-[#714B67]" />
+                            {t.stagePayment}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </TableCell>
+
+                      {/* Column 8: Action (Only Real Action: Delete) */}
+                      <TableCell className="py-2.5 text-center pr-4">
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(t.id)}
+                          className="text-slate-300 hover:text-rose-600 transition p-1.5 rounded hover:bg-rose-50 cursor-pointer"
+                          title="Delete task item"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      {/* Confirmation Modal: Mark Task as Finished */}
+      <Dialog
+        open={Boolean(taskToFinish)}
+        onOpenChange={(open) => {
+          if (!open) setTaskToFinish(null);
+        }}
+      >
+        <DialogContent className="max-w-md bg-white border border-slate-200 shadow-xl rounded">
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-emerald-700">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              <DialogTitle className="text-base font-bold text-slate-900">
+                Mark Task as Finished?
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-slate-600 pt-2 leading-relaxed">
+              Are you sure you want to mark this task as completed? This will set the milestone status to completed and record the completion timestamp.
+            </DialogDescription>
+          </DialogHeader>
+
+          {taskToFinish && (
+            <div className="bg-slate-50 border border-slate-200 rounded p-3 my-2 text-xs space-y-1.5">
+              <div className="font-semibold text-slate-900 text-sm">
+                {taskToFinish.title}
+              </div>
+              <div className="flex items-center gap-2 text-slate-500 text-[11px]">
+                <span className="font-mono text-slate-400">{taskToFinish.code || taskToFinish.id.slice(0, 8)}</span>
+                <span>•</span>
+                <span className="font-semibold text-[#714B67]">{taskToFinish.category}</span>
+                <span>•</span>
+                <span>Assignee: <strong className="text-slate-700">{taskToFinish.owner}</strong></span>
+              </div>
+              {taskToFinish.stagePayment && (
+                <div className="text-[11px] text-amber-700 font-medium flex items-center gap-1 pt-1">
+                  <CreditCard className="w-3 h-3" />
+                  <span>Linked Milestone: {taskToFinish.stagePayment}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="pt-2 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setTaskToFinish(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold gap-1.5"
+              disabled={updateStageMutation.isPending}
+              onClick={handleConfirmFinish}
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>{updateStageMutation.isPending ? 'Marking Finished...' : 'Yes, Mark Finished'}</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal: Add Custom Task */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
@@ -285,9 +685,20 @@ export const Tasks: React.FC = () => {
               Create Project Task
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Attach specialized operational task to event checklist.
+              Attach specialized operational task to event checklist in PostgreSQL database.
             </DialogDescription>
           </DialogHeader>
+
+          {createMutation.isError && (
+            <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs px-3.5 py-2 rounded flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>
+                {(createMutation.error as any)?.response?.data?.message ||
+                  (createMutation.error as any)?.message ||
+                  'Failed to create task.'}
+              </span>
+            </div>
+          )}
 
           <form onSubmit={handleAddTask} className="space-y-3 py-2">
             <div className="space-y-1">
@@ -323,7 +734,7 @@ export const Tasks: React.FC = () => {
                 <Label htmlFor="cat">Category</Label>
                 <Select
                   value={newCategory}
-                  onValueChange={(val) => setNewCategory(val as any)}
+                  onValueChange={(val) => setNewCategory(val)}
                 >
                   <SelectTrigger id="cat" className="h-8 text-xs border-slate-300">
                     <SelectValue placeholder="Category" />
@@ -334,6 +745,7 @@ export const Tasks: React.FC = () => {
                     <SelectItem value="VENDORS">VENDORS</SelectItem>
                     <SelectItem value="DESIGN">DESIGN</SelectItem>
                     <SelectItem value="PERMITS">PERMITS</SelectItem>
+                    <SelectItem value="CEREMONIES">CEREMONIES</SelectItem>
                     <SelectItem value="DAY_OF">DAY_OF</SelectItem>
                   </SelectContent>
                 </Select>
@@ -363,11 +775,21 @@ export const Tasks: React.FC = () => {
             </div>
 
             <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setModalOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setModalOpen(false)}
+              >
                 Cancel
               </Button>
-              <Button type="submit" variant="default" size="sm">
-                Add to Checklist
+              <Button
+                type="submit"
+                variant="default"
+                size="sm"
+                disabled={createMutation.isPending || !newTitle.trim()}
+              >
+                {createMutation.isPending ? 'Saving...' : 'Add to Checklist'}
               </Button>
             </DialogFooter>
           </form>

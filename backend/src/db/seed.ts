@@ -136,37 +136,45 @@ export async function seedDatabase() {
   }
   console.log(`✨ Seeded ${users.length} Users`);
 
-  // 3. Seed Clients
+  // 3. Seed Clients (All 5 Projects: Ongoing & Finalised)
   const client1Id = 'b0000001-0000-0000-0000-000000000001';
   const client2Id = 'b0000001-0000-0000-0000-000000000002';
   const client3Id = 'b0000001-0000-0000-0000-000000000003';
+  const client4Id = 'b0000001-0000-0000-0000-000000000004';
+  const client5Id = 'b0000001-0000-0000-0000-000000000005';
 
   await pool.query(
     `INSERT INTO clients (id, bride_name, groom_name, primary_contact_name, email, phone, city_of_residence, notes)
      VALUES 
       ($1, 'Aanya Singhania', 'Raghav Mehra', 'Raghav Mehra', 'client@royalknot.com', '+91 98290 11223', 'Mumbai', 'VIP Royal Udaipur 3-Day Wedding'),
       ($2, 'Kriti Maheshwari', 'Siddharth Jain', 'Siddharth Jain', 'siddharth@client.in', '+91 98110 44556', 'New Delhi', 'Jaipur Heritage Fort Wedding'),
-      ($3, 'Simran Bajaj', 'Armaan Gill', 'Armaan Gill', 'armaan@client.in', '+91 99887 66554', 'Bangalore', 'Palace Chic with 500 Guests')
+      ($3, 'Simran Bajaj', 'Armaan Gill', 'Armaan Gill', 'armaan@client.in', '+91 99887 66554', 'Bangalore', 'Palace Chic with 500 Guests'),
+      ($4, 'Pooja Agarwal', 'Rohan Kapoor', 'Rohan Kapoor', 'pooja.rohan@clients.in', '+91 98290 55667', 'Jodhpur', 'Heritage Royal Extravaganza (Audited & Settled)'),
+      ($5, 'Meera Singhal', 'Arjun Chawla', 'Arjun Chawla', 'meera.arjun@clients.in', '+91 98290 77889', 'Udaipur', 'Bespoke Island Wedding (Audited & Settled)')
      ON CONFLICT (id) DO NOTHING`,
-    [client1Id, client2Id, client3Id]
+    [client1Id, client2Id, client3Id, client4Id, client5Id]
   );
-  console.log(`✨ Seeded 3 Clients`);
+  console.log(`✨ Seeded 5 Clients`);
 
-  // 4. Seed Weddings
+  // 4. Seed Weddings (All 5 Projects: Ongoing & Finalised)
   const wedding1Id = 'c0000001-0000-0000-0000-000000000001';
   const wedding2Id = 'c0000001-0000-0000-0000-000000000002';
   const wedding3Id = 'c0000001-0000-0000-0000-000000000003';
+  const wedding4Id = 'c0000001-0000-0000-0000-000000000004';
+  const wedding5Id = 'c0000001-0000-0000-0000-000000000005';
 
   await pool.query(
     `INSERT INTO weddings (id, code, client_id, lead_planner_id, package_type, theme, destination_city, primary_venue, start_date, end_date, season_year, estimated_guest_count, actual_banquet_headcount, total_budget, agency_fee, status, notes)
      VALUES 
-      ($1, 'RW-2026-001', $4, 'a0000001-0000-0000-0000-000000000003', 'FULL_SERVICE', 'Royal Lakefront Heritage', 'Udaipur', 'The Oberoi Udaivilas', '2026-12-10', '2026-12-13', 2026, 400, 460, 35000000.00, 3500000.00, 'LIVE_BIG_DAY', '400 confirmed guests, multi-stage crore budget'),
-      ($2, 'RW-2026-002', $5, 'a0000001-0000-0000-0000-000000000003', 'FULL_SERVICE', 'Regal Palace Romance', 'Jaipur', 'Rambagh Palace', '2026-11-20', '2026-11-23', 2026, 420, 420, 27500000.00, 2800000.00, 'IN_PLANNING', '3 caterers quote comparison active'),
-      ($3, 'RW-2026-003', $6, 'a0000001-0000-0000-0000-000000000003', 'DAY_OF', 'Regal Fortress Chic', 'Jaipur', 'Alila Fort Bishangarh', '2027-01-14', '2027-01-17', 2027, 500, NULL, 30000000.00, 1800000.00, 'BOOKED', 'Contract signed, deposit received')
-     ON CONFLICT (id) DO NOTHING`,
-    [wedding1Id, wedding2Id, wedding3Id, client1Id, client2Id, client3Id]
+      ($1, 'RW-2026-001', $6, 'a0000001-0000-0000-0000-000000000003', 'FULL_SERVICE', 'Royal Lakefront Heritage', 'Udaipur', 'The Oberoi Udaivilas', '2026-12-10', '2026-12-13', 2026, 400, 460, 35000000.00, 3500000.00, 'LIVE_BIG_DAY', '400 confirmed guests, multi-stage crore budget'),
+      ($2, 'RW-2026-002', $7, 'a0000001-0000-0000-0000-000000000003', 'FULL_SERVICE', 'Regal Palace Romance', 'Jaipur', 'Rambagh Palace', '2026-11-20', '2026-11-23', 2026, 420, 420, 27500000.00, 2800000.00, 'IN_PLANNING', '3 caterers quote comparison active'),
+      ($3, 'RW-2026-003', $8, 'a0000001-0000-0000-0000-000000000003', 'DAY_OF', 'Regal Fortress Chic', 'Jaipur', 'Alila Fort Bishangarh', '2027-01-14', '2027-01-17', 2027, 500, NULL, 30000000.00, 1800000.00, 'BOOKED', 'Contract signed, deposit received'),
+      ($4, 'RW-2025-010', $9, 'a0000001-0000-0000-0000-000000000003', 'FULL_SERVICE', 'Heritage Royal Extravaganza', 'Jodhpur', 'Umaid Bhawan Palace', '2026-02-12', '2026-02-15', 2025, 450, 480, 42000000.00, 4200000.00, 'FINALISED_SETTLED', 'Audited and settled wedding'),
+      ($5, 'RW-2025-011', $10, 'a0000001-0000-0000-0000-000000000004', 'FULL_SERVICE', 'Bespoke Island Wedding', 'Udaipur', 'Taj Lake Palace', '2026-01-22', '2026-01-25', 2025, 350, 360, 38000000.00, 3800000.00, 'FINALISED', 'Audited and locked wedding')
+     ON CONFLICT (id) DO UPDATE SET code = EXCLUDED.code, theme = EXCLUDED.theme, destination_city = EXCLUDED.destination_city, primary_venue = EXCLUDED.primary_venue, status = EXCLUDED.status`,
+    [wedding1Id, wedding2Id, wedding3Id, wedding4Id, wedding5Id, client1Id, client2Id, client3Id, client4Id, client5Id]
   );
-  console.log(`✨ Seeded 3 Weddings`);
+  console.log(`✨ Seeded 5 Weddings`);
 
   // 5. Seed Inbound Enquiries (Scene 1)
   await pool.query(
@@ -258,43 +266,108 @@ export async function seedDatabase() {
   );
   console.log(`✨ Seeded Scene 2 RFQ & 3 Caterer Quotes Matrix`);
 
-  // 9. Seed 25+ Wedding Tasks (Scene 3: The Instant Wedding Plan)
-  const tasks = [
-    { title: 'Confirm Oberoi Udaivilas palace event lawn booking & sign contract', cat: 'VENUE', stage: 'DONE', days: 90 },
-    { title: 'Procure Udaipur local administration drone and fireworks sound permit', cat: 'VENUE', stage: 'DONE', days: 60 },
-    { title: 'Float catering RFQ to 3 shortlisted regional luxury caterers', cat: 'VENDORS', stage: 'DONE', days: 50 },
-    { title: 'Schedule wedding menu tasting session with couple at Marwar Kitchens', cat: 'VENDORS', stage: 'DONE', days: 45 },
-    { title: 'Client final selection & award catering contract in Decision Room', cat: 'VENDORS', stage: 'DONE', days: 40 },
-    { title: 'Finalize Mewar floral decor blueprint for lakeside mandap and aisle', cat: 'DESIGN', stage: 'DONE', days: 35 },
-    { title: 'Audit 3D sound & acoustic blueprint with Jodhpur Beats & Sound', cat: 'DESIGN', stage: 'IN_PROGRESS', days: 25 },
-    { title: 'Confirm 12-member Jaipur Dhol Tasha troupe arrival schedule for Baraat', cat: 'VENDORS', stage: 'IN_PROGRESS', days: 20 },
-    { title: 'Book bridal makeup artist and schedule hair trial session', cat: 'VENDORS', stage: 'IN_PROGRESS', days: 18 },
-    { title: 'Review 400 guest room allotment matrix with Udaivilas front desk', cat: 'VENUE', stage: 'IN_PROGRESS', days: 14 },
-    { title: 'Generate & send 30-Day Advance Client Invoice (50% stage payment)', cat: 'FINANCE', stage: 'DONE', days: 30 },
-    { title: 'Disburse advance payments to awarded caterer and decorator', cat: 'FINANCE', stage: 'DONE', days: 28 },
-    { title: 'Publish digital ceremony itinerary to couple portal', cat: 'CEREMONIES', stage: 'IN_PROGRESS', days: 10 },
-    { title: 'Conduct priest (Pandit Ji) ritual timing alignment meeting', cat: 'CEREMONIES', stage: 'TO_PLAN', days: 7 },
-    { title: 'Deploy on-ground backup diesel generator for main lawn illumination', cat: 'VENUE', stage: 'TO_PLAN', days: 5 },
-    { title: 'Inspect vintage groom entry carriage (Baggi) & flower adornments', cat: 'CEREMONIES', stage: 'TO_PLAN', days: 4 },
-    { title: 'Distribute minute-by-minute run sheet to all 18 vendor leads', cat: 'CEREMONIES', stage: 'TO_PLAN', days: 3 },
-    { title: 'Pre-event safety & fire extinguisher placement inspection', cat: 'VENUE', stage: 'TO_PLAN', days: 2 },
-    { title: 'Rehearsal: Sangeet sound levels check and sound limiter testing', cat: 'CEREMONIES', stage: 'TO_PLAN', days: 2 },
-    { title: 'Day-Of: Live check-in desk setup at hotel service gate', cat: 'CEREMONIES', stage: 'TO_PLAN', days: 1 },
-    { title: 'Day-Of: Headcount counter audit at banquet entry', cat: 'VENUE', stage: 'TO_PLAN', days: 0 },
-    { title: 'Post-Event: Reconcile extra banquet plates with banquet manager', cat: 'FINANCE', stage: 'TO_PLAN', days: -1 },
-    { title: 'Post-Event: Match vendor bills against original RFQ purchase orders', cat: 'FINANCE', stage: 'TO_PLAN', days: -2 },
-    { title: 'Post-Event: Issue final settlement invoice to client', cat: 'FINANCE', stage: 'TO_PLAN', days: -3 },
-    { title: 'Archive wedding photo proofs & trigger founder margin audit', cat: 'FINANCE', stage: 'TO_PLAN', days: -5 },
+  // 9. Seed Wedding Tasks across all 5 projects (Scene 3: The Instant Wedding Plan)
+  await pool.query('DELETE FROM wedding_tasks');
+
+  const w1Tasks = [
+    { title: 'Confirm Oberoi Udaivilas palace event lawn booking & sign contract', cat: 'VENUE', stage: 'DONE', days: 90, isMilestone: true, notes: 'Signed with Oberoi banquet leadership' },
+    { title: 'Procure Udaipur local administration drone and fireworks sound permit', cat: 'VENUE', stage: 'DONE', days: 60, isMilestone: false },
+    { title: 'Float catering RFQ to 3 shortlisted regional luxury caterers', cat: 'VENDORS', stage: 'DONE', days: 50, isMilestone: false },
+    { title: 'Schedule wedding menu tasting session with couple at Marwar Kitchens', cat: 'VENDORS', stage: 'DONE', days: 45, isMilestone: false },
+    { title: 'Client final selection & award catering contract in Decision Room', cat: 'VENDORS', stage: 'DONE', days: 40, isMilestone: true },
+    { title: 'Finalize Mewar floral decor blueprint for lakeside mandap and aisle', cat: 'DESIGN', stage: 'DONE', days: 35, isMilestone: false },
+    { title: 'Audit 3D sound & acoustic blueprint with Jodhpur Beats & Sound', cat: 'DESIGN', stage: 'IN_PROGRESS', days: 25, isMilestone: false },
+    { title: 'Confirm 12-member Jaipur Dhol Tasha troupe arrival schedule for Baraat', cat: 'VENDORS', stage: 'IN_PROGRESS', days: 20, isMilestone: false },
+    { title: 'Book bridal makeup artist and schedule hair trial session', cat: 'VENDORS', stage: 'IN_PROGRESS', days: 18, isMilestone: false },
+    { title: 'Review 400 guest room allotment matrix with Udaivilas front desk', cat: 'VENUE', stage: 'IN_PROGRESS', days: 14, isMilestone: false },
+    { title: 'Generate & send 30-Day Advance Client Invoice (50% stage payment)', cat: 'FINANCE', stage: 'DONE', days: 30, isMilestone: true },
+    { title: 'Disburse advance payments to awarded caterer and decorator', cat: 'FINANCE', stage: 'DONE', days: 28, isMilestone: false },
+    { title: 'Publish digital ceremony itinerary to couple portal', cat: 'CEREMONIES', stage: 'IN_PROGRESS', days: 10, isMilestone: false },
+    { title: 'Conduct priest (Pandit Ji) ritual timing alignment meeting', cat: 'CEREMONIES', stage: 'TO_PLAN', days: 7, isMilestone: false },
+    { title: 'Deploy on-ground backup diesel generator for main lawn illumination', cat: 'VENUE', stage: 'TO_PLAN', days: 5, isMilestone: false },
+    { title: 'Inspect vintage groom entry carriage (Baggi) & flower adornments', cat: 'CEREMONIES', stage: 'TO_PLAN', days: 4, isMilestone: false },
+    { title: 'Distribute minute-by-minute run sheet to all 18 vendor leads', cat: 'CEREMONIES', stage: 'TO_PLAN', days: 3, isMilestone: false },
+    { title: 'Pre-event safety & fire extinguisher placement inspection', cat: 'VENUE', stage: 'TO_PLAN', days: 2, isMilestone: false },
+    { title: 'Rehearsal: Sangeet sound levels check and sound limiter testing', cat: 'CEREMONIES', stage: 'TO_PLAN', days: 2, isMilestone: false },
+    { title: 'Day-Of: Live check-in desk setup at hotel service gate', cat: 'CEREMONIES', stage: 'TO_PLAN', days: 1, isMilestone: false },
+    { title: 'Day-Of: Headcount counter audit at banquet entry', cat: 'VENUE', stage: 'TO_PLAN', days: 0, isMilestone: false },
+    { title: 'Post-Event: Reconcile extra banquet plates with banquet manager', cat: 'FINANCE', stage: 'TO_PLAN', days: -1, isMilestone: true },
+    { title: 'Post-Event: Match vendor bills against original RFQ purchase orders', cat: 'FINANCE', stage: 'TO_PLAN', days: -2, isMilestone: false },
+    { title: 'Post-Event: Issue final settlement invoice to client', cat: 'FINANCE', stage: 'TO_PLAN', days: -3, isMilestone: true },
+    { title: 'Archive wedding photo proofs & trigger founder margin audit', cat: 'FINANCE', stage: 'TO_PLAN', days: -5, isMilestone: false },
   ];
 
-  for (const t of tasks) {
-    await pool.query(
-      `INSERT INTO wedding_tasks (wedding_id, title, category, stage, due_date, assigned_to)
-       VALUES ($1, $2, $3, $4, NOW() + ($5 || ' days')::interval, 'a0000001-0000-0000-0000-000000000003')`,
-      [wedding1Id, t.title, t.cat, t.stage, t.days]
-    );
+  const w2Tasks = [
+    { title: 'Lock Rambagh Palace ballroom and lawn hire agreement', cat: 'VENUE', stage: 'DONE', days: 75, isMilestone: true },
+    { title: 'Review 3 Caterers Side-by-Side Tasting Notes & quote comparison', cat: 'VENDORS', stage: 'IN_PROGRESS', days: 45, isMilestone: true },
+    { title: 'Collect Pre-Wedding Advance Payment (50%)', cat: 'FINANCE', stage: 'TO_PLAN', days: 30, isMilestone: true },
+    { title: 'Mandap floral mood board review with Sunil Gehlot', cat: 'DESIGN', stage: 'IN_PROGRESS', days: 25, isMilestone: false },
+    { title: 'Jaipur local administration drone clearance & fireworks permit application', cat: 'PERMITS', stage: 'TO_PLAN', days: 20, isMilestone: false },
+    { title: 'Dispatch digital luxury wedding invites via WhatsApp portal', cat: 'CEREMONIES', stage: 'TO_PLAN', days: 15, isMilestone: false },
+  ];
+
+  const w3Tasks = [
+    { title: 'Alila Fort Bishangarh booking deposit locked and countersigned', cat: 'FINANCE', stage: 'DONE', days: 100, isMilestone: true },
+    { title: 'Day-of execution logistics & check-in desk operational blueprint', cat: 'DAY_OF', stage: 'TO_PLAN', days: 20, isMilestone: false },
+    { title: 'Coordinate Baraat vintage safari jeeps & escort troupe', cat: 'CEREMONIES', stage: 'TO_PLAN', days: 18, isMilestone: false },
+    { title: 'Verify guest transfer fleet from Jaipur airport to fortress', cat: 'VENUE', stage: 'TO_PLAN', days: 14, isMilestone: false },
+  ];
+
+  const w4Tasks = [
+    { title: 'Umaid Bhawan Palace banquet contract execution & bar permit', cat: 'VENUE', stage: 'DONE', days: -30, isMilestone: true },
+    { title: 'Reconcile extra plates & late night DJ overtime charges', cat: 'FINANCE', stage: 'DONE', days: -10, isMilestone: true },
+    { title: 'Final settlement invoice payment cleared by client (₹4.20 Cr)', cat: 'FINANCE', stage: 'DONE', days: -5, isMilestone: true },
+    { title: 'Archive high-resolution photo and cinematography master hard drives', cat: 'CEREMONIES', stage: 'DONE', days: -2, isMilestone: false },
+    { title: 'Founder post-mortem and vendor score review meeting', cat: 'FINANCE', stage: 'DONE', days: -1, isMilestone: false },
+  ];
+
+  const w5Tasks = [
+    { title: 'Taj Lake Palace boat ferry jetty logistics & guest safety clearances', cat: 'VENUE', stage: 'DONE', days: -25, isMilestone: true },
+    { title: 'Island sound limiter curfew compliance certificate submitted', cat: 'PERMITS', stage: 'DONE', days: -15, isMilestone: false },
+    { title: 'Post-wedding financial audit and client sign-off completed', cat: 'FINANCE', stage: 'DONE', days: -7, isMilestone: true },
+    { title: 'Vendor security deposits released and feedback logged', cat: 'FINANCE', stage: 'DONE', days: -3, isMilestone: false },
+  ];
+
+  const allTaskGroups = [
+    { weddingId: wedding1Id, tasks: w1Tasks, planner: 'a0000001-0000-0000-0000-000000000003' },
+    { weddingId: wedding2Id, tasks: w2Tasks, planner: 'a0000001-0000-0000-0000-000000000003' },
+    { weddingId: wedding3Id, tasks: w3Tasks, planner: 'a0000001-0000-0000-0000-000000000003' },
+    { weddingId: wedding4Id, tasks: w4Tasks, planner: 'a0000001-0000-0000-0000-000000000003' },
+    { weddingId: wedding5Id, tasks: w5Tasks, planner: 'a0000001-0000-0000-0000-000000000004' },
+  ];
+
+  let totalTasksSeeded = 0;
+  for (const group of allTaskGroups) {
+    for (const t of group.tasks) {
+      // Assign realistic team member based on task category
+      let assignedUser = group.planner;
+      if (t.cat === 'FINANCE') {
+        assignedUser = 'a0000001-0000-0000-0000-000000000005'; // Anil Agarwal (Finance Head)
+      } else if (t.cat === 'DAY_OF') {
+        assignedUser = 'a0000001-0000-0000-0000-000000000004'; // Karan Verma (Field Coordinator)
+      } else if (t.cat === 'PERMITS') {
+        assignedUser = 'a0000001-0000-0000-0000-000000000002'; // Aditya Singhal (Admin)
+      }
+
+      await pool.query(
+        `INSERT INTO wedding_tasks (wedding_id, title, category, stage, is_milestone, due_date, assigned_to, completed_at, notes)
+         VALUES ($1, $2, $3, $4, $5, NOW() + ($6 || ' days')::interval, $7, $8, $9)`,
+        [
+          group.weddingId,
+          t.title,
+          t.cat,
+          t.stage,
+          t.isMilestone || false,
+          t.days,
+          assignedUser,
+          t.stage === 'DONE' ? new Date() : null,
+          (t as any).notes || null,
+        ]
+      );
+      totalTasksSeeded++;
+    }
   }
-  console.log(`✨ Seeded ${tasks.length} Wedding Tasks (Scene 3)`);
+  console.log(`✨ Seeded ${totalTasksSeeded} Wedding Tasks across all 5 Wedding Projects (Scene 3)`);
 
   // 10. Seed Day-of Operations (Scene 4: Live Run Sheet, Check-ins & Incidents)
   const runSheetSlots = [

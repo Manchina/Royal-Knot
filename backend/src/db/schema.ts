@@ -169,3 +169,17 @@ export const vendorQuotes = pgTable('vendor_quotes', {
   decisionReason: text('decision_reason'),
   decidedAt: timestamp('decided_at', { withTimezone: true }),
 });
+
+// Wedding Tasks (Scene 3: The Instant Wedding Plan & Operational Checklist)
+export const weddingTasks = pgTable('wedding_tasks', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  weddingId: uuid('wedding_id').references(() => weddings.id).notNull(),
+  title: varchar('title', { length: 200 }).notNull(),
+  category: varchar('category', { length: 60 }).notNull(),
+  assignedTo: uuid('assigned_to').references(() => users.id),
+  dueDate: date('due_date'),
+  stage: varchar('stage', { length: 30 }).default('TO_PLAN').notNull(),
+  isMilestone: boolean('is_milestone').default(false),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  notes: text('notes'),
+});

@@ -12,7 +12,7 @@ export const pool = new Pool({
 });
 
 // Initialize Drizzle ORM instance with full typed schema
-export const db = drizzle(pool, { schema });
+export const db = drizzle(pool as any, { schema });
 
 export async function checkDatabaseConnection(): Promise<{ connected: boolean; version?: string; error?: string }> {
   try {

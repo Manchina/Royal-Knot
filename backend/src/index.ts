@@ -6,6 +6,8 @@ import { checkDatabaseConnection, pool } from './db';
 import { authRoutes } from './routes/auth';
 import { enquiryRoutes } from './routes/enquiries';
 import { billingRoutes } from './routes/billing';
+import { analyticsRoutes } from './routes/analytics';
+import { tasksRoutes } from './routes/tasks';
 import { procurementRoutes } from './routes/procurement';
 import { weddingRoutes } from './routes/weddings';
 
@@ -39,6 +41,20 @@ async function buildServer() {
   // Register JWT
   await fastify.register(fastifyJwt, {
     secret: JWT_SECRET,
+  });
+
+  // Safely handle empty JSON bodies for PATCH / DELETE requests without 400 error
+  fastify.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body: string, done) => {
+    if (!body || body.trim() === '') {
+      return done(null, {});
+    }
+    try {
+      const json = JSON.parse(body);
+      done(null, json);
+    } catch (err: any) {
+      err.statusCode = 400;
+      done(err, undefined);
+    }
   });
 
   // Root endpoint
@@ -87,6 +103,13 @@ async function buildServer() {
 
   // Mount Billing & Extra Charges Routes under /api/billing (PeopleFirst standard)
   await fastify.register(billingRoutes, { prefix: '/api/billing' });
+  // Mount Checklist & Task Routes under /api/tasks and /api/checklists
+  await fastify.register(tasksRoutes, { prefix: '/api/tasks' });
+  await fastify.register(tasksRoutes, { prefix: '/api/checklists' });
+
+
+  // Mount Founder Analytics & Season P&L Routes under /api/analytics
+  await fastify.register(analyticsRoutes, { prefix: '/api/analytics' });
 
   // Mount Procurement & Vendor RFQs Routes under /api/procurement
   await fastify.register(procurementRoutes, { prefix: '/api/procurement' });
