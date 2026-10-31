@@ -499,9 +499,9 @@ export async function billingRoutes(fastify: FastifyInstance) {
 
       const vendorBillsList: VendorDisbursementItem[] = billsRows.map((r) => {
         const baseNum = parseFloat(r.agreedBaseAmount) || 0;
-        const extrasNum = parseFloat(r.extraChargesAmount) || 0;
+        const extrasNum = parseFloat(r.extraChargesAmount || '0') || 0;
         const payableNum = parseFloat(r.totalPayable) || (baseNum + extrasNum);
-        const advNum = parseFloat(r.advancePaid) || 0;
+        const advNum = parseFloat(r.advancePaid || '0') || 0;
         const balNum = parseFloat(r.balanceDue) || Math.max(0, payableNum - advNum);
 
         return {
@@ -557,11 +557,11 @@ export async function billingRoutes(fastify: FastifyInstance) {
         } else if (r.stageKey === 'FINAL_SETTLEMENT') {
           stageLabel = 'Post-Event Final Settlement (30% + Extras)';
           pct = 30;
-        } else if (r.stage_key === 'DAY_OF_EXTRA' || (typeof r.stage_key === 'string' && r.stage_key.startsWith('EXTRA'))) {
-          stageLabel = r.payment_reference ? `Day-of Extra: ${r.payment_reference}` : 'Day-of Addition Extra Charge';
+        } else if (r.stageKey === 'DAY_OF_EXTRA' || (typeof r.stageKey === 'string' && r.stageKey.startsWith('EXTRA'))) {
+          stageLabel = r.paymentReference ? `Day-of Extra: ${r.paymentReference}` : 'Day-of Addition Extra Charge';
           pct = 0;
         } else {
-          stageLabel = r.payment_reference ? `Extra: ${r.payment_reference}` : (r.stage_key || 'Additional Invoice');
+          stageLabel = r.paymentReference ? `Extra: ${r.paymentReference}` : (r.stageKey || 'Additional Invoice');
           pct = 0;
         }
 
@@ -920,7 +920,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
           return { success: false, message: `Bill ${billId} not found` };
         }
 
-        const currentAdvance = parseFloat(existingBill.advancePaid) || 0;
+        const currentAdvance = parseFloat(existingBill.advancePaid || '0') || 0;
         const totalPayable = parseFloat(existingBill.totalPayable) || 0;
         const additionalPay = Number(paymentAmount) || 0;
 
@@ -1046,7 +1046,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
             .limit(1);
 
           if (matchingBill) {
-            const currentExtras = parseFloat(matchingBill.extraChargesAmount) || 0;
+            const currentExtras = parseFloat(matchingBill.extraChargesAmount || '0') || 0;
             const currentTotal = parseFloat(matchingBill.totalPayable) || 0;
             const currentBal = parseFloat(matchingBill.balanceDue) || 0;
 

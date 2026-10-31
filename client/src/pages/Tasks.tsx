@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Plus,
   User,
@@ -67,6 +68,7 @@ export interface Task {
 }
 
 export const Tasks: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { weddings, selectedWeddingId, setSelectedWeddingId } = useWeddingStore();
 
@@ -75,7 +77,19 @@ export const Tasks: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [ownerFilter, setOwnerFilter] = useState<string>('ALL');
   const [milestonesOnly, setMilestonesOnly] = useState<boolean>(false);
-  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState<string>(() => searchParams.get('search') || '');
+
+  // Read URL params passed via "Go to Checklists Module"
+  useEffect(() => {
+    const urlWeddingId = searchParams.get('weddingId');
+    const urlSearch = searchParams.get('search');
+    if (urlWeddingId) {
+      setSelectedWeddingId(urlWeddingId);
+    }
+    if (urlSearch) {
+      setSearchTerm(urlSearch);
+    }
+  }, [searchParams, setSelectedWeddingId]);
 
   // Confirmation Pop-up state for marking as finished
   const [taskToFinish, setTaskToFinish] = useState<Task | null>(null);
