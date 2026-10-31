@@ -21,6 +21,48 @@ High-end destination weddings have thousands of moving parts across months of pl
 
 ---
 
+## 🛠 Tech Stack & Engineering Architecture
+
+The system is engineered for resilience, speed, and strict relational integrity:
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ FRONTEND LAYER: React 19 + TypeScript + Vite + Tailwind CSS v4          │
+│ • UI Primitives: shadcn/ui & Radix UI accessible headless primitives     │
+│ • State Architecture: TanStack Query v5 (cache) + Zustand (auth/session) │
+│ • Client Router: React Router v7 with role-gated <ProtectedRoute />      │
+└────────────────────────────────────┬─────────────────────────────────────┘
+                                     │ Direct API Calls (JSON / Bearer JWT)
+                                     ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ BACKEND RUNTIME: Fastify 5 + TypeScript + @fastify/jwt                   │
+│ • Low-overhead asynchronous HTTP engine with sub-millisecond dispatch    │
+│ • Lean JWT payload ({ userId, role }) with role-based route guard rails  │
+│ • Direct pg connection pool managing transactional database queries      │
+└────────────────────────────────────┬─────────────────────────────────────┘
+                                     │ Connection Pool (SQL)
+                                     ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ PERSISTENCE LAYER: PostgreSQL 15+ (Relational Domain Model)              │
+│ • 16 Normalized Tables: master_options, weddings, RFQs, invoices, etc.   │
+│ • Strict foreign key cascades, unique constraints, and numeric precision │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### Architectural Decisions & Problems Solved
+
+1. **Fastify 5 instead of Express**:
+   - High-throughput asynchronous performance. Sub-millisecond route dispatch handles rapid mobile vendor check-in traffic and concurrent run sheet updates on the wedding day without event-loop lag.
+2. **PostgreSQL Relational Engine over NoSQL**:
+   - Luxury weddings require strict financial and operational consistency. Foreign key cascades enforce that vendor quotes bind cleanly to RFQs, purchase orders link to client invoices, and extra banquet charges calculate with high-precision arithmetic (`NUMERIC(14, 2)`).
+3. **React 19, Tailwind v4 & shadcn/ui**:
+   - Delivers a pristine, high-density interface with Radix UI accessibility, fluid animations, and zero CSS runtime bloat.
+4. **TanStack Query v5 + Zustand**:
+   - Zustand manages global JWT authentication and role-switching.
+   - TanStack Query provides optimistic caching, automatic background invalidations upon quote acceptance or bill reconciliation, and eliminates prop drilling.
+
+---
+
 ## 👥 The 5 Role-Gated Personas
 
 The platform enforces 5 tailored roles to give each stakeholder exactly what they need:
@@ -99,13 +141,13 @@ The platform powers the complete chronological journey of a luxury destination w
 
 ---
 
-## 🗄 Relational PostgreSQL Database Architecture
+## 🗄 Relational PostgreSQL Database Schema
 
-The system is backed by a robust 16-table PostgreSQL schema:
+The database model is structured into 16 relational domain entities:
 
 ```
                     ┌─────────────────────────┐
-                    │     master_options      │ (Universal Category Master)
+                    │     master_options      │ (Lookup Master Table)
                     └────────────┬────────────┘
                                  │
      ┌───────────────────────────┼───────────────────────────┐
@@ -135,13 +177,11 @@ The system is backed by a robust 16-table PostgreSQL schema:
                         wedding_extra_chg          vendor_bills
 ```
 
-- **Universal Auto-Seed on Startup**: Whenever the backend boots, it checks the database. If tables are empty, it automatically populates all 16 tables with complete luxury wedding mock data, active RFQs, and live checklists.
-
 ---
 
-## 👥 Demo Accounts (Quick Login)
+## 👥 System Access Accounts
 
-The system includes pre-seeded accounts for each operational role (Password for all: `password123`):
+The platform includes configured accounts for testing each operational viewpoint (Password for all: `password123`):
 
 | Role | Email | Title & Focus |
 | :--- | :--- | :--- |
@@ -156,19 +196,18 @@ The system includes pre-seeded accounts for each operational role (Password for 
 
 ---
 
-## 🚀 Quick Start (Running Locally)
+## 🚀 Running Locally
 
 ```bash
 # 1. Clone repository
 git clone https://github.com/Manchina/Royal-Knot.git
 cd Royal-Knot
 
-# 2. Install dependencies across root, client, and backend
+# 2. Install dependencies
 npm run install:all
 
 # 3. Setup backend environment (.env)
 cp backend/.env.example backend/.env
-# Verify your DATABASE_URL in backend/.env points to your PostgreSQL instance
 
 # 4. Start frontend and backend concurrently
 npm run dev
