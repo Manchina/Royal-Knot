@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Search, 
-  Clock, 
-  ShieldCheck, 
-  ArrowRight, 
-  CheckCircle2, 
-  MapPin, 
+import {
+  Search,
+  ShieldCheck,
+  ArrowRight,
+  CheckCircle2,
+  MapPin,
   Users,
   CreditCard,
   TrendingUp,
@@ -16,15 +15,13 @@ import {
   LayoutList,
   LayoutGrid,
   Check,
-  AlertCircle,
-  FileSpreadsheet
+  AlertCircle
 } from 'lucide-react';
 import {
   Card,
   CardHeader,
   CardContent,
   CardFooter,
-  Button,
   Badge,
   Table,
   TableHeader,
@@ -241,28 +238,7 @@ export const Billing: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchBillingProjects}
-            className="text-xs font-semibold cursor-pointer border-slate-200 hover:bg-slate-50"
-          >
-            <Clock className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
-            Refresh Balances
-          </Button>
 
-          {projects.length > 0 && (
-            <Button
-              size="sm"
-              onClick={() => handleOpenLedger(projects[0].id)}
-              className="bg-[#714B67] hover:bg-[#5a3b52] text-white text-xs font-semibold shadow-2xs cursor-pointer"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />
-              Open Flagship Ledger ({projects[0].code})
-            </Button>
-          )}
-        </div>
       </div>
 
       {/* 2. Executive KPI Cards Ribbon */}
@@ -347,17 +323,15 @@ export const Billing: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setStageFilter(tab.id)}
-              className={`px-3 py-1.5 rounded font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
-                isActive
-                  ? 'bg-white text-slate-900 shadow-2xs font-bold border border-slate-200'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-              }`}
+              className={`px-3 py-1.5 rounded font-medium transition-all flex items-center gap-1.5 cursor-pointer ${isActive
+                ? 'bg-white text-slate-900 shadow-2xs font-bold border border-slate-200'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
             >
               <span>{tab.label}</span>
               <span
-                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${
-                  isActive ? 'bg-[#714B67] text-white' : 'bg-slate-200 text-slate-700'
-                }`}
+                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${isActive ? 'bg-[#714B67] text-white' : 'bg-slate-200 text-slate-700'
+                  }`}
               >
                 {tab.count}
               </span>
@@ -398,18 +372,16 @@ export const Billing: React.FC = () => {
         <div className="flex items-center gap-1 border border-slate-200 rounded p-0.5 bg-slate-50 self-end md:self-auto shrink-0">
           <button
             onClick={() => setViewMode('table')}
-            className={`p-1.5 rounded transition-colors cursor-pointer ${
-              viewMode === 'table' ? 'bg-white text-slate-800 shadow-2xs font-bold' : 'text-slate-400 hover:text-slate-700'
-            }`}
+            className={`p-1.5 rounded transition-colors cursor-pointer ${viewMode === 'table' ? 'bg-white text-slate-800 shadow-2xs font-bold' : 'text-slate-400 hover:text-slate-700'
+              }`}
             title="Table View"
           >
             <LayoutList className="w-4 h-4" />
           </button>
           <button
             onClick={() => setViewMode('cards')}
-            className={`p-1.5 rounded transition-colors cursor-pointer ${
-              viewMode === 'cards' ? 'bg-white text-slate-800 shadow-2xs font-bold' : 'text-slate-400 hover:text-slate-700'
-            }`}
+            className={`p-1.5 rounded transition-colors cursor-pointer ${viewMode === 'cards' ? 'bg-white text-slate-800 shadow-2xs font-bold' : 'text-slate-400 hover:text-slate-700'
+              }`}
             title="Card Grid View"
           >
             <LayoutGrid className="w-4 h-4" />
@@ -432,7 +404,6 @@ export const Billing: React.FC = () => {
                   <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Vendor Balance</TableHead>
                   <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Margin</TableHead>
                   <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Status</TableHead>
-                  <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right py-3">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -448,7 +419,7 @@ export const Billing: React.FC = () => {
                   </TableRow>
                 ) : (
                   filteredList.map((project) => (
-                    <TableRow 
+                    <TableRow
                       key={project.id}
                       onClick={() => handleOpenLedger(project.id)}
                       className="border-slate-100 hover:bg-slate-50/80 cursor-pointer transition-colors group"
@@ -495,9 +466,8 @@ export const Billing: React.FC = () => {
                       </TableCell>
 
                       <TableCell className="py-3.5">
-                        <span className={`font-mono text-xs font-bold ${
-                          project.rawVendorBalanceDue === 0 ? 'text-emerald-600' : 'text-slate-800'
-                        }`}>
+                        <span className={`font-mono text-xs font-bold ${project.rawVendorBalanceDue === 0 ? 'text-emerald-600' : 'text-slate-800'
+                          }`}>
                           {project.vendorBalanceDue}
                         </span>
                       </TableCell>
@@ -512,20 +482,6 @@ export const Billing: React.FC = () => {
                         {renderStatusBadge(project.status)}
                       </TableCell>
 
-                      <TableCell className="py-3.5 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenLedger(project.id);
-                          }}
-                          className="text-xs font-bold text-[#714B67] hover:bg-[#714B67]/10 cursor-pointer h-8 px-2.5"
-                        >
-                          View Ledger
-                          <ArrowRight className="w-3.5 h-3.5 ml-1 transition-transform group-hover:translate-x-0.5" />
-                        </Button>
-                      </TableCell>
                     </TableRow>
                   ))
                 )}
