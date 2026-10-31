@@ -11,8 +11,7 @@ import {
   Loader2,
   Edit2,
   Tag,
-  Calendar,
-  Sparkles
+  Calendar
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useWeddingStore } from '../store/useWeddingStore';
@@ -352,7 +351,6 @@ export const VendorDetail: React.FC = () => {
 
                 <div>
                   <span className="text-slate-400 block text-[11px] font-medium mb-1 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-[#714B67]" />
                     Specialties & Description
                   </span>
                   <div className="p-3 rounded bg-slate-50 border border-slate-200 text-slate-700 text-xs leading-relaxed">
@@ -400,15 +398,6 @@ export const VendorDetail: React.FC = () => {
               </div>
 
               <div className="pt-3 border-t border-slate-100">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setAssignModalOpen(true)}
-                  className="w-full h-8 text-xs font-semibold text-[#714B67] border-[#714B67]/30 hover:bg-[#714B67]/5"
-                >
-                  <SlidersHorizontal className="w-3.5 h-3.5 mr-1" />
-                  Assign to Wedding Project
-                </Button>
               </div>
             </CardContent>
           </Card>

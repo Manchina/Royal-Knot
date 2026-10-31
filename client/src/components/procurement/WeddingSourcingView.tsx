@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Calendar,
-  MapPin,
   SlidersHorizontal,
   Trash2,
   Edit2,
@@ -273,15 +272,6 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
     },
   ];
 
-  // Awarded categories count
-  const awardedCount = useMemo(() => {
-    if (!currentWedding) return 0;
-    let count = 0;
-    if (currentWedding.categories?.CATERER?.winner) count++;
-    if (currentWedding.categories?.DJ?.winner) count++;
-    if (currentWedding.categories?.DECORATOR?.winner) count++;
-    return count;
-  }, [currentWedding]);
 
   // Visible filtered categories
   const visibleWeddingCategories = useMemo(() => {
@@ -379,64 +369,6 @@ export const WeddingSourcingView: React.FC<WeddingSourcingViewProps> = ({
   // =========================================================================
   return (
     <div className="space-y-4">
-      {/* 1. Active Wedding Project Summary Banner */}
-      <div className="bg-white border border-slate-200 rounded p-4 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-[#714B67]/10 text-[#714B67] border border-[#714B67]/20">
-              {currentWedding.code}
-            </span>
-            <Badge variant="outline" className="text-[10px] py-0 border-slate-300 text-slate-600 font-semibold">
-              {currentWedding.wedding_status}
-            </Badge>
-            <span className="text-slate-300 text-xs">•</span>
-            <span className="text-xs text-slate-500 flex items-center gap-1 font-medium">
-              <MapPin className="w-3.5 h-3.5 text-slate-400" />
-              {currentWedding.destination_city} • {currentWedding.primary_venue}
-            </span>
-          </div>
-
-          <h2 className="text-base font-bold text-slate-900 tracking-tight">
-            {currentWedding.couple_name}
-          </h2>
-
-          <div className="flex items-center gap-3 text-xs text-slate-600 flex-wrap">
-            <span>
-              <strong>Budget:</strong> ₹{(Number(currentWedding.total_budget) / 10000000).toFixed(2)} Cr
-            </span>
-            <span className="text-slate-300">•</span>
-            <span>
-              <strong>Guests:</strong> {currentWedding.estimated_guest_count}
-            </span>
-            <span className="text-slate-300">•</span>
-            <span>
-              <strong>Date:</strong> {new Date(currentWedding.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="text-right pr-2 hidden sm:block">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Procurement Status
-            </div>
-            <div className="text-xs font-bold text-slate-800">
-              {awardedCount} of 3 Categories Awarded
-            </div>
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onOpenAssignModal('CATERER')}
-            className="text-xs h-8 border-slate-300 font-semibold text-slate-700"
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5 mr-1 text-[#714B67]" />
-            Edit Vendor Assignments
-          </Button>
-        </div>
-      </div>
-
       {/* 2. Category Tabs with Live Counts */}
       <div className="bg-white border border-slate-200 rounded p-1.5 shadow-2xs">
         <Tabs value={sourcingCategoryFilter} onValueChange={setSourcingCategoryFilter} className="w-full">
