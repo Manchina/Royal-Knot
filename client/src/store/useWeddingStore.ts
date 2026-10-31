@@ -9,7 +9,7 @@ export interface WeddingSummary {
   startDate: string;
   guestCount: number;
   packageType: string;
-  status: 'LIVE_BIG_DAY' | 'IN_PLANNING' | 'BOOKED' | 'ENQUIRY' | 'FINALISED';
+  status: 'LIVE_BIG_DAY' | 'IN_PLANNING' | 'BOOKED' | 'ENQUIRY' | 'FINALISED' | 'FINALISED_SETTLED';
   isFinalised?: boolean;
   finalisedDate?: string;
   finalisedBy?: string;
@@ -71,7 +71,7 @@ export const SYSTEM_WEDDINGS: WeddingSummary[] = [
     startDate: 'Feb 12 - 15, 2026',
     guestCount: 450,
     packageType: 'Heritage Royal Extravaganza',
-    status: 'FINALISED',
+    status: 'FINALISED_SETTLED',
     isFinalised: true,
     finalisedDate: 'Feb 20, 2026',
     finalisedBy: 'Aditya Singhal (Super Admin)',

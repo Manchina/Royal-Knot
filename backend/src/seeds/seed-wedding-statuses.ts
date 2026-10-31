@@ -35,16 +35,23 @@ export async function seedWeddingStatuses() {
     {
       cat: 'WEDDING_STATUS',
       key: 'FINALISED',
-      label: 'Finalised & Audited',
-      desc: 'Wedding successfully completed, day-of extras invoiced, all vendor disbursements settled',
+      label: 'Finalised',
+      desc: 'Wedding completed, day-of extras invoiced and verified',
       sortOrder: 4,
+    },
+    {
+      cat: 'WEDDING_STATUS',
+      key: 'FINALISED_SETTLED',
+      label: 'Finalised & Settled',
+      desc: 'Wedding audited and all vendor disbursements 100% settled and cleared',
+      sortOrder: 5,
     },
     {
       cat: 'WEDDING_STATUS',
       key: 'ENQUIRY',
       label: 'Initial Discovery',
       desc: 'Consultation request and digital luxury proposal phase',
-      sortOrder: 5,
+      sortOrder: 6,
     },
   ];
 

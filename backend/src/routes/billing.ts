@@ -252,7 +252,7 @@ let BILLING_PROJECTS: ProjectBillingData[] = [
     startDate: 'Feb 12 - 15, 2026',
     guestCount: 450,
     packageType: 'Heritage Royal Extravaganza',
-    status: 'FINALISED',
+    status: 'FINALISED_SETTLED',
     isFinalised: true,
     finalisedDate: 'Feb 20, 2026',
     finalisedBy: 'Aditya Singhal (Super Admin)',
@@ -460,6 +460,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
         IN_PLANNING: 0,
         BOOKED: 0,
         FINALISED: 0,
+        FINALISED_SETTLED: 0,
       };
 
       const ongoingAll: ProjectBillingData[] = [];
@@ -478,7 +479,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
           if (!match) continue;
         }
 
-        if (p.isFinalised || p.status === 'FINALISED') {
+        if (p.isFinalised || p.status === 'FINALISED' || p.status === 'FINALISED_SETTLED') {
           finalisedAll.push(p);
           counts.ALL_FINALISED++;
           counts[p.status] = (counts[p.status] || 0) + 1;
@@ -495,15 +496,16 @@ export async function billingRoutes(fastify: FastifyInstance) {
 
       // Status subtabs definition matching PeopleFirst standard
       const ongoingStatusTabs = [
-        { id: 'ALL', label: 'All Ongoing', count: counts.ALL_ONGOING },
+        { id: 'ALL', label: 'All', count: counts.ALL_ONGOING },
         { id: 'LIVE_BIG_DAY', label: masterLabelMap.get('LIVE_BIG_DAY') || 'Live Big Day', count: counts.LIVE_BIG_DAY || 0 },
         { id: 'IN_PLANNING', label: masterLabelMap.get('IN_PLANNING') || 'In Planning', count: counts.IN_PLANNING || 0 },
         { id: 'BOOKED', label: masterLabelMap.get('BOOKED') || 'Booked', count: counts.BOOKED || 0 },
       ];
 
       const finalisedStatusTabs = [
-        { id: 'ALL', label: 'All Finalised', count: counts.ALL_FINALISED },
-        { id: 'FINALISED', label: masterLabelMap.get('FINALISED') || 'Finalised & Audited', count: counts.FINALISED || counts.ALL_FINALISED },
+        { id: 'ALL', label: 'All', count: counts.ALL_FINALISED },
+        { id: 'FINALISED', label: masterLabelMap.get('FINALISED') || 'Finalised', count: counts.FINALISED || 0 },
+        { id: 'FINALISED_SETTLED', label: masterLabelMap.get('FINALISED_SETTLED') || 'Finalised & Settled', count: counts.FINALISED_SETTLED || 0 },
       ];
 
       // Filter active list based on selected status subtab
