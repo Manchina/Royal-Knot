@@ -289,8 +289,11 @@ export async function seedDatabase() {
     { title: 'Distribute minute-by-minute run sheet to all 18 vendor leads', cat: 'CEREMONIES', stage: 'TO_PLAN', days: 3, isMilestone: false },
     { title: 'Pre-event safety & fire extinguisher placement inspection', cat: 'VENUE', stage: 'TO_PLAN', days: 2, isMilestone: false },
     { title: 'Rehearsal: Sangeet sound levels check and sound limiter testing', cat: 'CEREMONIES', stage: 'TO_PLAN', days: 2, isMilestone: false },
-    { title: 'Day-Of: Live check-in desk setup at hotel service gate', cat: 'CEREMONIES', stage: 'TO_PLAN', days: 1, isMilestone: false },
-    { title: 'Day-Of: Headcount counter audit at banquet entry', cat: 'VENUE', stage: 'TO_PLAN', days: 0, isMilestone: false },
+    { title: 'Morning bridal suite styling & garland handover', cat: 'DAY_OF', stage: 'DONE', days: 0, isMilestone: false, notes: 'Execution Time: 09:30 | Venue: Bridal Villa Suite' },
+    { title: 'Mandap floral canopy structural security sign-off', cat: 'DAY_OF', stage: 'DONE', days: 0, isMilestone: false, notes: 'Execution Time: 11:00 | Venue: Mandap Pavilion' },
+    { title: 'Baraat vintage carriage ignition & escort alignment', cat: 'DAY_OF', stage: 'IN_PROGRESS', days: 0, isMilestone: false, notes: 'Execution Time: 15:45 | Venue: Main Palace Gate' },
+    { title: 'Varmala flower petal cannon & pyrotechnic cue check', cat: 'DAY_OF', stage: 'TO_PLAN', days: 0, isMilestone: true, notes: 'Execution Time: 17:30 | Venue: Lakefront Deck' },
+    { title: 'Banquet live headcount wristband audit with hotel banquet director', cat: 'DAY_OF', stage: 'TO_PLAN', days: 0, isMilestone: true, notes: 'Execution Time: 20:30 | Venue: Main Palace Ballroom' },
     { title: 'Post-Event: Reconcile extra banquet plates with banquet manager', cat: 'FINANCE', stage: 'TO_PLAN', days: -1, isMilestone: true },
     { title: 'Post-Event: Match vendor bills against original RFQ purchase orders', cat: 'FINANCE', stage: 'TO_PLAN', days: -2, isMilestone: false },
     { title: 'Post-Event: Issue final settlement invoice to client', cat: 'FINANCE', stage: 'TO_PLAN', days: -3, isMilestone: true },
@@ -369,47 +372,124 @@ export async function seedDatabase() {
   }
   console.log(`✨ Seeded ${totalTasksSeeded} Wedding Tasks across all 5 Wedding Projects (Scene 3)`);
 
-  // 10. Seed Day-of Operations (Scene 4: Live Run Sheet, Check-ins & Incidents)
-  const runSheetSlots = [
-    { time: '09:00:00', title: 'Florist team arrives; begins Mandap fresh flower draping', loc: 'Mandap Pavillion' },
-    { time: '11:00:00', title: 'Haldi ceremony starts; live folk musicians seated', loc: 'Zenana Lawn' },
-    { time: '15:00:00', title: 'Jaipur Dhol Tasha troupe check-in at main gate', loc: 'Palace North Gate' },
-    { time: '16:00:00', title: 'Sound engineer tests DJ audio console & monitors', loc: 'Promenade Ballroom' },
-    { time: '16:45:00', title: 'Groom Baraat assembly with royal vintage car & drummers', loc: 'Main Palace Driveway' },
-    { time: '17:30:00', title: 'Bride grand entry under Phoolon Ki Chaadar & Varmala', loc: 'Lakefront Deck' },
-    { time: '19:00:00', title: 'Vedic Pheras ceremony with Royal Pandit Ji', loc: 'Mewar Mandap' },
-    { time: '20:30:00', title: 'Royal Banquet opens; 400+ guests seated for dinner', loc: 'Main Palace Ballroom' },
-    { time: '22:00:00', title: 'DJ music starts; cake cutting & celebration', loc: 'Promenade Ballroom' },
+  // 10. Seed Day-of Operations across projects (Scene 4: Live Run Sheet, Check-ins & Incidents)
+  await pool.query('DELETE FROM day_of_incidents');
+  await pool.query('DELETE FROM day_of_vendor_checkins');
+  await pool.query('DELETE FROM day_of_run_sheet');
+
+  const w1RunSheet = [
+    { time: '08:30:00', title: 'Bridal suite morning styling & photography prep', loc: 'Bridal Villa Suite', status: 'COMPLETED' },
+    { time: '10:00:00', title: 'Florist team arrives; begins Mandap fresh flower draping', loc: 'Mandap Pavillion', status: 'COMPLETED' },
+    { time: '11:30:00', title: 'Haldi ceremony starts; live folk musicians seated', loc: 'Zenana Lawn', status: 'COMPLETED' },
+    { time: '13:00:00', title: 'Royal lunch buffet service for 250 in-house guests', loc: 'Lakefront Verandah', status: 'COMPLETED' },
+    { time: '15:00:00', title: 'Jaipur Dhol Tasha troupe check-in at main gate', loc: 'Palace North Gate', status: 'IN_PROGRESS' },
+    { time: '16:00:00', title: 'Sound engineer tests DJ audio console & monitors', loc: 'Promenade Ballroom', status: 'IN_PROGRESS' },
+    { time: '16:45:00', title: 'Groom Baraat assembly with royal vintage car & drummers', loc: 'Main Palace Driveway', status: 'UPCOMING' },
+    { time: '17:30:00', title: 'Bride grand entry under Phoolon Ki Chaadar & Varmala', loc: 'Lakefront Deck', status: 'UPCOMING' },
+    { time: '19:00:00', title: 'Vedic Pheras ceremony with Royal Pandit Ji', loc: 'Mewar Mandap', status: 'UPCOMING' },
+    { time: '20:30:00', title: 'Royal Banquet opens; 400+ guests seated for dinner', loc: 'Main Palace Ballroom', status: 'UPCOMING' },
+    { time: '22:00:00', title: 'DJ music starts; cake cutting & celebration', loc: 'Promenade Ballroom', status: 'UPCOMING' },
   ];
 
-  for (let i = 0; i < runSheetSlots.length; i++) {
-    const s = runSheetSlots[i];
+  const w2RunSheet = [
+    { time: '10:00:00', title: 'Rambagh Lawn floral mandap structures safety inspection', loc: 'Rambagh Royal Lawns', status: 'COMPLETED' },
+    { time: '13:00:00', title: 'Baraat vintage open-top Rolls Royce positioning', loc: 'Main Palace Verandah', status: 'COMPLETED' },
+    { time: '16:00:00', title: 'Varmala garland exchange ceremony', loc: 'Palace Verandah Steps', status: 'IN_PROGRESS' },
+    { time: '18:30:00', title: 'Vedic Pheras under starlit canopy with Royal Drummers', loc: 'Central Lawn Mandap', status: 'UPCOMING' },
+    { time: '20:30:00', title: 'Royal Rajputana Banquet dinner service', loc: 'Maharani Ballroom', status: 'UPCOMING' },
+  ];
+
+  const w3RunSheet = [
+    { time: '11:00:00', title: 'Safari Jeep convoy assembly at fortress base', loc: 'Fortress Lower Gate', status: 'COMPLETED' },
+    { time: '13:00:00', title: 'Welcome lunch & folk musical performance', loc: 'Haveli Courtyard', status: 'COMPLETED' },
+    { time: '17:00:00', title: 'Sunset Pheras ceremony', loc: 'Turret Mandap Deck', status: 'IN_PROGRESS' },
+    { time: '19:30:00', title: 'Rooftop celebration dinner & fireworks', loc: 'Fortress Ramparts', status: 'UPCOMING' },
+  ];
+
+  const w4RunSheet = [
+    { time: '10:00:00', title: 'Umaid Bhawan banquet hall handover & decor setup', loc: 'Marwar Durbar Hall', status: 'COMPLETED' },
+    { time: '15:00:00', title: 'Baraat royal procession & palace band welcome', loc: 'Palace Grand Portico', status: 'COMPLETED' },
+    { time: '18:00:00', title: 'Vedic Pheras ritual', loc: 'Royal Gardens Pavilion', status: 'COMPLETED' },
+    { time: '20:30:00', title: 'Reception gala dinner & post-event audit', loc: 'Palace Banquet Hall', status: 'COMPLETED' },
+  ];
+
+  const w5RunSheet = [
+    { time: '11:00:00', title: 'Boat ferry jetty shuttle operational test', loc: 'Lake Pichola Jetty', status: 'COMPLETED' },
+    { time: '16:00:00', title: 'Sunset island ceremony & champagne toast', loc: 'Taj Lake Palace Promenade', status: 'COMPLETED' },
+    { time: '19:30:00', title: 'Royal island gala dinner & acoustic performance', loc: 'Lily Pond Courtyard', status: 'COMPLETED' },
+  ];
+
+  const runSheets = [
+    { wid: wedding1Id, slots: w1RunSheet },
+    { wid: wedding2Id, slots: w2RunSheet },
+    { wid: wedding3Id, slots: w3RunSheet },
+    { wid: wedding4Id, slots: w4RunSheet },
+    { wid: wedding5Id, slots: w5RunSheet },
+  ];
+
+  for (const rs of runSheets) {
+    for (let i = 0; i < rs.slots.length; i++) {
+      const s = rs.slots[i] as any;
+      const statusTag = `[STATUS:${s.status || 'UPCOMING'}]`;
+      await pool.query(
+        `INSERT INTO day_of_run_sheet (wedding_id, time_slot, activity_title, location, responsible_user_id, sort_order, notes)
+         VALUES ($1, $2, $3, $4, 'a0000001-0000-0000-0000-000000000004', $5, $6)`,
+        [rs.wid, s.time, s.title, s.loc, i + 1, statusTag]
+      );
+    }
+  }
+
+  // Day-of Vendor Check-ins across weddings (Scene 4: Arrival Telemetry)
+  const checkins = [
+    { wid: wedding1Id, vid: vendorDecor, hours: 4, actualHours: 4, status: 'ARRIVED_ON_TIME', delay: 0, remarks: 'Mandap structure team checked in on schedule; flower crates unloaded' },
+    { wid: wedding1Id, vid: vendorCaterer2, hours: 2, actualHours: 1.6, status: 'ARRIVED_ON_TIME', delay: 20, remarks: 'Delayed by 20 min due to highway toll queue; arrived safely at service dock' },
+    { wid: wedding1Id, vid: vendorDJ, hours: 1, actualHours: null, status: 'RUNNING_LATE', delay: 25, remarks: 'Main acoustic console technician en route; coordinator notified' },
+    { wid: wedding1Id, vid: vendorDhol, hours: 1.5, actualHours: 1.5, status: 'ARRIVED_ON_TIME', delay: 0, remarks: '12-member Dhol Tasha troupe checked in at North Gate in traditional attire' },
+    { wid: wedding1Id, vid: vendorPhoto, hours: 3, actualHours: 3, status: 'ARRIVED_ON_TIME', delay: 0, remarks: 'Cinematography drone crew on-site; FAA/Police permits logged' },
+    { wid: wedding1Id, vid: vendorCaterer1, hours: 0.5, actualHours: null, status: 'SCHEDULED', delay: 0, remarks: 'Evening dessert live station chef scheduled for 19:00 arrival' },
+    { wid: wedding1Id, vid: vendorCaterer3, hours: 1, actualHours: null, status: 'DELAYED_CRITICAL', delay: 45, remarks: 'Auxiliary cold storage reefer truck breakdown on bypass road' },
+
+    { wid: wedding2Id, vid: vendorCaterer1, hours: 3, actualHours: 3, status: 'ARRIVED_ON_TIME', delay: 0, remarks: 'Catering trucks unloaded & kitchen prepped' },
+    { wid: wedding2Id, vid: vendorDecor, hours: 4, actualHours: 4, status: 'ARRIVED_ON_TIME', delay: 0, remarks: 'Floral staging active at Rambagh Royal Lawns' },
+    { wid: wedding2Id, vid: vendorDJ, hours: 2, actualHours: 2, status: 'ARRIVED_ON_TIME', delay: 0, remarks: 'Audio console setup complete' },
+    { wid: wedding2Id, vid: vendorPhoto, hours: 1, actualHours: null, status: 'RUNNING_LATE', delay: 15, remarks: 'Pre-wedding candid team delayed at airport arrival' },
+
+    { wid: wedding3Id, vid: vendorDJ, hours: 2, actualHours: 2, status: 'ARRIVED_ON_TIME', delay: 0, remarks: 'Fortress sound equipment loaded' },
+    { wid: wedding3Id, vid: vendorCaterer3, hours: 3, actualHours: 3, status: 'ARRIVED_ON_TIME', delay: 0, remarks: 'Banquets kitchen team prepped' },
+    { wid: wedding3Id, vid: vendorDecor, hours: 1, actualHours: null, status: 'SCHEDULED', delay: 0, remarks: 'Sunset terrace floral team en route' },
+
+    { wid: wedding4Id, vid: vendorCaterer3, hours: 5, actualHours: 5, status: 'ARRIVED_ON_TIME', delay: 0, remarks: 'Audited and cleared' },
+    { wid: wedding5Id, vid: vendorDecor, hours: 4, actualHours: 4, status: 'ARRIVED_ON_TIME', delay: 0, remarks: 'Taj Lake Palace setup finalized' },
+  ];
+
+  for (const c of checkins) {
     await pool.query(
-      `INSERT INTO day_of_run_sheet (wedding_id, event_id, time_slot, activity_title, location, responsible_user_id, sort_order)
-       VALUES ($1, $2, $3, $4, $5, 'a0000001-0000-0000-0000-000000000004', $6)`,
-      [wedding1Id, event3Id, s.time, s.title, s.loc, i + 1]
+      `INSERT INTO day_of_vendor_checkins (wedding_id, vendor_id, scheduled_arrival_time, actual_arrival_time, status, delay_minutes, staff_verifier_id, remarks)
+       VALUES ($1, $2, NOW() - ($3 || ' hours')::interval, ${c.actualHours ? `NOW() - ('${c.actualHours} hours')::interval` : 'NULL'}, $4, $5, 'a0000001-0000-0000-0000-000000000004', $6)`,
+      [c.wid, c.vid, c.hours, c.status, c.delay, c.remarks]
     );
   }
 
-  // Day-of Vendor Check-ins
-  await pool.query(
-    `INSERT INTO day_of_vendor_checkins (wedding_id, event_id, vendor_id, scheduled_arrival_time, actual_arrival_time, status, delay_minutes, remarks)
-     VALUES
-      ($1, $2, $3, NOW() - interval '4 hours', NOW() - interval '4 hours', 'ARRIVED', 0, 'Mandap structure team on schedule'),
-      ($1, $2, $4, NOW() - interval '2 hours', NOW() - interval '100 minutes', 'ARRIVED', 20, 'Delayed by 20 min due to highway traffic at Udaipur toll'),
-      ($1, $2, $5, NOW() - interval '1 hour', NULL, 'RUNNING_LATE', 25, 'DJ sound technician en route; coordinator notified')`,
-    [wedding1Id, event3Id, vendorDecor, vendorCaterer2, vendorDJ]
-  );
+  // Day-of Incidents across weddings (Scene 4: Live Incidents & Fast Resolutions)
+  const incidentsList = [
+    { wid: wedding1Id, title: 'Generator circuit load trip in West Lawn during DJ sound check', sev: 'CRITICAL', status: 'REPORTED', notes: 'Hotel electrical engineer on site; testing main circuit breakers.' },
+    { wid: wedding1Id, title: 'Bride vintage entry car stuck in Old City traffic checkpoint', sev: 'HIGH', status: 'REPORTED', notes: 'Field coordinator routed driver via Ring Road bypass; ETA +10 mins.' },
+    { wid: wedding1Id, title: 'Extra 40 dinner guest headcount chair requirement at Lakefront Deck', sev: 'MEDIUM', status: 'REPORTED', notes: 'Banquets captain dispatching 4 additional setup crew.' },
+    { wid: wedding1Id, title: 'Florist requires auxiliary 20kVA generator for outdoor floodlights', sev: 'HIGH', status: 'RESOLVED', notes: 'Backup hotel generator patched by hotel maintenance in 15 mins.' },
+    { wid: wedding1Id, title: 'Sound limiter sensor tripped by high-bass dhol beats at entry gate', sev: 'LOW', status: 'RESOLVED', notes: 'Sound engineer adjusted dB limiter to venue curfew specifications.' },
+    { wid: wedding2Id, title: 'Floral arch wind reinforcement required at Rambagh Lawns', sev: 'MEDIUM', status: 'RESOLVED', notes: 'Decor team added 50kg counterweights to truss base.' },
+    { wid: wedding3Id, title: 'Fortress luggage trolley lift temporary power trip', sev: 'MEDIUM', status: 'RESOLVED', notes: 'Fortress engineering team reset circuit in 8 minutes.' },
+    { wid: wedding4Id, title: 'Extra 60 banquet headcount guest chair arrangement', sev: 'HIGH', status: 'RESOLVED', notes: 'Durbar hall stewards arranged 6 additional banquet tables.' },
+  ];
 
-  // Day-of Incidents
-  await pool.query(
-    `INSERT INTO day_of_incidents (wedding_id, event_id, title, severity, status, assigned_to, resolution_notes)
-     VALUES
-      ($1, $2, 'Florist requires auxiliary 20kVA generator for outdoor floodlights', 'HIGH', 'RESOLVED', 'a0000001-0000-0000-0000-000000000004', 'Backup hotel generator patched by hotel maintenance in 15 mins.'),
-      ($1, $2, 'Bride vintage entry car stuck in Old City traffic checkpoint', 'MEDIUM', 'INVESTIGATING', 'a0000001-0000-0000-0000-000000000004', 'Field coordinator routed driver via Ring Road bypass; ETA +10 mins.')`,
-    [wedding1Id, event3Id]
-  );
-  console.log(`✨ Seeded Scene 4 Day-Of Run Sheet, Check-ins & Incidents`);
+  for (const inc of incidentsList) {
+    await pool.query(
+      `INSERT INTO day_of_incidents (wedding_id, title, severity, status, assigned_to, resolution_notes)
+       VALUES ($1, $2, $3, $4, 'a0000001-0000-0000-0000-000000000004', $5)`,
+      [inc.wid, inc.title, inc.sev, inc.status, inc.notes]
+    );
+  }
+  console.log('✨ Seeded Scene 4 Day-Of Run Sheet, Check-ins & Incidents across all projects');
 
   // 11. Seed Billing & Extra Costs (Scene 5: 60 Extra Guests & Vendor Matching)
   const inv1Id = '10000001-0000-0000-0000-000000000001';

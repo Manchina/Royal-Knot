@@ -12,6 +12,9 @@ import {
   Filter,
   X,
   Bookmark,
+  Clock,
+  Truck,
+  CalendarClock,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -77,8 +80,23 @@ export const Tasks: React.FC = () => {
   // Confirmation Pop-up state for marking as finished
   const [taskToFinish, setTaskToFinish] = useState<Task | null>(null);
 
-  // Modal State for adding custom task
+  // Modal State for adding regular checklist task
   const [modalOpen, setModalOpen] = useState<boolean>(false);
+
+  // Modal State for adding Day-Of Wedding Task (accepts time instead of date)
+  const [dayOfModalOpen, setDayOfModalOpen] = useState<boolean>(false);
+  const [dayOfType, setDayOfType] = useState<'MINUTE_TO_MINUTE' | 'VENDOR_TELEMETRY'>('MINUTE_TO_MINUTE');
+  const [dayOfTaskWeddingId, setDayOfTaskWeddingId] = useState<string>(
+    selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'
+  );
+  const [dayOfTitle, setDayOfTitle] = useState('');
+  const [dayOfTime, setDayOfTime] = useState('14:30');
+  const [dayOfOwner, setDayOfOwner] = useState('Karan Verma');
+  const [dayOfVenue, setDayOfVenue] = useState('Palace Main Lawn');
+  const [dayOfVendorId, setDayOfVendorId] = useState('');
+  const [dayOfGate, setDayOfGate] = useState('Palace North Service Gate');
+  const [dayOfRemarks, setDayOfRemarks] = useState('');
+  const [dayOfIsMilestone, setDayOfIsMilestone] = useState(false);
   const [newTaskWeddingId, setNewTaskWeddingId] = useState<string>(
     selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'
   );
@@ -176,6 +194,104 @@ export const Tasks: React.FC = () => {
       setModalOpen(false);
       setNewTitle('');
       setNewDays('20 Days');
+    },
+  });
+
+  // Fetch registered active vendors for Vendor Arrival Telemetry selection
+  const { data: vendorsRes } = useQuery({
+    queryKey: ['day-of-vendors'],
+    queryFn: async () => {
+      return await api.get<{
+        success: boolean;
+        data: { id: string; businessName: string; category: string; contactPerson?: string; phone?: string }[];
+      }>('/day-of/vendors');
+    },
+  });
+  const registeredVendors = vendorsRes?.data || [];
+
+  // Create Day-Of Wedding Task mutation (supports selecting either "Minute to Minute" or "Vendor Arrival Telemetry")
+  const createDayOfTaskMutation = useMutation({
+    mutationFn: async (payload: {
+      type: 'MINUTE_TO_MINUTE' | 'VENDOR_TELEMETRY';
+      weddingId: string;
+      title: string;
+      time: string;
+      ownerName: string;
+      venue?: string;
+      vendorId?: string;
+      gate?: string;
+      remarks?: string;
+      isMilestone: boolean;
+    }) => {
+      if (payload.type === 'MINUTE_TO_MINUTE') {
+        // 1. Post to Checklist tasks
+        const taskRes = await api.post('/tasks', {
+          weddingId: payload.weddingId,
+          title: `[Minute to Minute] ${payload.title}`,
+          category: 'DAY_OF',
+          ownerName: payload.ownerName,
+          daysBefore: `@ ${payload.time} (Wedding Day)`,
+          notes: `[Minute to Minute] Execution Time: ${payload.time} | Venue: ${payload.venue || 'Palace Grounds'}`,
+          isMilestone: payload.isMilestone,
+        });
+
+        // 2. Also register into live Day-Of Run Sheet
+        try {
+          await api.post('/day-of/run-sheet', {
+            weddingId: payload.weddingId,
+            timeSlot: payload.time,
+            activityTitle: payload.title,
+            location: payload.venue,
+            ownerName: payload.ownerName,
+            status: 'UPCOMING',
+          });
+        } catch {
+          // Run sheet registration optional
+        }
+
+        return taskRes;
+      } else {
+        // VENDOR_TELEMETRY
+        const selectedVendor = registeredVendors.find((v) => v.id === payload.vendorId);
+        const vendorName = selectedVendor ? selectedVendor.businessName : 'Vendor Partner';
+        const vendorCategory = selectedVendor ? selectedVendor.category : 'VENDORS';
+
+        // 1. Post to Checklist tasks
+        const taskRes = await api.post('/tasks', {
+          weddingId: payload.weddingId,
+          title: `[Vendor Telemetry] ${vendorName} (${vendorCategory}) Gate Arrival`,
+          category: 'DAY_OF',
+          ownerName: payload.ownerName || 'Karan Verma',
+          daysBefore: `@ ${payload.time} (Wedding Day)`,
+          notes: `[Vendor Arrival Telemetry] Scheduled: ${payload.time} | Gate: ${payload.gate || 'North Gate'} | Remarks: ${payload.remarks || 'Check-in required'}`,
+          isMilestone: payload.isMilestone,
+        });
+
+        // 2. Register into live Day-Of Vendor Check-ins
+        try {
+          await api.post('/day-of/vendor-checkins', {
+            weddingId: payload.weddingId,
+            vendorId: payload.vendorId || (registeredVendors[0]?.id || ''),
+            scheduledArrivalTime: payload.time,
+            remarks: `Gate: ${payload.gate || 'Main Service Gate'}${payload.remarks ? ` • ${payload.remarks}` : ''}`,
+            status: 'SCHEDULED',
+          });
+        } catch {
+          // Telemetry registration optional
+        }
+
+        return taskRes;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['day-of-run-sheet'] });
+      queryClient.invalidateQueries({ queryKey: ['day-of-vendor-checkins'] });
+      setDayOfModalOpen(false);
+      setDayOfTitle('');
+      setDayOfTime('14:30');
+      setDayOfVenue('Palace Main Lawn');
+      setDayOfRemarks('');
     },
   });
 
@@ -279,6 +395,21 @@ export const Tasks: React.FC = () => {
           >
             <Plus className="w-4 h-4" />
             <span>Add Task</span>
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setDayOfTaskWeddingId(selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001');
+              createDayOfTaskMutation.reset();
+              setDayOfModalOpen(true);
+            }}
+            className="gap-1.5 h-8 text-xs font-semibold bg-[#714B67]/10 text-[#714B67] hover:bg-[#714B67]/20 border border-[#714B67]/30"
+            title="Add specialized wedding day task with exact execution time"
+          >
+            <Clock className="w-3.5 h-3.5 text-[#714B67]" />
+            <span>Day-Of Task</span>
           </Button>
         </div>
       </div>
@@ -577,7 +708,14 @@ export const Tasks: React.FC = () => {
 
                       {/* Column 6: Timeline */}
                       <TableCell className="py-2.5 font-mono text-xs text-slate-600">
-                        {t.daysBefore || (t.dueDate ? t.dueDate.split('T')[0] : '—')}
+                        {t.category === 'DAY_OF' || (t.daysBefore && t.daysBefore.startsWith('@')) ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#714B67] bg-[#714B67]/10 px-2 py-0.5 rounded border border-[#714B67]/20">
+                            <Clock className="w-3 h-3" />
+                            <span>{t.daysBefore?.replace('(Wedding Day)', '').trim() || 'Day-Of'}</span>
+                          </span>
+                        ) : (
+                          t.daysBefore || (t.dueDate ? t.dueDate.split('T')[0] : '—')
+                        )}
                       </TableCell>
 
                       {/* Column 7: Payment Milestone */}
@@ -790,6 +928,306 @@ export const Tasks: React.FC = () => {
                 disabled={createMutation.isPending || !newTitle.trim()}
               >
                 {createMutation.isPending ? 'Saving...' : 'Add to Checklist'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Add Day-Of Wedding Task (Accepts exact time instead of date) */}
+      <Dialog open={dayOfModalOpen} onOpenChange={setDayOfModalOpen}>
+        <DialogContent className="max-w-md bg-white border border-slate-200 shadow-xl rounded">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-[#714B67]" />
+              <span>Create Day-Of Wedding Task</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Attach time-critical wedding day task. Accepts exact execution time instead of date because it runs on the live wedding day.
+            </DialogDescription>
+          </DialogHeader>
+
+          {createDayOfTaskMutation.isError && (
+            <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs px-3.5 py-2 rounded flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>
+                {(createDayOfTaskMutation.error as any)?.response?.data?.message ||
+                  (createDayOfTaskMutation.error as any)?.message ||
+                  'Failed to create Day-Of task.'}
+              </span>
+            </div>
+          )}
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (dayOfType === 'MINUTE_TO_MINUTE') {
+                if (!dayOfTitle.trim()) return;
+                createDayOfTaskMutation.mutate({
+                  type: 'MINUTE_TO_MINUTE',
+                  weddingId: dayOfTaskWeddingId || (selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'),
+                  title: dayOfTitle.trim(),
+                  time: dayOfTime,
+                  ownerName: dayOfOwner.trim(),
+                  venue: dayOfVenue.trim(),
+                  isMilestone: dayOfIsMilestone,
+                });
+              } else {
+                createDayOfTaskMutation.mutate({
+                  type: 'VENDOR_TELEMETRY',
+                  weddingId: dayOfTaskWeddingId || (selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'),
+                  title: '',
+                  vendorId: dayOfVendorId || (registeredVendors[0]?.id || ''),
+                  time: dayOfTime,
+                  ownerName: dayOfOwner.trim(),
+                  gate: dayOfGate.trim(),
+                  remarks: dayOfRemarks.trim(),
+                  isMilestone: dayOfIsMilestone,
+                });
+              }
+            }}
+            className="space-y-3 py-2"
+          >
+            {/* 2 Fields Selection: User can ONLY select one either "Minute to Minute" or "Vendor Arrival Telemetry" */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-800">
+                Day-Of Execution Stream (Select One)
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDayOfType('MINUTE_TO_MINUTE')}
+                  className={`p-2.5 rounded border text-left flex items-start gap-2.5 transition cursor-pointer ${
+                    dayOfType === 'MINUTE_TO_MINUTE'
+                      ? 'bg-[#714B67]/10 border-[#714B67] text-[#714B67] ring-1 ring-[#714B67]'
+                      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="dayOfTypeSelector"
+                    checked={dayOfType === 'MINUTE_TO_MINUTE'}
+                    onChange={() => setDayOfType('MINUTE_TO_MINUTE')}
+                    className="mt-0.5 text-[#714B67] focus:ring-[#714B67]"
+                  />
+                  <div>
+                    <div className="text-xs font-bold flex items-center gap-1.5">
+                      <CalendarClock className="w-3.5 h-3.5 text-[#714B67]" />
+                      <span>Minute to Minute</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                      Ceremonies, cues & run sheet timeline
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDayOfType('VENDOR_TELEMETRY');
+                    if (!dayOfVendorId && registeredVendors.length > 0) {
+                      setDayOfVendorId(registeredVendors[0].id);
+                    }
+                  }}
+                  className={`p-2.5 rounded border text-left flex items-start gap-2.5 transition cursor-pointer ${
+                    dayOfType === 'VENDOR_TELEMETRY'
+                      ? 'bg-[#714B67]/10 border-[#714B67] text-[#714B67] ring-1 ring-[#714B67]'
+                      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="dayOfTypeSelector"
+                    checked={dayOfType === 'VENDOR_TELEMETRY'}
+                    onChange={() => {
+                      setDayOfType('VENDOR_TELEMETRY');
+                      if (!dayOfVendorId && registeredVendors.length > 0) {
+                        setDayOfVendorId(registeredVendors[0].id);
+                      }
+                    }}
+                    className="mt-0.5 text-[#714B67] focus:ring-[#714B67]"
+                  />
+                  <div>
+                    <div className="text-xs font-bold flex items-center gap-1.5">
+                      <Truck className="w-3.5 h-3.5 text-[#714B67]" />
+                      <span>Vendor Arrival Telemetry</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                      Vendor dispatch & gate check-ins
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="dayof_wedding">Related Wedding Project</Label>
+              <select
+                id="dayof_wedding"
+                value={dayOfTaskWeddingId}
+                onChange={(e) => setDayOfTaskWeddingId(e.target.value)}
+                className="w-full h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
+              >
+                {weddings.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.code}: {w.couple} ({w.city})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Stream 1: Minute to Minute Fields */}
+            {dayOfType === 'MINUTE_TO_MINUTE' ? (
+              <>
+                <div className="space-y-1">
+                  <Label htmlFor="dayof_title">Day-Of Task / Activity Cue</Label>
+                  <Input
+                    id="dayof_title"
+                    placeholder="e.g. Groom vintage car Baraat arrival & drummers assembly"
+                    value={dayOfTitle}
+                    onChange={(e) => setDayOfTitle(e.target.value)}
+                    required
+                    className="border-slate-300"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <Label htmlFor="dayof_time" className="flex items-center gap-1 text-[#714B67] font-semibold">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Execution Time (HH:MM)</span>
+                    </Label>
+                    <Input
+                      id="dayof_time"
+                      type="time"
+                      value={dayOfTime}
+                      onChange={(e) => setDayOfTime(e.target.value)}
+                      required
+                      className="border-[#714B67]/40 focus:border-[#714B67]"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="dayof_venue">Venue / Location</Label>
+                    <Input
+                      id="dayof_venue"
+                      placeholder="e.g. Main Palace Driveway"
+                      value={dayOfVenue}
+                      onChange={(e) => setDayOfVenue(e.target.value)}
+                      className="border-slate-300"
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* Stream 2: Vendor Arrival Telemetry Fields */
+              <>
+                <div className="space-y-1">
+                  <Label htmlFor="dayof_vendor">Assigned Vendor Partner</Label>
+                  <select
+                    id="dayof_vendor"
+                    value={dayOfVendorId || (registeredVendors[0]?.id || '')}
+                    onChange={(e) => setDayOfVendorId(e.target.value)}
+                    className="w-full h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
+                  >
+                    {registeredVendors.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.businessName} ({v.category})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <Label htmlFor="dayof_time" className="flex items-center gap-1 text-[#714B67] font-semibold">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Scheduled Arrival (HH:MM)</span>
+                    </Label>
+                    <Input
+                      id="dayof_time"
+                      type="time"
+                      value={dayOfTime}
+                      onChange={(e) => setDayOfTime(e.target.value)}
+                      required
+                      className="border-[#714B67]/40 focus:border-[#714B67]"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="dayof_gate">Service Gate / Checkpoint</Label>
+                    <Input
+                      id="dayof_gate"
+                      placeholder="e.g. Palace North Service Gate"
+                      value={dayOfGate}
+                      onChange={(e) => setDayOfGate(e.target.value)}
+                      className="border-slate-300"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="dayof_remarks">Telemetry Remarks / Notes</Label>
+                  <Input
+                    id="dayof_remarks"
+                    placeholder="e.g. Mandap floral crates delivery & setup crew"
+                    value={dayOfRemarks}
+                    onChange={(e) => setDayOfRemarks(e.target.value)}
+                    className="border-slate-300"
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="space-y-1">
+                <Label htmlFor="dayof_owner">Responsible Field Lead</Label>
+                <Input
+                  id="dayof_owner"
+                  placeholder="Karan Verma"
+                  value={dayOfOwner}
+                  onChange={(e) => setDayOfOwner(e.target.value)}
+                  className="border-slate-300"
+                />
+              </div>
+
+              <div className="space-y-1 flex flex-col justify-end">
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 pb-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={dayOfIsMilestone}
+                    onChange={(e) => setDayOfIsMilestone(e.target.checked)}
+                    className="rounded border-slate-300 text-[#714B67] focus:ring-[#714B67]"
+                  />
+                  <span>Mark as Key Milestone</span>
+                </label>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setDayOfModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="default"
+                size="sm"
+                disabled={
+                  createDayOfTaskMutation.isPending ||
+                  (dayOfType === 'MINUTE_TO_MINUTE' && !dayOfTitle.trim())
+                }
+                className="bg-[#714B67] hover:bg-[#5a3a52] text-white"
+              >
+                {createDayOfTaskMutation.isPending
+                  ? 'Scheduling...'
+                  : dayOfType === 'MINUTE_TO_MINUTE'
+                  ? 'Add Minute-to-Minute Cue'
+                  : 'Schedule Vendor Telemetry'}
               </Button>
             </DialogFooter>
           </form>

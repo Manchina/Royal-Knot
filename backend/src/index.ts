@@ -10,6 +10,7 @@ import { analyticsRoutes } from './routes/analytics';
 import { tasksRoutes } from './routes/tasks';
 import { procurementRoutes } from './routes/procurement';
 import { weddingRoutes } from './routes/weddings';
+import { dayOfRoutes } from './routes/dayOf';
 
 dotenv.config();
 
@@ -107,6 +108,9 @@ async function buildServer() {
   await fastify.register(tasksRoutes, { prefix: '/api/tasks' });
   await fastify.register(tasksRoutes, { prefix: '/api/checklists' });
 
+
+  // Mount Day-of Live Execution & Operations Routes under /api/day-of
+  await fastify.register(dayOfRoutes, { prefix: '/api/day-of' });
 
   // Mount Founder Analytics & Season P&L Routes under /api/analytics
   await fastify.register(analyticsRoutes, { prefix: '/api/analytics' });
