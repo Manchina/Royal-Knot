@@ -1,18 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   TrendingUp,
-  DollarSign,
   ArrowUpRight,
   ArrowDownRight,
-  Calendar,
   CheckCircle,
   AlertTriangle,
   Star,
-  Users,
   FileSpreadsheet,
   Search,
   RefreshCw,
-  Database,
   Table as TableIcon,
   BarChart3,
   PieChart as PieChartIcon,
@@ -58,69 +54,18 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
+  TablePagination,
 } from '../ui';
-import { api } from '../../api/client';
+import {
+  useAnalyticsStore,
+  type WeddingProfit,
+  type CashFlowPeriod,
+  type VendorScoreItem,
+  type MetricCardItem,
+  type SeasonSummaryResponse,
+} from '../../store/useAnalyticsStore';
 
-export interface WeddingProfit {
-  id?: string;
-  code: string;
-  couple: string;
-  venue: string;
-  city: string;
-  guests: number;
-  clientBilled: string;
-  clientBilledNum?: number;
-  vendorCosts: string;
-  vendorCostsNum?: number;
-  netProfit: string;
-  netProfitNum?: number;
-  marginPct: string;
-  marginPctNum?: number;
-  status: 'High Margin' | 'On Target' | 'Audit Extras';
-  packageType?: string;
-  leadPlanner: string;
-  date: string;
-}
-
-export interface CashFlowPeriod {
-  period: string;
-  milestoneInflows: string;
-  vendorPayables: string;
-  netCashDelta: string;
-  status: 'SURPLUS' | 'DEFICIT';
-}
-
-export interface VendorScoreItem {
-  id: string;
-  vendor: string;
-  category: string;
-  city: string;
-  rating: string;
-  onTimeArrivalPct: string;
-  eventsDelivered: number;
-  avgDelayMins: number;
-  reliability: 'High Reliability' | 'Satisfactory' | 'Watchlist';
-}
-
-export interface MetricCardItem {
-  label?: string;
-  title?: string;
-  value: string;
-  change?: string;
-  positive?: boolean;
-  isPositive?: boolean;
-  sub?: string;
-  subtext?: string;
-  icon?: React.ComponentType<{ className?: string }>;
-}
-
-export interface SeasonSummaryResponse {
-  success: boolean;
-  metrics?: MetricCardItem[];
-  weddingProfits?: WeddingProfit[];
-  cashFlowForecast?: CashFlowPeriod[];
-  vendorScorecard?: VendorScoreItem[];
-}
+export type { WeddingProfit, CashFlowPeriod, VendorScoreItem, MetricCardItem, SeasonSummaryResponse };
 
 interface ExecutiveDashboardProps {
   selectedCouple?: string;
@@ -129,6 +74,16 @@ interface ExecutiveDashboardProps {
 export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
   selectedCouple = 'ALL',
 }) => {
+  // Global Analytics Zustand Store
+  const {
+    metrics,
+    weddingProfits,
+    cashFlowForecast,
+    vendorScorecard,
+    loading,
+    fetchSeasonSummary,
+  } = useAnalyticsStore();
+
   // View modes for individual sections ('table' | 'chart')
   const [profitViewMode, setProfitViewMode] = useState<'table' | 'chart'>('table');
   const [cashFlowViewMode, setCashFlowViewMode] = useState<'table' | 'chart'>('table');
@@ -142,41 +97,18 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
   const [vendorCategoryFilter, setVendorCategoryFilter] = useState<string>('ALL');
   const [exportModalOpen, setExportModalOpen] = useState(false);
 
-  // Live PostgreSQL States
-  const [loading, setLoading] = useState(true);
-  const [lastRefreshed, setLastRefreshed] = useState<string>('');
-  const [metrics, setMetrics] = useState<MetricCardItem[]>([]);
-  const [weddingProfits, setWeddingProfits] = useState<WeddingProfit[]>([]);
-  const [cashFlowForecast, setCashFlowForecast] = useState<CashFlowPeriod[]>([]);
-  const [vendorScorecard, setVendorScorecard] = useState<VendorScoreItem[]>([]);
-
-  // Fetch PostgreSQL analytics from backend
-  const fetchSeasonSummary = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get<SeasonSummaryResponse>('/api/analytics/season-summary');
-      if (res && res.success) {
-        const iconMap = [TrendingUp, DollarSign, Calendar, Users];
-        const mappedMetrics = (res.metrics || []).map((m, i: number) => ({
-          ...m,
-          icon: iconMap[i % iconMap.length],
-        }));
-        setMetrics(mappedMetrics);
-        setWeddingProfits(res.weddingProfits || []);
-        setCashFlowForecast(res.cashFlowForecast || []);
-        setVendorScorecard(res.vendorScorecard || []);
-        setLastRefreshed(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-      }
-    } catch (err) {
-      console.error('Failed to load season summary from backend:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Table pagination state
+  const [profitPage, setProfitPage] = useState(1);
+  const profitPageSize = 6;
 
   useEffect(() => {
     fetchSeasonSummary();
-  }, []);
+  }, [fetchSeasonSummary]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setProfitPage(1);
+  }, [searchTerm, cityFilter, packageFilter, statusFilter, selectedCouple]);
 
   // Filtered weddings for matrix
   const filteredWeddings = useMemo(() => {
@@ -199,6 +131,11 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
       return matchesSearch && matchesStatus;
     });
   }, [weddingProfits, selectedCouple, cityFilter, packageFilter, searchTerm, statusFilter]);
+
+  const paginatedWeddings = useMemo(() => {
+    const start = (profitPage - 1) * profitPageSize;
+    return filteredWeddings.slice(start, start + profitPageSize);
+  }, [filteredWeddings, profitPage, profitPageSize]);
 
   // Pie Chart Data: Revenue Distribution by Package Type
   const packageDistributionData = useMemo(() => {
@@ -477,15 +414,6 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               Executive Financial Overview
             </span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
-              <Database className="w-3 h-3 text-emerald-600" />
-              Live PostgreSQL
-            </span>
-            {lastRefreshed && (
-              <span className="text-[10px] text-slate-400 font-mono">
-                Sync {lastRefreshed}
-              </span>
-            )}
           </div>
           <h1 className="text-lg font-bold text-slate-900 tracking-tight mt-0.5">
             Season 2026 Profitability & Cash Flow Review
@@ -849,74 +777,83 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
 
         <CardContent className="p-0">
           {profitViewMode === 'table' ? (
-            <Table>
-              <TableHeader className="bg-slate-100/80 border-b border-slate-200">
-                <TableRow>
-                  <TableHead className="font-bold text-slate-700 text-xs">Event Code / Couple</TableHead>
-                  <TableHead className="font-bold text-slate-700 text-xs">Venue & Destination</TableHead>
-                  <TableHead className="font-bold text-slate-700 text-xs text-right">Guests</TableHead>
-                  <TableHead className="font-bold text-slate-700 text-xs text-right">Invoiced (Client)</TableHead>
-                  <TableHead className="font-bold text-slate-700 text-xs text-right">Vendor Bills</TableHead>
-                  <TableHead className="font-bold text-slate-700 text-xs text-right">Net Profit</TableHead>
-                  <TableHead className="font-bold text-slate-700 text-xs text-right">Margin</TableHead>
-                  <TableHead className="font-bold text-slate-700 text-xs text-center">Reconciliation Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody className="divide-y divide-slate-100">
-                {filteredWeddings.length === 0 ? (
+            <>
+              <Table>
+                <TableHeader className="bg-slate-100/80 border-b border-slate-200">
                   <TableRow>
-                    <TableCell colSpan={8} className="py-8 text-center text-xs text-slate-500">
-                      No matching weddings found for the selected filter.
-                    </TableCell>
+                    <TableHead className="font-bold text-slate-700 text-xs">Event Code / Couple</TableHead>
+                    <TableHead className="font-bold text-slate-700 text-xs">Venue & Destination</TableHead>
+                    <TableHead className="font-bold text-slate-700 text-xs text-right">Guests</TableHead>
+                    <TableHead className="font-bold text-slate-700 text-xs text-right">Invoiced (Client)</TableHead>
+                    <TableHead className="font-bold text-slate-700 text-xs text-right">Vendor Bills</TableHead>
+                    <TableHead className="font-bold text-slate-700 text-xs text-right">Net Profit</TableHead>
+                    <TableHead className="font-bold text-slate-700 text-xs text-right">Margin</TableHead>
+                    <TableHead className="font-bold text-slate-700 text-xs text-center">Reconciliation Status</TableHead>
                   </TableRow>
-                ) : (
-                  filteredWeddings.map((w) => (
-                    <TableRow key={w.code} className="hover:bg-slate-50 transition">
-                      <TableCell className="py-2.5">
-                        <div className="font-bold text-xs text-slate-900">{w.couple}</div>
-                        <div className="text-[11px] text-slate-500 font-mono">{w.code}</div>
-                      </TableCell>
-                      <TableCell className="py-2.5">
-                        <div className="text-slate-800 text-xs font-medium">{w.venue}</div>
-                        <div className="text-[11px] text-slate-500">{w.city}</div>
-                      </TableCell>
-                      <TableCell className="py-2.5 text-right font-mono text-xs">{w.guests}</TableCell>
-                      <TableCell className="py-2.5 text-right font-mono font-semibold text-xs text-slate-900">
-                        {w.clientBilled}
-                      </TableCell>
-                      <TableCell className="py-2.5 text-right font-mono text-xs text-slate-600">
-                        {w.vendorCosts}
-                      </TableCell>
-                      <TableCell className="py-2.5 text-right font-mono font-bold text-xs text-emerald-800">
-                        {w.netProfit}
-                      </TableCell>
-                      <TableCell className="py-2.5 text-right font-mono font-bold text-xs text-slate-800">
-                        {w.marginPct}
-                      </TableCell>
-                      <TableCell className="py-2.5 text-center">
-                        <Badge
-                          variant={
-                            w.status === 'High Margin'
-                              ? 'success'
-                              : w.status === 'On Target'
-                                ? 'info'
-                                : 'warning'
-                          }
-                          className="text-[11px] font-semibold"
-                        >
-                          {w.status === 'Audit Extras' ? (
-                            <AlertTriangle className="w-3 h-3 mr-1" />
-                          ) : (
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                          )}
-                          {w.status}
-                        </Badge>
+                </TableHeader>
+                <TableBody className="divide-y divide-slate-100">
+                  {filteredWeddings.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="py-8 text-center text-xs text-slate-500">
+                        No matching weddings found for the selected filter.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    paginatedWeddings.map((w) => (
+                      <TableRow key={w.code} className="hover:bg-slate-50 transition">
+                        <TableCell className="py-2.5">
+                          <div className="font-bold text-xs text-slate-900">{w.couple}</div>
+                          <div className="text-[11px] text-slate-500 font-mono">{w.code}</div>
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <div className="text-slate-800 text-xs font-medium">{w.venue}</div>
+                          <div className="text-[11px] text-slate-500">{w.city}</div>
+                        </TableCell>
+                        <TableCell className="py-2.5 text-right font-mono text-xs">{w.guests}</TableCell>
+                        <TableCell className="py-2.5 text-right font-mono font-semibold text-xs text-slate-900">
+                          {w.clientBilled}
+                        </TableCell>
+                        <TableCell className="py-2.5 text-right font-mono text-xs text-slate-600">
+                          {w.vendorCosts}
+                        </TableCell>
+                        <TableCell className="py-2.5 text-right font-mono font-bold text-xs text-emerald-800">
+                          {w.netProfit}
+                        </TableCell>
+                        <TableCell className="py-2.5 text-right font-mono font-bold text-xs text-slate-800">
+                          {w.marginPct}
+                        </TableCell>
+                        <TableCell className="py-2.5 text-center">
+                          <Badge
+                            variant={
+                              w.status === 'High Margin'
+                                ? 'success'
+                                : w.status === 'On Target'
+                                  ? 'info'
+                                  : 'warning'
+                            }
+                            className="text-[11px] font-semibold"
+                          >
+                            {w.status === 'Audit Extras' ? (
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                            ) : (
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                            )}
+                            {w.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+              <TablePagination
+                currentPage={profitPage}
+                totalItems={filteredWeddings.length}
+                pageSize={profitPageSize}
+                onPageChange={setProfitPage}
+                itemName="weddings"
+              />
+            </>
           ) : (
             <div className="p-4 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">

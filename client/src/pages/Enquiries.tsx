@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Plus,
   Phone,
@@ -30,6 +30,7 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
+  TablePagination,
 } from '../components/ui';
 
 export const Enquiries: React.FC = () => {
@@ -41,6 +42,8 @@ export const Enquiries: React.FC = () => {
   const [cityFilter, setCityFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [modalOpen, setModalOpen] = useState<boolean>(false);
+  const [page, setPage] = useState<number>(1);
+  const pageSize = 8;
 
   // New lead form state
   const [newCouple, setNewCouple] = useState('');
@@ -80,6 +83,10 @@ export const Enquiries: React.FC = () => {
 
 
 
+  useEffect(() => {
+    setPage(1);
+  }, [stageFilter, channelFilter, cityFilter, searchTerm]);
+
   const filtered = enquiries.filter((e) => {
     const matchesStage = stageFilter === 'ALL' || e.status === stageFilter;
     const matchesChannel = channelFilter === 'ALL' || (e.channel || '').includes(channelFilter);
@@ -91,6 +98,11 @@ export const Enquiries: React.FC = () => {
     return matchesStage && matchesChannel && matchesCity && matchesSearch;
   });
 
+  const paginated = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
+
   const stageCounts = {
     ALL: enquiries.length,
     'Initial Discovery': enquiries.filter((e) => e.status === 'Initial Discovery').length,
@@ -101,13 +113,13 @@ export const Enquiries: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {/* Odoo Control Panel */}
-      <div className="bg-white border border-slate-200 rounded p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-        <div>
+      {/* Odoo Control Panel with generous breathing space */}
+      <div className="bg-white border border-slate-200 rounded p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
+        <div className="space-y-0.5">
           <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
             CRM & Lead Pipeline
           </div>
-          <h1 className="text-lg font-bold text-slate-900 tracking-tight">
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
             Client Enquiries & Intake
           </h1>
         </div>
@@ -116,7 +128,7 @@ export const Enquiries: React.FC = () => {
           variant="default"
           size="sm"
           onClick={() => setModalOpen(true)}
-          className="gap-1.5"
+          className="gap-1.5 h-9 font-semibold bg-[#714B67] hover:bg-[#5b3c53] text-white shadow-2xs"
         >
           <Plus className="w-4 h-4" />
           <span>New Lead Intake</span>
@@ -224,7 +236,7 @@ export const Enquiries: React.FC = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((enq) => (
+              paginated.map((enq) => (
                 <TableRow
                   key={enq.id}
                   onClick={() => navigate(`/enquiries/${enq.id}`)}
@@ -303,6 +315,14 @@ export const Enquiries: React.FC = () => {
             )}
           </TableBody>
         </Table>
+
+        <TablePagination
+          currentPage={page}
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          itemName="leads"
+        />
       </div>
 
 

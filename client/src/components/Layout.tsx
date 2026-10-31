@@ -188,9 +188,6 @@ export const Layout: React.FC = () => {
                 <div className="font-bold text-xs tracking-tight uppercase leading-none truncate">
                   The Royal Knot
                 </div>
-                <div className="text-[10px] text-white/60 leading-none mt-0.5 truncate">
-                  Wedding Operations
-                </div>
               </div>
             </NavLink>
 
@@ -291,11 +288,11 @@ export const Layout: React.FC = () => {
       {/* Main App Workspace Canvas */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* Top Utility Bar */}
-        <header className="h-10 bg-white border-b border-slate-200 px-3 sm:px-6 flex items-center justify-between shrink-0 shadow-2xs z-10">
-          <div className="flex items-center gap-2.5 min-w-0">
+        <header className="h-13 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shrink-0 shadow-2xs z-10">
+          <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="md:hidden p-1 rounded hover:bg-slate-100 text-slate-600 cursor-pointer"
+              className="md:hidden p-1.5 rounded hover:bg-slate-100 text-slate-600 cursor-pointer"
             >
               <Menu className="w-4 h-4" />
             </button>
@@ -304,7 +301,7 @@ export const Layout: React.FC = () => {
             <button
               onClick={handleToggle}
               title={isPinned ? "Unpin sidebar (auto-collapse)" : "Pin sidebar open"}
-              className="hidden md:flex p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+              className="hidden md:flex p-1.5 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
             >
               {open ? (
                 <PanelLeftClose className="w-4 h-4" />
@@ -313,10 +310,10 @@ export const Layout: React.FC = () => {
               )}
             </button>
 
-            <span className="font-bold text-xs text-slate-800 tracking-tight shrink-0">
+            <span className="font-bold text-sm text-slate-900 tracking-tight shrink-0">
               {currentModule}
             </span>
-          </div >
+          </div>
 
           {/* Top Right: Season Tracker & User Profile with Sign Out */}
           < div className="flex items-center gap-2.5 shrink-0" >

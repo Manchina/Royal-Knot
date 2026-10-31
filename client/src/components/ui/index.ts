@@ -13,3 +13,4 @@ export * from "./avatar";
 export * from "./separator";
 export * from "./tooltip";
 export * from "./combobox-multi-select";
+export * from "./table-pagination";
