@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { CreditCard, Receipt, FileText, History } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui';
 import { useWeddingStore } from '../store/useWeddingStore';
 import { useBillingStore } from '../store/useBillingStore';
@@ -148,22 +147,18 @@ export const BillingProjectDetail: React.FC = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="bg-slate-100 p-1 rounded-lg border border-slate-200/80 w-full justify-start overflow-x-auto">
           <TabsTrigger value="vendorBills" className="gap-2 text-xs font-semibold cursor-pointer py-2">
-            <CreditCard className="w-4 h-4 text-[#714B67]" />
             Vendor Bills & PO Ledger ({project?.vendorBills?.length || 0})
           </TabsTrigger>
 
           <TabsTrigger value="extraCharges" className="gap-2 text-xs font-semibold cursor-pointer py-2">
-            <Receipt className="w-4 h-4 text-amber-600" />
             Audited Extra Charges ({project?.extraCharges?.length || 0})
           </TabsTrigger>
 
           <TabsTrigger value="invoices" className="gap-2 text-xs font-semibold cursor-pointer py-2">
-            <FileText className="w-4 h-4 text-emerald-600" />
             Client Milestone Invoices ({project?.invoices?.length || 0})
           </TabsTrigger>
 
           <TabsTrigger value="changelog" className="gap-2 text-xs font-semibold cursor-pointer py-2">
-            <History className="w-4 h-4 text-slate-600" />
             Audit Changelog ({project?.changelog?.length || 0})
           </TabsTrigger>
         </TabsList>

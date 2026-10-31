@@ -44,6 +44,7 @@ import {
   TableRow,
   TableHead,
   TableCell,
+  TablePagination,
 } from '../components/ui';
 
 export const Weddings: React.FC = () => {
@@ -62,6 +63,8 @@ export const Weddings: React.FC = () => {
     () => searchParams.get('search') || ''
   );
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [page, setPage] = useState<number>(1);
+  const pageSize = 8;
 
   // Sync state if URL query params change
   useEffect(() => {
@@ -186,6 +189,15 @@ export const Weddings: React.FC = () => {
     });
   }, [weddings, stageFilter, cityFilter, searchTerm]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [stageFilter, cityFilter, searchTerm]);
+
+  const paginatedWeddings = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredWeddings.slice(start, start + pageSize);
+  }, [filteredWeddings, page, pageSize]);
+
   const formatBudget = (raw: string | number) => {
     const val = Number(raw);
     if (!val || isNaN(val)) return '₹2.50 Cr';
@@ -211,9 +223,9 @@ export const Weddings: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {/* 1. Odoo Control Panel Header */}
-      <div className="bg-white border border-slate-200 rounded p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-        <div>
+      {/* 1. Odoo Control Panel Header with generous breathing room */}
+      <div className="bg-white border border-slate-200 rounded p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
+        <div className="space-y-0.5">
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               Project Operations
@@ -223,11 +235,11 @@ export const Weddings: React.FC = () => {
               Weddings Portfolio
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight">
+          <div className="flex items-center gap-2.5 pt-0.5">
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
               Active Wedding Projects
             </h1>
-            <Badge variant="outline" className="text-[10px] py-0 text-slate-600 border-slate-300">
+            <Badge variant="outline" className="text-xs py-0.5 font-mono text-slate-600 border-slate-300">
               {filteredWeddings.length} Projects
             </Badge>
             {loading && <Loader2 className="w-4 h-4 text-[#714B67] animate-spin" />}
@@ -360,7 +372,7 @@ export const Weddings: React.FC = () => {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredWeddings.map((w) => (
+                paginatedWeddings.map((w) => (
                   <TableRow
                     key={w.id}
                     onClick={() => navigate(`/weddings/${w.code || w.id}`)}
@@ -441,98 +453,118 @@ export const Weddings: React.FC = () => {
               )}
             </TableBody>
           </Table>
+
+          <TablePagination
+            currentPage={page}
+            totalItems={filteredWeddings.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            itemName="weddings"
+          />
         </div>
       ) : (
         /* ========================================================================= */
         /* VIEW 2: KANBAN / CARDS VIEW                                               */
         /* ========================================================================= */
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {filteredWeddings.map((w) => (
-            <Card key={w.id} className="border border-slate-200 shadow-2xs rounded bg-white flex flex-col justify-between hover:border-slate-300 transition-all">
-              <CardHeader className="p-4 pb-2 border-b border-slate-100 bg-slate-50/50">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-[#714B67]">{w.code}</span>
-                      <Badge variant="outline" className="text-[10px] py-0 border-slate-300">
-                        {w.city}
-                      </Badge>
-                      {getStageBadge(w.status)}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {paginatedWeddings.map((w) => (
+              <Card key={w.id} className="border border-slate-200 shadow-2xs rounded bg-white flex flex-col justify-between hover:border-slate-300 transition-all">
+                <CardHeader className="p-4 pb-2 border-b border-slate-100 bg-slate-50/50">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-[#714B67]">{w.code}</span>
+                        <Badge variant="outline" className="text-[10px] py-0 border-slate-300">
+                          {w.city}
+                        </Badge>
+                        {getStageBadge(w.status)}
+                      </div>
+                      <CardTitle 
+                        onClick={() => navigate(`/weddings/${w.code || w.id}`)}
+                        className="text-sm font-bold text-slate-900 pt-0.5 cursor-pointer hover:text-[#714B67]"
+                      >
+                        {w.couple}
+                      </CardTitle>
                     </div>
-                    <CardTitle 
-                      onClick={() => navigate(`/weddings/${w.code || w.id}`)}
-                      className="text-sm font-bold text-slate-900 pt-0.5 cursor-pointer hover:text-[#714B67]"
+                    <div className="text-right shrink-0">
+                      <div className="text-[11px] text-slate-500">Contract Budget</div>
+                      <div className="text-sm font-bold font-mono text-slate-900">{formatBudget(w.budget)}</div>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="p-4 space-y-3">
+                  <div className="space-y-1 text-xs text-slate-600">
+                    <div className="flex items-center gap-1.5 font-medium text-slate-800">
+                      <Building2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span className="truncate">{w.venue}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-slate-500">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>{new Date(w.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5" />
+                        <span>{w.guestCount} Guests</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded bg-slate-50 border border-slate-200 text-xs space-y-1">
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-slate-500">Package Tier:</span>
+                      <span className="font-bold text-slate-800">{w.packageType}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-slate-500">Lead Planner:</span>
+                      <span className="font-semibold text-slate-900">{w.coordinator || 'Karan Verma'}</span>
+                    </div>
+                  </div>
+                </CardContent>
+
+                <CardFooter className="p-3 bg-slate-50/80 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[11px] text-slate-500">
+                    {w.theme || 'Palace Royal Heritage'}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        setSelectedWeddingId(w.id);
+                        navigate('/procurement');
+                      }}
                     >
-                      {w.couple}
-                    </CardTitle>
+                      <SlidersHorizontal className="w-3 h-3 mr-1 text-[#714B67]" />
+                      Sourcing
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="h-7 text-xs bg-[#714B67] hover:bg-[#5b3c53] text-white"
+                      onClick={() => navigate(`/weddings/${w.code || w.id}`)}
+                    >
+                      <span>View Dossier</span>
+                      <ArrowRight className="w-3 h-3 ml-1" />
+                    </Button>
                   </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-[11px] text-slate-500">Contract Budget</div>
-                    <div className="text-sm font-bold font-mono text-slate-900">{formatBudget(w.budget)}</div>
-                  </div>
-                </div>
-              </CardHeader>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
 
-              <CardContent className="p-4 space-y-3">
-                <div className="space-y-1 text-xs text-slate-600">
-                  <div className="flex items-center gap-1.5 font-medium text-slate-800">
-                    <Building2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                    <span className="truncate">{w.venue}</span>
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-slate-500">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5" />
-                      <span>{new Date(w.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Users className="w-3.5 h-3.5" />
-                      <span>{w.guestCount} Guests</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-2.5 rounded bg-slate-50 border border-slate-200 text-xs space-y-1">
-                  <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-slate-500">Package Tier:</span>
-                    <span className="font-bold text-slate-800">{w.packageType}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-slate-500">Lead Planner:</span>
-                    <span className="font-semibold text-slate-900">{w.coordinator || 'Karan Verma'}</span>
-                  </div>
-                </div>
-              </CardContent>
-
-              <CardFooter className="p-3 bg-slate-50/80 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
-                <span className="text-[11px] text-slate-500">
-                  {w.theme || 'Palace Royal Heritage'}
-                </span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => {
-                      setSelectedWeddingId(w.id);
-                      navigate('/procurement');
-                    }}
-                  >
-                    <SlidersHorizontal className="w-3 h-3 mr-1 text-[#714B67]" />
-                    Sourcing
-                  </Button>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="h-7 text-xs bg-[#714B67] hover:bg-[#5b3c53] text-white"
-                    onClick={() => navigate(`/weddings/${w.code || w.id}`)}
-                  >
-                    <span>View Dossier</span>
-                    <ArrowRight className="w-3 h-3 ml-1" />
-                  </Button>
-                </div>
-              </CardFooter>
-            </Card>
-          ))}
+          <div className="bg-white border border-slate-200 rounded shadow-2xs overflow-hidden">
+            <TablePagination
+              currentPage={page}
+              totalItems={filteredWeddings.length}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              itemName="weddings"
+            />
+          </div>
         </div>
       )}
 

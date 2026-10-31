@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { db } from '../db';
 import { dayOfRunSheet, dayOfVendorCheckins, dayOfIncidents, weddings, users, vendors, weddingEvents } from '../db/schema';
-import { eq, desc, asc, and, ilike, or } from 'drizzle-orm';
+import { eq, desc, asc, and, ilike, or, sql } from 'drizzle-orm';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -197,7 +197,7 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
         const found = await db
           .select({ id: users.id })
           .from(users)
-          .where(ilike(users.fullName, `%${ownerName.trim()}%`))
+          .where(ilike(sql`${users.fullName}`, `%${ownerName.trim()}%`))
           .limit(1);
         if (found.length) {
           finalUserId = found[0].id;
@@ -463,7 +463,7 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
         const found = await db
           .select({ id: vendors.id })
           .from(vendors)
-          .where(ilike(vendors.businessName, `%${vendorId.trim()}%`))
+          .where(ilike(sql`${vendors.businessName}`, `%${vendorId.trim()}%`))
           .limit(1);
         if (found.length) {
           targetVendorId = found[0].id;
@@ -659,7 +659,7 @@ export async function dayOfRoutes(fastify: FastifyInstance) {
         const foundUser = await db
           .select({ id: users.id })
           .from(users)
-          .where(ilike(users.fullName, `%${ownerName.trim()}%`))
+          .where(ilike(sql`${users.fullName}`, `%${ownerName.trim()}%`))
           .limit(1);
         if (foundUser.length) {
           targetAssignedTo = foundUser[0].id;

@@ -121,15 +121,15 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
       const conditions: SQL[] = [];
 
       if (channel && channel !== 'ALL') {
-        conditions.push(ilike(enquiries.channel, `%${channel}%`));
+        conditions.push(ilike(sql`${enquiries.channel}`, `%${channel}%`));
       }
 
       if (search) {
         conditions.push(
           or(
-            ilike(enquiries.coupleName, `%${search}%`),
-            ilike(enquiries.code, `%${search}%`),
-            ilike(enquiries.phone, `%${search}%`)
+            ilike(sql`${enquiries.coupleName}`, `%${search}%`),
+            ilike(sql`${enquiries.code}`, `%${search}%`),
+            ilike(sql`${enquiries.phone}`, `%${search}%`)
           )!
         );
       }

@@ -80,40 +80,45 @@ export const BillingHeader: React.FC<BillingHeaderProps> = ({
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs">
-      <div>
+    <div className="bg-white border border-slate-200 rounded p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs">
+      {/* Left: Back Arrow & Project Identity */}
+      <div className="flex items-center gap-3.5 min-w-0">
         <button
+          type="button"
           onClick={onBack}
-          className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors mb-2 cursor-pointer"
+          className="p-1.5 -ml-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition cursor-pointer shrink-0"
+          title="Back to Billing Ledger"
         >
-          <ArrowLeft className="w-3.5 h-3.5" />
+          <ArrowLeft className="w-5 h-5" />
         </button>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-[#714B67]/10 text-[#714B67] border border-[#714B67]/20">
-            {project?.code || 'RW-2026-001'}
-          </span>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            {project?.couple || storeWedding?.couple}
-          </h1>
-          {renderStatusBadge(project?.status)}
-        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+              {project?.couple || storeWedding?.couple || 'Wedding Commercial Ledger'}
+            </h1>
+            <span className="font-mono text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+              {project?.code || 'RW-2026-001'}
+            </span>
+            {renderStatusBadge(project?.status)}
+          </div>
 
-        <div className="flex items-center gap-3 text-xs text-slate-500 mt-1.5">
-          <span className="flex items-center gap-1">
-            <MapPin className="w-3.5 h-3.5 text-slate-400" />
-            {project?.city} • {project?.venue}
-          </span>
-          <span>•</span>
-          <span className="flex items-center gap-1">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            {project?.startDate}
-          </span>
-          <span>•</span>
-          <span className="flex items-center gap-1">
-            <Users className="w-3.5 h-3.5 text-slate-400" />
-            {project?.guestCount} Guests
-          </span>
+          <p className="text-[11px] text-slate-500 mt-1 flex flex-wrap items-center gap-2">
+            <span className="flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5 text-slate-400" />
+              {project?.city} • {project?.venue}
+            </span>
+            <span>•</span>
+            <span className="flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              {project?.startDate}
+            </span>
+            <span>•</span>
+            <span className="flex items-center gap-1">
+              <Users className="w-3.5 h-3.5 text-slate-400" />
+              {project?.guestCount} Guests
+            </span>
+          </p>
         </div>
       </div>
 

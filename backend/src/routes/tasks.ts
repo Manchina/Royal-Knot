@@ -105,7 +105,7 @@ export async function tasksRoutes(fastify: FastifyInstance) {
 
       // Filter by owner / assignee
       if (owner && owner !== 'ALL') {
-        conditions.push(ilike(users.fullName, `%${owner.trim()}%`));
+        conditions.push(ilike(sql`${users.fullName}`, `%${owner.trim()}%`));
       }
 
       // Filter by milestone status
@@ -118,9 +118,9 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         const term = `%${search.trim()}%`;
         conditions.push(
           or(
-            ilike(weddingTasks.title, term),
-            ilike(weddingTasks.notes, term),
-            ilike(users.fullName, term)
+            ilike(sql`${weddingTasks.title}`, term),
+            ilike(sql`${weddingTasks.notes}`, term),
+            ilike(sql`${users.fullName}`, term)
           )!
         );
       }
@@ -326,7 +326,7 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         const foundUser = await db
           .select({ id: users.id })
           .from(users)
-          .where(ilike(users.fullName, `%${ownerName.trim()}%`))
+          .where(ilike(sql`${users.fullName}`, `%${ownerName.trim()}%`))
           .limit(1);
 
         if (foundUser.length) {
@@ -469,7 +469,7 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         const foundUser = await db
           .select({ id: users.id })
           .from(users)
-          .where(ilike(users.fullName, `%${ownerName.trim()}%`))
+          .where(ilike(sql`${users.fullName}`, `%${ownerName.trim()}%`))
           .limit(1);
         if (foundUser.length) {
           updateData.assignedTo = foundUser[0].id;

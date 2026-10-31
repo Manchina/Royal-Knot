@@ -130,6 +130,7 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
           marginPct: `${marginPctNum.toFixed(1)}%`,
           marginPctNum,
           status: profitStatus,
+          packageType: w.packageType,
           leadPlanner: w.leadPlanner || 'Lead Planner',
           date: w.date,
         };

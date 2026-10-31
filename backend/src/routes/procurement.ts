@@ -74,10 +74,10 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         conditions.push(eq(vendors.category, category.toUpperCase()));
       }
       if (city && city !== 'ALL') {
-        conditions.push(ilike(vendors.city, `%${city}%`));
+        conditions.push(ilike(sql`${vendors.city}`, `%${city}%`));
       }
       if (search) {
-        conditions.push(ilike(vendors.businessName, `%${search}%`));
+        conditions.push(ilike(sql`${vendors.businessName}`, `%${search}%`));
       }
 
       const allVendors = conditions.length > 0 
