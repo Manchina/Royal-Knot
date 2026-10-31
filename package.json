@@ -3,11 +3,25 @@
   "version": "1.0.0",
   "private": true,
   "description": "The Royal Knot - Wedding Planning Management System",
+  "workspaces": [
+    "backend",
+    "client"
+  ],
   "scripts": {
     "dev": "concurrently -n \"CLIENT,BACKEND\" -c \"cyan,magenta\" \"npm run dev:client\" \"npm run dev:server\"",
-    "dev:client": "npm --prefix client run dev",
-    "dev:server": "npm --prefix backend run dev",
-    "install:all": "npm install && npm --prefix client install && npm --prefix backend install"
+    "dev:client": "npm run dev --workspace=client",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:server": "npm run dev --workspace=backend",
+    "build": "npm run build --workspaces --if-present",
+    "build:client": "npm run build --workspace=client",
+    "build:backend": "npm run build --workspace=backend",
+    "build:server": "npm run build --workspace=backend",
+    "lint": "npm run lint --workspaces --if-present",
+    "lint:client": "npm run lint --workspace=client",
+    "start": "npm run start --workspace=backend",
+    "seed": "npm run seed --workspace=backend",
+    "seed:update": "npm run seed:update --workspace=backend",
+    "install:all": "npm install"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
