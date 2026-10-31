@@ -24,7 +24,6 @@
     "install:all": "npm install"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2",
-    "playwright": "^1.64.1"
+    "concurrently": "^9.1.2"
   }
 }
