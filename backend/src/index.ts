@@ -6,6 +6,7 @@ import { checkDatabaseConnection, pool } from './db';
 import { authRoutes } from './routes/auth';
 import { enquiryRoutes } from './routes/enquiries';
 import { billingRoutes } from './routes/billing';
+import { analyticsRoutes } from './routes/analytics';
 
 dotenv.config();
 
@@ -85,6 +86,9 @@ async function buildServer() {
 
   // Mount Billing & Extra Charges Routes under /api/billing (PeopleFirst standard)
   await fastify.register(billingRoutes, { prefix: '/api/billing' });
+
+  // Mount Founder Analytics & Season P&L Routes under /api/analytics
+  await fastify.register(analyticsRoutes, { prefix: '/api/analytics' });
 
   return fastify;
 }

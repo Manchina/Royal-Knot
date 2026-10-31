@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp,
   DollarSign,
@@ -10,7 +11,10 @@ import {
   Star,
   Users,
   FileSpreadsheet,
-  Search
+  Search,
+  RefreshCw,
+  Database,
+  ExternalLink
 } from 'lucide-react';
 import {
   Card,
@@ -39,148 +43,154 @@ import {
   SelectContent,
   SelectItem,
 } from '../components/ui';
+import { api } from '../api/client';
 
-interface WeddingProfit {
+export interface WeddingProfit {
+  id?: string;
   code: string;
   couple: string;
   venue: string;
   city: string;
   guests: number;
   clientBilled: string;
+  clientBilledNum?: number;
   vendorCosts: string;
+  vendorCostsNum?: number;
   netProfit: string;
+  netProfitNum?: number;
   marginPct: string;
+  marginPctNum?: number;
   status: 'High Margin' | 'On Target' | 'Audit Extras';
   leadPlanner: string;
   date: string;
 }
 
+export interface CashFlowPeriod {
+  period: string;
+  milestoneInflows: string;
+  vendorPayables: string;
+  netCashDelta: string;
+  status: 'SURPLUS' | 'DEFICIT';
+}
+
+export interface VendorScoreItem {
+  id: string;
+  vendor: string;
+  category: string;
+  city: string;
+  rating: string;
+  onTimeArrivalPct: string;
+  eventsDelivered: number;
+  avgDelayMins: number;
+  reliability: 'High Reliability' | 'Satisfactory' | 'Watchlist';
+}
+
 export const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
+
+  // Filter & Modal States
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'High Margin' | 'On Target' | 'Audit Extras'>('ALL');
   const [selectedWedding, setSelectedWedding] = useState<WeddingProfit | null>(null);
   const [exportModalOpen, setExportModalOpen] = useState(false);
 
-  const metrics = [
-    {
-      label: 'Net Profit Margin (Season)',
-      value: '₹3.85 Cr',
-      change: '+18.4% vs 2025',
-      positive: true,
-      sub: '25 Destination Weddings',
-      icon: TrendingUp,
-    },
-    {
-      label: 'Contracted Client Revenue',
-      value: '₹14.20 Cr',
-      change: '+22.1% YoY',
-      positive: true,
-      sub: 'Packages & Management Fee',
-      icon: DollarSign,
-    },
-    {
-      label: 'Pending Inflows (Next 30 Days)',
-      value: '₹2.45 Cr',
-      change: '5 Stage Payments Due',
-      positive: true,
-      sub: 'Client Milestones',
-      icon: Calendar,
-    },
-    {
-      label: 'Vendor Disbursements Due',
-      value: '₹1.15 Cr',
-      change: '18 Reconciled Invoices',
-      positive: false,
-      sub: 'Awaiting Coordinator Approval',
-      icon: Users,
-    },
-  ];
+  // Live PostgreSQL States
+  const [loading, setLoading] = useState(true);
+  const [lastRefreshed, setLastRefreshed] = useState<string>('');
+  const [metrics, setMetrics] = useState<any[]>([]);
+  const [weddingProfits, setWeddingProfits] = useState<WeddingProfit[]>([]);
+  const [cashFlowForecast, setCashFlowForecast] = useState<CashFlowPeriod[]>([]);
+  const [vendorScorecard, setVendorScorecard] = useState<VendorScoreItem[]>([]);
 
-  const weddingProfits: WeddingProfit[] = [
-    {
-      code: 'RW-2026-001',
-      couple: 'Singhania & Mehra',
-      venue: 'City Palace Complex & Jagmandir Island',
-      city: 'Udaipur',
-      guests: 450,
-      clientBilled: '₹75,00,000',
-      vendorCosts: '₹48,20,000',
-      netProfit: '₹26,80,000',
-      marginPct: '35.7%',
-      status: 'High Margin',
-      leadPlanner: 'Devika Sharma',
-      date: 'Nov 14 - 16, 2026',
-    },
-    {
-      code: 'RW-2026-002',
-      couple: 'Oberoi & Rathore',
-      venue: 'Rambagh Palace & Jaigarh Fort',
-      city: 'Jaipur',
-      guests: 520,
-      clientBilled: '₹92,00,000',
-      vendorCosts: '₹64,50,000',
-      netProfit: '₹27,50,000',
-      marginPct: '29.8%',
-      status: 'On Target',
-      leadPlanner: 'Karan Verma',
-      date: 'Dec 02 - 04, 2026',
-    },
-    {
-      code: 'RW-2026-003',
-      couple: 'Kapoor & Chauhan',
-      venue: 'Oberoi Rajvilas & Fort Nahargarh',
-      city: 'Jaipur',
-      guests: 380,
-      clientBilled: '₹55,00,000',
-      vendorCosts: '₹39,80,000',
-      netProfit: '₹15,20,000',
-      marginPct: '27.6%',
-      status: 'On Target',
-      leadPlanner: 'Priya Joshi',
-      date: 'Dec 18 - 20, 2026',
-    },
-    {
-      code: 'RW-2026-004',
-      couple: 'Bansal & Agarwal',
-      venue: 'Taj Lake Palace, Udaipur',
-      city: 'Udaipur',
-      guests: 410,
-      clientBilled: '₹68,00,000',
-      vendorCosts: '₹52,10,000',
-      netProfit: '₹15,90,000',
-      marginPct: '23.3%',
-      status: 'Audit Extras',
-      leadPlanner: 'Devika Sharma',
-      date: 'Jan 08 - 10, 2027',
-    },
-  ];
+  // Fetch real PostgreSQL analytics from backend
+  const fetchSeasonSummary = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/analytics/season-summary');
+      if (res && res.success) {
+        // Map icons for metric cards
+        const iconMap = [TrendingUp, DollarSign, Calendar, Users];
+        const mappedMetrics = (res.metrics || []).map((m: any, i: number) => ({
+          ...m,
+          icon: iconMap[i % iconMap.length],
+        }));
+        setMetrics(mappedMetrics);
+        setWeddingProfits(res.weddingProfits || []);
+        setCashFlowForecast(res.cashFlowForecast || []);
+        setVendorScorecard(res.vendorScorecard || []);
+        setLastRefreshed(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      }
+    } catch (err) {
+      console.error('Failed to load season summary from backend:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const vendorScorecard = [
-    { name: 'Royal Mewar Banquets', category: 'Catering', weddings: 8, onTimeScore: 98, rating: 4.95, city: 'Udaipur' },
-    { name: 'Jaipur Floral Wonders', category: 'Decor & Mandap', weddings: 12, onTimeScore: 92, rating: 4.88, city: 'Jaipur' },
-    { name: 'Desert Beat Sounds', category: 'DJ & Production', weddings: 9, onTimeScore: 85, rating: 4.70, city: 'Jaipur' },
-    { name: 'Heritage Dhol Troupe', category: 'Baraat Drummers', weddings: 14, onTimeScore: 99, rating: 4.98, city: 'Udaipur' },
-  ];
+  useEffect(() => {
+    fetchSeasonSummary();
+  }, []);
 
+  // Filtered weddings for matrix
   const filteredWeddings = weddingProfits.filter((w) => {
     const matchesSearch =
       w.couple.toLowerCase().includes(searchTerm.toLowerCase()) ||
       w.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      w.venue.toLowerCase().includes(searchTerm.toLowerCase());
+      w.venue.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      w.city.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'ALL' || w.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
+  // Download real CSV ledger of season
+  const handleExportCsv = () => {
+    const headers = ['Event Code', 'Couple', 'City', 'Venue', 'Guests', 'Client Billed', 'Vendor Costs', 'Net Margin', 'Margin %', 'Status', 'Lead Planner'];
+    const rows = weddingProfits.map((w) => [
+      w.code,
+      `"${w.couple.replace(/"/g, '""')}"`,
+      w.city,
+      `"${w.venue.replace(/"/g, '""')}"`,
+      w.guests,
+      `"${w.clientBilled}"`,
+      `"${w.vendorCosts}"`,
+      `"${w.netProfit}"`,
+      w.marginPct,
+      w.status,
+      w.leadPlanner,
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `royal_knot_season_2026_ledger_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setExportModalOpen(false);
+  };
+
   return (
     <div className="space-y-4">
-      {/* Odoo Control Panel: Title & Primary Actions */}
+      {/* Control Panel: Header & Live DB Indicator */}
       <div className="bg-white border border-slate-200 rounded p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div>
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-            Executive Financial Management
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              Executive Financial Management
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
+              <Database className="w-3 h-3 text-emerald-600" />
+              Live PostgreSQL
+            </span>
+            {lastRefreshed && (
+              <span className="text-[10px] text-slate-400 font-mono">
+                Sync {lastRefreshed}
+              </span>
+            )}
           </div>
-          <h1 className="text-lg font-bold text-slate-900 tracking-tight">
-            Profitability & Operational Performance
+          <h1 className="text-lg font-bold text-slate-900 tracking-tight mt-0.5">
+            Season 2026 Profitability & Cash Flow Review
           </h1>
         </div>
 
@@ -188,8 +198,19 @@ export const Dashboard: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
+            onClick={fetchSeasonSummary}
+            disabled={loading}
+            className="text-xs gap-1.5 h-8 border-slate-300"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setExportModalOpen(true)}
-            className="text-xs gap-1.5"
+            className="text-xs gap-1.5 h-8 border-slate-300"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
             <span>Export Financial Ledger</span>
@@ -199,45 +220,52 @@ export const Dashboard: React.FC = () => {
 
       {/* Operational KPI Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {metrics.map((m, i) => {
-          const Icon = m.icon;
-          return (
-            <Card key={i} className="border border-slate-200 shadow-2xs rounded bg-white">
-              <CardContent className="p-3.5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    {m.label}
-                  </span>
-                  <div className="p-1 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                    <Icon className="w-3.5 h-3.5" />
+        {metrics.length === 0 && loading ? (
+          <div className="col-span-4 p-8 text-center text-slate-500 bg-white border border-slate-200 rounded">
+            <RefreshCw className="w-5 h-5 animate-spin mx-auto text-slate-400 mb-2" />
+            Loading real financial metrics from PostgreSQL...
+          </div>
+        ) : (
+          metrics.map((m, i) => {
+            const Icon = m.icon || TrendingUp;
+            return (
+              <Card key={i} className="border border-slate-200 shadow-2xs rounded bg-white">
+                <CardContent className="p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      {m.label}
+                    </span>
+                    <div className="p-1 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                      <Icon className="w-3.5 h-3.5" />
+                    </div>
                   </div>
-                </div>
 
-                <div className="text-2xl font-bold font-mono text-slate-900 tracking-tight">
-                  {m.value}
-                </div>
+                  <div className="text-2xl font-bold font-mono text-slate-900 tracking-tight">
+                    {m.value}
+                  </div>
 
-                <div className="flex items-center gap-1.5 text-xs pt-1 border-t border-slate-100">
-                  <span
-                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold border ${
-                      m.positive
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                        : 'bg-slate-100 text-slate-700 border-slate-300'
-                    }`}
-                  >
-                    {m.positive ? (
-                      <ArrowUpRight className="w-3 h-3 mr-0.5" />
-                    ) : (
-                      <ArrowDownRight className="w-3 h-3 mr-0.5" />
-                    )}
-                    {m.change}
-                  </span>
-                  <span className="text-slate-500 text-[11px] truncate">{m.sub}</span>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+                  <div className="flex items-center gap-1.5 text-xs pt-1 border-t border-slate-100">
+                    <span
+                      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold border ${
+                        m.positive
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                          : 'bg-slate-100 text-slate-700 border-slate-300'
+                      }`}
+                    >
+                      {m.positive ? (
+                        <ArrowUpRight className="w-3 h-3 mr-0.5" />
+                      ) : (
+                        <ArrowDownRight className="w-3 h-3 mr-0.5" />
+                      )}
+                      {m.change}
+                    </span>
+                    <span className="text-slate-500 text-[11px] truncate">{m.sub}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
       </div>
 
       {/* Wedding-by-Wedding Profitability Matrix */}
@@ -245,15 +273,20 @@ export const Dashboard: React.FC = () => {
         <CardHeader className="p-3.5 border-b border-slate-200 bg-slate-50/70">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-sm font-bold text-slate-900">
-                Wedding Profitability Matrix
-              </CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-sm font-bold text-slate-900">
+                  Season Profitability Matrix
+                </CardTitle>
+                <Badge variant="outline" className="text-[10px] font-mono py-0.5">
+                  Direct PostgreSQL
+                </Badge>
+              </div>
               <div className="text-xs text-slate-500 mt-0.5">
-                Contracted billing vs direct vendor accounts with margin health
+                Contracted billing vs approved vendor payouts with agency margin health
               </div>
             </div>
 
-            {/* Odoo Style Filter & Search Controls */}
+            {/* Filter & Search Controls */}
             <div className="flex items-center gap-2">
               <div className="w-36">
                 <Select
@@ -275,7 +308,7 @@ export const Dashboard: React.FC = () => {
               <div className="relative w-48 sm:w-60">
                 <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <Input
-                  placeholder="Search code, couple, venue..."
+                  placeholder="Search code, couple, city..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-8 h-8 text-xs bg-white border-slate-300"
@@ -283,7 +316,7 @@ export const Dashboard: React.FC = () => {
               </div>
 
               <Badge variant="outline" className="text-xs font-mono py-1">
-                {filteredWeddings.length} of 25
+                {filteredWeddings.length} Weddings
               </Badge>
             </div>
           </div>
@@ -301,120 +334,213 @@ export const Dashboard: React.FC = () => {
                 <TableHead className="font-bold text-slate-700 text-xs text-right">Net Profit</TableHead>
                 <TableHead className="font-bold text-slate-700 text-xs text-right">Margin</TableHead>
                 <TableHead className="font-bold text-slate-700 text-xs text-center">Status</TableHead>
-                <TableHead className="font-bold text-slate-700 text-xs text-right">Audit</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs text-right">Audit & Bill</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="divide-y divide-slate-100">
-              {filteredWeddings.map((w) => (
-                <TableRow key={w.code} className="hover:bg-slate-50 transition">
-                  <TableCell className="py-2.5">
-                    <div className="font-bold text-xs text-slate-900">{w.couple}</div>
-                    <div className="text-[11px] text-slate-500 font-mono">{w.code}</div>
-                  </TableCell>
-                  <TableCell className="py-2.5">
-                    <div className="text-slate-800 text-xs font-medium">{w.venue}</div>
-                    <div className="text-[11px] text-slate-500">{w.city}</div>
-                  </TableCell>
-                  <TableCell className="py-2.5 text-right font-mono text-xs">{w.guests}</TableCell>
-                  <TableCell className="py-2.5 text-right font-mono font-semibold text-xs text-slate-900">
-                    {w.clientBilled}
-                  </TableCell>
-                  <TableCell className="py-2.5 text-right font-mono text-xs text-slate-600">
-                    {w.vendorCosts}
-                  </TableCell>
-                  <TableCell className="py-2.5 text-right font-mono font-bold text-xs text-emerald-800">
-                    {w.netProfit}
-                  </TableCell>
-                  <TableCell className="py-2.5 text-right font-mono font-bold text-xs text-slate-800">
-                    {w.marginPct}
-                  </TableCell>
-                  <TableCell className="py-2.5 text-center">
-                    <Badge
-                      variant={
-                        w.status === 'High Margin'
-                          ? 'success'
-                          : w.status === 'On Target'
-                          ? 'info'
-                          : 'warning'
-                      }
-                      className="text-[11px] font-semibold"
-                    >
-                      {w.status === 'Audit Extras' ? (
-                        <AlertTriangle className="w-3 h-3 mr-1" />
-                      ) : (
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                      )}
-                      {w.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="py-2.5 text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedWedding(w)}
-                      className="h-6 px-2 text-xs text-slate-700"
-                    >
-                      Audit
-                    </Button>
+              {filteredWeddings.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="py-8 text-center text-xs text-slate-500">
+                    No matching weddings found for the selected filter.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                filteredWeddings.map((w) => (
+                  <TableRow key={w.code} className="hover:bg-slate-50 transition">
+                    <TableCell className="py-2.5">
+                      <div className="font-bold text-xs text-slate-900">{w.couple}</div>
+                      <div className="text-[11px] text-slate-500 font-mono">{w.code}</div>
+                    </TableCell>
+                    <TableCell className="py-2.5">
+                      <div className="text-slate-800 text-xs font-medium">{w.venue}</div>
+                      <div className="text-[11px] text-slate-500">{w.city}</div>
+                    </TableCell>
+                    <TableCell className="py-2.5 text-right font-mono text-xs">{w.guests}</TableCell>
+                    <TableCell className="py-2.5 text-right font-mono font-semibold text-xs text-slate-900">
+                      {w.clientBilled}
+                    </TableCell>
+                    <TableCell className="py-2.5 text-right font-mono text-xs text-slate-600">
+                      {w.vendorCosts}
+                    </TableCell>
+                    <TableCell className="py-2.5 text-right font-mono font-bold text-xs text-emerald-800">
+                      {w.netProfit}
+                    </TableCell>
+                    <TableCell className="py-2.5 text-right font-mono font-bold text-xs text-slate-800">
+                      {w.marginPct}
+                    </TableCell>
+                    <TableCell className="py-2.5 text-center">
+                      <Badge
+                        variant={
+                          w.status === 'High Margin'
+                            ? 'success'
+                            : w.status === 'On Target'
+                            ? 'info'
+                            : 'warning'
+                        }
+                        className="text-[11px] font-semibold"
+                      >
+                        {w.status === 'Audit Extras' ? (
+                          <AlertTriangle className="w-3 h-3 mr-1" />
+                        ) : (
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                        )}
+                        {w.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-2.5 text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedWedding(w)}
+                        className="h-6 px-2 text-xs text-slate-700"
+                      >
+                        Audit
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
-      {/* Vendor SLA Scorecard (Formal High-Density Grid) */}
+      {/* Cash Flow Forecast (Scene 6: Milestone Inflows vs Pending Vendor Disbursements) */}
+      <Card className="border border-slate-200 shadow-2xs rounded bg-white">
+        <CardHeader className="p-3.5 border-b border-slate-200 bg-slate-50/70">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <CardTitle className="text-sm font-bold text-slate-900">
+                Cash Flow Forecast (Receivables vs Vendor Disbursements)
+              </CardTitle>
+              <div className="text-xs text-slate-500 mt-0.5">
+                Staged milestone inflows from clients vs scheduled vendor disbursements
+              </div>
+            </div>
+            <Badge variant="outline" className="text-xs font-mono font-semibold py-0.5">
+              Live Inflow Matching
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-slate-100/80 border-b border-slate-200">
+              <TableRow>
+                <TableHead className="font-bold text-slate-700 text-xs">Period / Month</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs text-right">Milestone Inflows (Client)</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs text-right">Scheduled Vendor Payables</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs text-right">Net Monthly Cash Delta</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs text-center">Liquidity Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-slate-100">
+              {cashFlowForecast.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-6 text-center text-xs text-slate-500">
+                    No cash flow schedule recorded in database.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                cashFlowForecast.map((c, idx) => (
+                  <TableRow key={idx} className="hover:bg-slate-50 transition">
+                    <TableCell className="py-2.5 font-bold text-xs text-slate-900 font-mono">
+                      {c.period}
+                    </TableCell>
+                    <TableCell className="py-2.5 text-right font-mono font-semibold text-xs text-slate-900">
+                      {c.milestoneInflows}
+                    </TableCell>
+                    <TableCell className="py-2.5 text-right font-mono text-xs text-slate-600">
+                      {c.vendorPayables}
+                    </TableCell>
+                    <TableCell className="py-2.5 text-right font-mono font-bold text-xs text-emerald-800">
+                      {c.netCashDelta}
+                    </TableCell>
+                    <TableCell className="py-2.5 text-center">
+                      <Badge
+                        variant={c.status === 'SURPLUS' ? 'success' : 'warning'}
+                        className="text-[11px] font-bold"
+                      >
+                        {c.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Vendor Scorecard (Scene 6: Reliability based on check-in arrival history) */}
       <Card className="border border-slate-200 shadow-2xs rounded bg-white">
         <CardHeader className="p-3.5 border-b border-slate-200 bg-slate-50/70">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-sm font-bold text-slate-900">
-                Vendor SLA & Delivery Benchmarks
+                Vendor Reliability Scorecard & Check-in Benchmarks
               </CardTitle>
               <div className="text-xs text-slate-500">
-                Punctuality ratings and verified performance records
+                Aggregated punctuality and SLA compliance computed from Day-of Coordinator arrival check-ins
               </div>
             </div>
             <Badge variant="outline" className="text-xs font-mono font-semibold">
-              18 Partners Audited
+              {vendorScorecard.length} Partners Audited
             </Badge>
           </div>
         </CardHeader>
         <CardContent className="p-3.5">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {vendorScorecard.map((v, i) => (
-              <div
-                key={i}
-                className="p-3 rounded border border-slate-200 bg-slate-50/40 flex flex-col justify-between space-y-2.5"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">
-                      {v.category}
-                    </span>
-                    <div className="flex items-center gap-1 text-xs font-bold text-amber-700">
-                      <Star className="w-3 h-3 fill-amber-500 text-amber-600" />
-                      <span>{v.rating}</span>
+            {vendorScorecard.map((v) => {
+              const onTimeScore = parseInt(v.onTimeArrivalPct, 10) || 100;
+              return (
+                <div
+                  key={v.id}
+                  className="p-3 rounded border border-slate-200 bg-slate-50/40 flex flex-col justify-between space-y-2.5"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                        {v.category}
+                      </span>
+                      <div className="flex items-center gap-1 text-xs font-bold text-amber-700">
+                        <Star className="w-3 h-3 fill-amber-500 text-amber-600" />
+                        <span>{v.rating}</span>
+                      </div>
+                    </div>
+                    <div className="font-bold text-xs text-slate-900 truncate" title={v.vendor}>
+                      {v.vendor}
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      {v.eventsDelivered} Events &bull; {v.city}
                     </div>
                   </div>
-                  <div className="font-bold text-xs text-slate-900">{v.name}</div>
-                  <div className="text-[11px] text-slate-500">
-                    {v.weddings} Weddings Delivered &bull; {v.city}
-                  </div>
-                </div>
 
-                <div className="space-y-1 pt-1.5 border-t border-slate-200">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 text-[11px]">On-Time Arrival:</span>
-                    <span className="font-bold text-emerald-800 text-xs font-mono">
-                      {v.onTimeScore}%
-                    </span>
+                  <div className="space-y-1 pt-1.5 border-t border-slate-200">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500 text-[11px]">On-Time Arrival:</span>
+                      <span className="font-bold text-emerald-800 text-xs font-mono">
+                        {v.onTimeArrivalPct}
+                      </span>
+                    </div>
+                    <Progress value={onTimeScore} className="h-1.5" />
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
+                      <span>Status:</span>
+                      <span
+                        className={`font-semibold ${
+                          v.reliability === 'High Reliability'
+                            ? 'text-emerald-700'
+                            : v.reliability === 'Satisfactory'
+                            ? 'text-blue-700'
+                            : 'text-amber-700'
+                        }`}
+                      >
+                        {v.reliability}
+                      </span>
+                    </div>
                   </div>
-                  <Progress value={v.onTimeScore} className="h-1.5" />
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>
@@ -491,12 +617,22 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            <DialogFooter className="pt-2">
+            <DialogFooter className="pt-2 flex flex-col sm:flex-row gap-2">
               <Button variant="outline" size="sm" onClick={() => setSelectedWedding(null)}>
                 Close
               </Button>
-              <Button variant="default" size="sm" onClick={() => setSelectedWedding(null)}>
-                Download Itemized Ledger
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => {
+                  const targetCode = selectedWedding.code;
+                  setSelectedWedding(null);
+                  navigate(`/billing/${targetCode}`);
+                }}
+                className="gap-1.5"
+              >
+                <span>Open Invoicing & Extra Plates Audit</span>
+                <ExternalLink className="w-3.5 h-3.5" />
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -511,22 +647,26 @@ export const Dashboard: React.FC = () => {
               Export Season 2026 Financial Ledger
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Export consolidated audit records across all 25 destination weddings into formatted XLSX / CSV.
+              Export consolidated audit records directly queried from PostgreSQL database into formatted CSV.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-2 text-xs text-slate-600">
+          <div className="py-2 text-xs text-slate-600 space-y-2">
             <p className="p-2.5 rounded bg-slate-50 border border-slate-200">
-              Includes gross revenue, verified vendor payables, extra plates adjustments, and net agency margin calculations.
+              Includes gross revenue, verified vendor payables, extra plates adjustments, and net agency margin calculations across all {weddingProfits.length} destination weddings.
             </p>
+            <div className="text-[11px] text-slate-500">
+              File: <code className="text-emerald-700 font-mono">royal_knot_season_2026_ledger.csv</code>
+            </div>
           </div>
 
           <DialogFooter className="pt-2">
             <Button variant="outline" size="sm" onClick={() => setExportModalOpen(false)}>
               Cancel
             </Button>
-            <Button variant="default" size="sm" onClick={() => setExportModalOpen(false)}>
-              Export Document
+            <Button variant="default" size="sm" onClick={handleExportCsv} className="gap-1.5">
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Download CSV File</span>
             </Button>
           </DialogFooter>
         </DialogContent>
