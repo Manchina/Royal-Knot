@@ -31,6 +31,16 @@ interface ProcurementState {
     category: string;
     vendorIds: string[];
   }) => Promise<boolean>;
+  editQuote: (payload: {
+    quoteId: string;
+    baseCost?: string;
+    pricePerPlate?: string;
+    overtimeHourlyRate?: string;
+    pdfUrl?: string;
+    inclusions?: string;
+    exclusions?: string;
+  }) => Promise<boolean>;
+  uploadQuotePdf: (quoteId: string, pdfUrl: string) => Promise<boolean>;
 }
 
 export const useProcurementStore = create<ProcurementState>((set, get) => ({
@@ -103,6 +113,42 @@ export const useProcurementStore = create<ProcurementState>((set, get) => ({
       return false;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to assign vendor options';
+      set({ error: message });
+      throw err;
+    } finally {
+      set({ loading: false, isLoading: false });
+    }
+  },
+
+  editQuote: async (payload) => {
+    set({ loading: true, isLoading: true, error: null });
+    try {
+      const res = await api.post<{ success: boolean; message: string }>('/api/procurement/edit-quote', payload);
+      if (res?.success) {
+        await get().fetchProcurementData();
+        return true;
+      }
+      return false;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to edit quote';
+      set({ error: message });
+      throw err;
+    } finally {
+      set({ loading: false, isLoading: false });
+    }
+  },
+
+  uploadQuotePdf: async (quoteId, pdfUrl) => {
+    set({ loading: true, isLoading: true, error: null });
+    try {
+      const res = await api.post<{ success: boolean; message: string }>(`/api/procurement/quotes/${quoteId}/pdf`, { pdfUrl });
+      if (res?.success) {
+        await get().fetchProcurementData();
+        return true;
+      }
+      return false;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to attach proposal PDF';
       set({ error: message });
       throw err;
     } finally {

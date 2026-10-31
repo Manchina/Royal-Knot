@@ -165,6 +165,7 @@ export const vendorQuotes = pgTable('vendor_quotes', {
   lineItems: jsonb('line_items').default(sql`'[]'::jsonb`).notNull(),
   inclusions: text('inclusions'),
   exclusions: text('exclusions'),
+  pdfUrl: text('pdf_url'),
   status: varchar('status', { length: 30 }).default('PENDING'),
   decisionReason: text('decision_reason'),
   decidedAt: timestamp('decided_at', { withTimezone: true }),

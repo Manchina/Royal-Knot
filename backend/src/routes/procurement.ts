@@ -36,9 +36,14 @@ interface QuoteOverviewItem {
   rating: string | null;
   phone: string | null;
   city: string | null;
+  quoteReference?: string | null;
   baseCost: string | null;
   pricePerPlate: string | null;
   overtimeHourlyRate: string | null;
+  lineItems?: Array<{ item: string; cost: number }> | null;
+  inclusions?: string | null;
+  exclusions?: string | null;
+  pdfUrl?: string | null;
   status: string | null;
   decisionReason: string | null;
   isWinner: boolean;
@@ -405,10 +410,15 @@ export async function procurementRoutes(fastify: FastifyInstance) {
           service_category: rfqRequests.serviceCategory,
           rfq_status: rfqRequests.status,
           quote_id: vendorQuotes.id,
+          quote_reference: vendorQuotes.quoteReference,
           quote_status: vendorQuotes.status,
           base_cost: vendorQuotes.baseCost,
           price_per_plate: vendorQuotes.pricePerPlate,
           overtime_hourly_rate: vendorQuotes.overtimeHourlyRate,
+          line_items: vendorQuotes.lineItems,
+          inclusions: vendorQuotes.inclusions,
+          exclusions: vendorQuotes.exclusions,
+          pdf_url: vendorQuotes.pdfUrl,
           decision_reason: vendorQuotes.decisionReason,
           vendor_id: vendors.id,
           business_name: vendors.businessName,
@@ -468,9 +478,14 @@ export async function procurementRoutes(fastify: FastifyInstance) {
             rating: row.rating_score,
             phone: row.phone,
             city: row.vendor_city,
+            quoteReference: row.quote_reference,
             baseCost: row.base_cost,
             pricePerPlate: row.price_per_plate,
             overtimeHourlyRate: row.overtime_hourly_rate,
+            lineItems: (row.line_items as Array<{ item: string; cost: number }>) || [],
+            inclusions: row.inclusions,
+            exclusions: row.exclusions,
+            pdfUrl: row.pdf_url,
             status: row.quote_status,
             decisionReason: row.decision_reason,
             isWinner,
@@ -575,14 +590,16 @@ export async function procurementRoutes(fastify: FastifyInstance) {
           const baseVariation = Number(baseInfo.base) + (i * 35000);
           const plateVariation = baseInfo.plate ? Number(baseInfo.plate) + (i * 120) : undefined;
 
+          const quoteRef = `RK-${baseInfo.ref}-${quoteNum}`;
           await db.insert(vendorQuotes).values({
             rfqId: rfq.id,
             vendorId: vid,
-            quoteReference: `RK-${baseInfo.ref}-${quoteNum}`,
+            quoteReference: quoteRef,
             baseCost: String(baseVariation),
             pricePerPlate: plateVariation ? String(plateVariation) : undefined,
             overtimeHourlyRate: baseInfo.overtime || '15000.00',
             status: 'PENDING',
+            pdfUrl: `/proposals/${quoteRef}.pdf`,
             lineItems: [
               { item: `${formattedCategory} Curated Option`, cost: baseVariation }
             ],
@@ -657,8 +674,8 @@ export async function procurementRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // 6. Edit Negotiated Pricing for an Assigned Quote (Drizzle ORM)
-  fastify.post('/edit-quote', async (request: FastifyRequest<{ Body: { quoteId: string; baseCost?: string; pricePerPlate?: string; overtimeHourlyRate?: string } }>, reply: FastifyReply) => {
+  // 6. Edit Negotiated Pricing & Proposal Document for an Assigned Quote (Drizzle ORM)
+  fastify.post('/edit-quote', async (request: FastifyRequest<{ Body: { quoteId: string; baseCost?: string; pricePerPlate?: string; overtimeHourlyRate?: string; pdfUrl?: string; inclusions?: string; exclusions?: string } }>, reply: FastifyReply) => {
     try {
       const authUser = await getAuthUser(request);
       if (authUser?.role === 'CLIENT') {
@@ -666,7 +683,7 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         return { success: false, message: 'Access denied: Clients cannot modify negotiated pricing.' };
       }
 
-      const { quoteId, baseCost, pricePerPlate, overtimeHourlyRate } = request.body || {};
+      const { quoteId, baseCost, pricePerPlate, overtimeHourlyRate, pdfUrl, inclusions, exclusions } = request.body || {};
       if (!quoteId) {
         reply.status(400);
         return { success: false, message: 'Quote ID is required.' };
@@ -676,15 +693,49 @@ export async function procurementRoutes(fastify: FastifyInstance) {
       if (baseCost !== undefined) updateData.baseCost = String(baseCost);
       if (pricePerPlate !== undefined) updateData.pricePerPlate = pricePerPlate ? String(pricePerPlate) : null;
       if (overtimeHourlyRate !== undefined) updateData.overtimeHourlyRate = overtimeHourlyRate ? String(overtimeHourlyRate) : null;
+      if (pdfUrl !== undefined) updateData.pdfUrl = pdfUrl ? String(pdfUrl).trim() : null;
+      if (inclusions !== undefined) updateData.inclusions = inclusions ? String(inclusions).trim() : null;
+      if (exclusions !== undefined) updateData.exclusions = exclusions ? String(exclusions).trim() : null;
 
       await db.update(vendorQuotes).set(updateData).where(eq(vendorQuotes.id, quoteId));
 
       return {
         success: true,
-        message: 'Vendor quote pricing successfully updated.',
+        message: 'Vendor quote pricing and proposal successfully updated.',
       };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to edit quote';
+      reply.status(500);
+      return { success: false, error: msg };
+    }
+  });
+
+  // 7. Update / Attach Proposal PDF Document for a Vendor Quote
+  fastify.post('/quotes/:id/pdf', async (request: FastifyRequest<{ Params: { id: string }; Body: { pdfUrl: string } }>, reply: FastifyReply) => {
+    try {
+      const authUser = await getAuthUser(request);
+      if (authUser?.role === 'CLIENT') {
+        reply.status(403);
+        return { success: false, message: 'Access denied: Clients cannot upload proposal documents.' };
+      }
+
+      const { id } = request.params;
+      const { pdfUrl } = request.body || {};
+
+      if (!pdfUrl) {
+        reply.status(400);
+        return { success: false, message: 'PDF URL or document data is required.' };
+      }
+
+      await db.update(vendorQuotes).set({ pdfUrl: String(pdfUrl).trim() }).where(eq(vendorQuotes.id, id));
+
+      return {
+        success: true,
+        message: 'Proposal PDF successfully attached to vendor quote.',
+        pdfUrl,
+      };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to attach proposal PDF';
       reply.status(500);
       return { success: false, error: msg };
     }

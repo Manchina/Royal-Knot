@@ -180,6 +180,7 @@ CREATE TABLE IF NOT EXISTS vendor_quotes (
     line_items JSONB NOT NULL DEFAULT '[]'::jsonb,
     inclusions TEXT,
     exclusions TEXT,
+    pdf_url TEXT,
     status VARCHAR(30) DEFAULT 'PENDING',
     decision_reason TEXT,
     decided_at TIMESTAMPTZ
