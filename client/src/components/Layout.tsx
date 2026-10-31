@@ -8,13 +8,11 @@ import {
   CheckSquare,
   Clock,
   CreditCard,
-  Settings,
   Menu,
   X,
   LogOut,
   Layers,
   ChevronsUpDown,
-  User,
   PanelLeftClose,
   PanelLeftOpen,
   Pin
@@ -29,7 +27,6 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuGroup,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -138,12 +135,6 @@ export const Layout: React.FC = () => {
       path: '/billing',
       icon: CreditCard,
       roles: ['SUPER_ADMIN', 'FINANCE_MANAGER', 'FOUNDER']
-    },
-    {
-      name: 'Configuration',
-      path: '/settings',
-      icon: Settings,
-      roles: ['SUPER_ADMIN']
     },
   ];
 
@@ -386,16 +377,6 @@ export const Layout: React.FC = () => {
                     </div>
                   </div>
                 </DropdownMenuLabel>
-                <DropdownMenuSeparator className="my-1 bg-slate-100" />
-                <DropdownMenuGroup>
-                  <DropdownMenuItem
-                    onClick={() => navigate('/settings')}
-                    className="flex items-center gap-2 px-2.5 py-2 text-xs text-slate-700 font-medium rounded-md hover:bg-slate-100 cursor-pointer focus:bg-slate-100 transition-colors"
-                  >
-                    <User className="w-4 h-4 text-slate-400" />
-                    <span>My Profile & Settings</span>
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
                 <DropdownMenuSeparator className="my-1 bg-slate-100" />
                 <DropdownMenuItem
                   onClick={handleLogout}
