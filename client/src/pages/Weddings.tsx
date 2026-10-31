@@ -583,7 +583,7 @@ export const Weddings: React.FC = () => {
                 <Label className="text-xs font-semibold text-slate-700">Destination City *</Label>
                 <select
                   value={newCity}
-                  onChange={(e) => setNewCity(e.target.value as any)}
+                  onChange={(e) => setNewCity(e.target.value as 'Udaipur' | 'Jaipur' | 'Jodhpur')}
                   className="mt-1 w-full h-8 text-xs bg-white border border-slate-200 rounded px-2 text-slate-800"
                 >
                   <option value="Udaipur">Udaipur</option>

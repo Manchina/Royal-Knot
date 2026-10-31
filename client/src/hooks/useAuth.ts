@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { useAuthStore } from '../store/useAuthStore';
+import { useAuthStore, type UserRole } from '../store/useAuthStore';
 
 export interface AuthMeResponse {
   success: boolean;
@@ -8,7 +8,7 @@ export interface AuthMeResponse {
     id: string;
     email: string;
     full_name: string;
-    role: any;
+    role: UserRole;
     title: string;
   };
 }

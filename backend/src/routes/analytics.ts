@@ -1,12 +1,77 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { pool } from '../db';
 
+interface WeddingAnalyticsRow {
+  id: string;
+  code: string;
+  couple: string;
+  venue: string;
+  city: string;
+  guests: number;
+  actualHeadcount: number | null;
+  packageType: string;
+  totalBudget: string;
+  agencyFee: string;
+  status: string;
+  leadPlanner: string;
+  date: string;
+  seasonYear: number;
+}
+
+interface ExtraGroupRow {
+  wedding_id: string;
+  total_extras: string;
+  extras_count: string;
+}
+
+interface BillGroupRow {
+  wedding_id: string;
+  total_vendor_costs: string;
+  total_advance_paid: string;
+  total_balance_due: string;
+}
+
+interface InvoiceAnalyticsRow {
+  id: string;
+  wedding_id: string;
+  invoice_number: string;
+  stage_key: string;
+  amount_due: string;
+  status: string;
+  paid_amount: string | null;
+  due_date: string;
+  month_year: string;
+}
+
+interface VendorScorecardRow {
+  id: string;
+  vendor: string;
+  category: string;
+  city: string;
+  rating: string;
+  total_checkins: string;
+  on_time_checkins: string;
+  avg_delay_minutes: string;
+}
+
+interface MonthlyInflowsRow {
+  period: string;
+  month_date: string;
+  total_inflows: string;
+}
+
+interface MonthlyPayablesRow {
+  period: string;
+  month_date: string;
+  total_payables: string;
+}
+
 export async function analyticsRoutes(fastify: FastifyInstance) {
   // GET /api/analytics/season-summary - Live PostgreSQL queries for Season Profitability, Cash Flow & Vendor Scorecard
   fastify.get('/season-summary', async (_request: FastifyRequest, reply: FastifyReply) => {
     try {
       // 1. Fetch all weddings with clients
-      const weddingsRes = await pool.query(`
+      const weddingsRes = await pool.query<WeddingAnalyticsRow>(`
         SELECT 
           w.id,
           w.code,
@@ -29,7 +94,7 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
       `);
 
       // 2. Fetch extra charges grouped by wedding
-      const extrasRes = await pool.query(`
+      const extrasRes = await pool.query<ExtraGroupRow>(`
         SELECT 
           wedding_id,
           COALESCE(SUM(total_amount), 0) as total_extras,
@@ -37,11 +102,11 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
         FROM wedding_extra_charges
         GROUP BY wedding_id
       `);
-      const extrasMap = new Map(extrasRes.rows.map((r: any) => [r.wedding_id, parseFloat(r.total_extras) || 0]));
-      const extrasCountMap = new Map(extrasRes.rows.map((r: any) => [r.wedding_id, parseInt(r.extras_count, 10) || 0]));
+      const extrasMap = new Map(extrasRes.rows.map((r: ExtraGroupRow) => [r.wedding_id, parseFloat(r.total_extras) || 0]));
+      const extrasCountMap = new Map(extrasRes.rows.map((r: ExtraGroupRow) => [r.wedding_id, parseInt(r.extras_count, 10) || 0]));
 
       // 3. Fetch vendor bills grouped by wedding
-      const billsRes = await pool.query(`
+      const billsRes = await pool.query<BillGroupRow>(`
         SELECT 
           wedding_id,
           COALESCE(SUM(total_payable), 0) as total_vendor_costs,
@@ -50,14 +115,14 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
         FROM vendor_bills
         GROUP BY wedding_id
       `);
-      const billsMap = new Map(billsRes.rows.map((r: any) => [r.wedding_id, {
+      const billsMap = new Map(billsRes.rows.map((r: BillGroupRow) => [r.wedding_id, {
         totalCosts: parseFloat(r.total_vendor_costs) || 0,
         advancePaid: parseFloat(r.total_advance_paid) || 0,
         balanceDue: parseFloat(r.total_balance_due) || 0,
       }]));
 
       // 4. Fetch Client Invoices for Cash Flow Inflows
-      const invoicesRes = await pool.query(`
+      const invoicesRes = await pool.query<InvoiceAnalyticsRow>(`
         SELECT 
           id,
           wedding_id,
@@ -76,7 +141,7 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
       let totalSeasonRevenue = 0;
       let totalSeasonVendorCosts = 0;
 
-      const weddingProfits = weddingsRes.rows.map((w: any) => {
+      const weddingProfits = weddingsRes.rows.map((w: WeddingAnalyticsRow) => {
         const baseBudget = parseFloat(w.totalBudget) || 0;
         const extras = extrasMap.get(w.id) || 0;
         const clientBilled = baseBudget + extras;
@@ -122,19 +187,19 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
 
       // 6. Cash Flow Calculations (Pending Inflows vs Outflows)
       let pendingInflowsTotal = 0;
-      invoicesRes.rows.forEach((inv: any) => {
+      invoicesRes.rows.forEach((inv: InvoiceAnalyticsRow) => {
         if (inv.status === 'UNPAID') {
           pendingInflowsTotal += parseFloat(inv.amount_due) || 0;
         }
       });
 
       let pendingDisbursementsTotal = 0;
-      billsRes.rows.forEach((b: any) => {
+      billsRes.rows.forEach((b: BillGroupRow) => {
         pendingDisbursementsTotal += parseFloat(b.total_balance_due) || 0;
       });
 
       // 7. Vendor Scorecard from day_of_vendor_checkins
-      const vendorScorecardRes = await pool.query(`
+      const vendorScorecardRes = await pool.query<VendorScorecardRow>(`
         SELECT 
           v.id,
           v.business_name as vendor,
@@ -150,7 +215,7 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
         ORDER BY v.rating_score DESC
       `);
 
-      const vendorScorecard = vendorScorecardRes.rows.map((v: any) => {
+      const vendorScorecard = vendorScorecardRes.rows.map((v: VendorScorecardRow) => {
         const total = parseInt(v.total_checkins, 10) || 1;
         const onTime = parseInt(v.on_time_checkins, 10) || 1;
         const onTimePct = Math.min(100, Math.round((onTime / total) * 100));
@@ -177,7 +242,7 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
       });
 
       // 8. Compute Monthly Cash Flow Forecast from PostgreSQL client_invoices and vendor_bills
-      const monthlyInflowsRes = await pool.query(`
+      const monthlyInflowsRes = await pool.query<MonthlyInflowsRow>(`
         SELECT 
           TO_CHAR(due_date, 'Mon YYYY') as period,
           DATE_TRUNC('month', due_date) as month_date,
@@ -187,7 +252,7 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
         ORDER BY month_date ASC
       `);
 
-      const monthlyPayablesRes = await pool.query(`
+      const monthlyPayablesRes = await pool.query<MonthlyPayablesRow>(`
         SELECT 
           TO_CHAR(w.start_date, 'Mon YYYY') as period,
           DATE_TRUNC('month', w.start_date) as month_date,
@@ -199,12 +264,12 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
       `);
 
       const payablesByPeriod = new Map(
-        monthlyPayablesRes.rows.map((r: any) => [r.period, parseFloat(r.total_payables) || 0])
+        monthlyPayablesRes.rows.map((r: MonthlyPayablesRow) => [r.period, parseFloat(r.total_payables) || 0])
       );
 
       const cashFlowForecast = monthlyInflowsRes.rows
-        .filter((r: any) => new Date(r.month_date).getTime() >= new Date('2026-08-01').getTime())
-        .map((r: any) => {
+        .filter((r: MonthlyInflowsRow) => new Date(r.month_date).getTime() >= new Date('2026-08-01').getTime())
+        .map((r: MonthlyInflowsRow) => {
           const inflows = parseFloat(r.total_inflows) || 0;
           const payables = payablesByPeriod.get(r.period) || 0;
           const delta = inflows - payables;
@@ -237,7 +302,7 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
           {
             label: 'Pending Inflows (Next 30 Days)',
             value: `₹${(pendingInflowsTotal / 10000000).toFixed(2)} Cr`,
-            change: `${invoicesRes.rows.filter((i: any) => i.status === 'UNPAID').length} Milestone Invoices Due`,
+            change: `${invoicesRes.rows.filter((i: InvoiceAnalyticsRow) => i.status === 'UNPAID').length} Milestone Invoices Due`,
             positive: true,
             sub: 'Client Scheduled Payments',
           },
@@ -253,11 +318,12 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
         cashFlowForecast,
         vendorScorecard,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       reply.status(500);
       return {
         success: false,
-        error: err.message,
+        error: msg,
       };
     }
   });

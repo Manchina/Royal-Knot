@@ -35,7 +35,7 @@ async function request(path: string, options: RequestInit = {}) {
   const url = `${BASE_URL}${path}`;
   const headers: Record<string, string> = {
     ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-    ...((options.headers as any) || {}),
+    ...((options.headers as Record<string, string>) || {}),
   };
   const res = await fetch(url, {
     ...options,
@@ -208,7 +208,7 @@ async function runDayOfE2ETests() {
   // Query checklists to verify Day-Of task is returned with exact time slot
   const taskQuery = await request(`/tasks?weddingId=RW-2026-001&category=DAY_OF`);
   assert(taskQuery.status === 200, 'Filter /tasks?category=DAY_OF returns HTTP 200', 'Suite 4');
-  const foundTask = taskQuery.data?.data.find((t: any) => t.id === dayOfTaskId);
+  const foundTask = (taskQuery.data?.data as Array<{ id: string; category?: string; owner?: string }>)?.find((t) => t.id === dayOfTaskId);
   assert(Boolean(foundTask), 'Newly created Day-Of task found in database checklists', 'Suite 4');
   assert(foundTask?.category === 'DAY_OF', 'Task category is DAY_OF', 'Suite 4');
   assert(foundTask?.owner === 'Karan Verma', 'Task owner resolved to Karan Verma', 'Suite 4');

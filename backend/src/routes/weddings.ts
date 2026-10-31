@@ -108,10 +108,11 @@ export async function weddingRoutes(fastify: FastifyInstance) {
         data,
         total: data.length,
       };
-    } catch (err: any) {
-      fastify.log.error(err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve weddings from database';
+      fastify.log.error(msg);
       reply.status(500);
-      return { success: false, message: 'Failed to retrieve weddings from database', error: err.message };
+      return { success: false, message: 'Failed to retrieve weddings from database', error: msg };
     }
   });
 
@@ -137,9 +138,10 @@ export async function weddingRoutes(fastify: FastifyInstance) {
         success: true,
         data: options,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve options';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -218,9 +220,10 @@ export async function weddingRoutes(fastify: FastifyInstance) {
           rfqs,
         },
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to retrieve wedding details';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 

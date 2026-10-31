@@ -66,7 +66,7 @@ export const ComboboxMultiSelect: React.FC<ComboboxMultiSelectProps> = ({
     }
   };
 
-  const removeValue = (val: string, e: React.MouseEvent) => {
+  const removeValue = (val: string, e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation();
     onChange(selectedValues.filter((v) => v !== val));
   };
@@ -114,7 +114,7 @@ export const ComboboxMultiSelect: React.FC<ComboboxMultiSelectProps> = ({
                   role="button"
                   tabIndex={0}
                   onClick={(e) => removeValue(opt.value, e)}
-                  onKeyDown={(e) => e.key === 'Enter' && removeValue(opt.value, e as any)}
+                  onKeyDown={(e) => e.key === 'Enter' && removeValue(opt.value, e)}
                   className="hover:text-red-600 rounded-full cursor-pointer"
                 >
                   <X className="w-2.5 h-2.5" />

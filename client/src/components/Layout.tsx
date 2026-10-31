@@ -320,10 +320,6 @@ export const Layout: React.FC = () => {
 
           {/* Top Right: Season Tracker & User Profile with Sign Out */}
           < div className="flex items-center gap-2.5 shrink-0" >
-            <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-mono border border-slate-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-              <span>Season 2026: 25 Projects Active</span>
-            </div>
 
             <div className="h-4 w-px bg-slate-200 hidden sm:block" />
 

@@ -829,9 +829,9 @@ export const Tasks: React.FC = () => {
             <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs px-3.5 py-2 rounded flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
               <span>
-                {(createMutation.error as any)?.response?.data?.message ||
-                  (createMutation.error as any)?.message ||
-                  'Failed to create task.'}
+                {createMutation.error instanceof Error
+                  ? createMutation.error.message
+                  : 'Failed to create task.'}
               </span>
             </div>
           )}
@@ -950,9 +950,9 @@ export const Tasks: React.FC = () => {
             <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs px-3.5 py-2 rounded flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
               <span>
-                {(createDayOfTaskMutation.error as any)?.response?.data?.message ||
-                  (createDayOfTaskMutation.error as any)?.message ||
-                  'Failed to create Day-Of task.'}
+                {createDayOfTaskMutation.error instanceof Error
+                  ? createDayOfTaskMutation.error.message
+                  : 'Failed to create Day-Of task.'}
               </span>
             </div>
           )}

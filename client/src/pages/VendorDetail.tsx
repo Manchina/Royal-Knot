@@ -118,7 +118,7 @@ export const VendorDetail: React.FC = () => {
 
     setSubmittingEdit(true);
     try {
-      const res = await api.put<{ success: boolean; message: string; data: any }>(`/api/procurement/vendors/${vendor.id}`, {
+      const res = await api.put<{ success: boolean; message: string; data: unknown }>(`/api/procurement/vendors/${vendor.id}`, {
         businessName: editName,
         contactPerson: editContact,
         phone: editPhone,

@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { db } from '../db';
 import { enquiries, clients, weddings, enquiryChangeLogs, users } from '../db/schema';
-import { eq, desc, asc, ilike, or, and, count, sql } from 'drizzle-orm';
+import { eq, desc, asc, ilike, or, and, count, sql, type SQL } from 'drizzle-orm';
 import { isUUID } from '../utils';
 
 const matchEnquiry = (param: string) => (isUUID(param) ? eq(enquiries.id, param) : eq(enquiries.code, param));
@@ -92,8 +92,9 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
           performedBy: created.channel || 'Website Portal',
           notes: `Consultation lead submitted. Destination: ${created.cityPreference}, Guest count: ${created.guestCount}.`,
         });
-      } catch (logErr: any) {
-        fastify.log.warn(`Change log insert error: ${logErr.message}`);
+      } catch (logErr: unknown) {
+        const msg = logErr instanceof Error ? logErr.message : 'Unknown error';
+        fastify.log.warn(`Change log insert error: ${msg}`);
       }
 
       return {
@@ -101,13 +102,14 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
         message: 'Luxury royal wedding enquiry submitted successfully. Our lead planner will connect within 24 hours.',
         data: created,
       };
-    } catch (err: any) {
-      fastify.log.error(`Drizzle enquiry creation error: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      fastify.log.error(`Drizzle enquiry creation error: ${msg}`);
       reply.status(500);
       return {
         success: false,
         message: 'Could not record enquiry. Database error.',
-        error: err.message,
+        error: msg,
       };
     }
   });
@@ -116,7 +118,7 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
   fastify.get('/', async (request: FastifyRequest<{ Querystring: { channel?: string; search?: string } }>, reply: FastifyReply) => {
     try {
       const { channel, search } = request.query;
-      const conditions = [];
+      const conditions: SQL[] = [];
 
       if (channel && channel !== 'ALL') {
         conditions.push(ilike(enquiries.channel, `%${channel}%`));
@@ -128,7 +130,7 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
             ilike(enquiries.coupleName, `%${search}%`),
             ilike(enquiries.code, `%${search}%`),
             ilike(enquiries.phone, `%${search}%`)
-          )
+          )!
         );
       }
 
@@ -143,13 +145,14 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
         count: rows.length,
         data: rows,
       };
-    } catch (err: any) {
-      fastify.log.error(`Error querying enquiries via Drizzle: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      fastify.log.error(`Error querying enquiries via Drizzle: ${msg}`);
       reply.status(500);
       return {
         success: false,
         message: 'Failed to retrieve enquiries.',
-        error: err.message,
+        error: msg,
       };
     }
   });
@@ -168,10 +171,11 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
         success: true,
         data: enquiry,
       };
-    } catch (err: any) {
-      fastify.log.error(`Error querying single enquiry via Drizzle: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      fastify.log.error(`Error querying single enquiry via Drizzle: ${msg}`);
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -183,7 +187,7 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
     try {
       const isSigned = agreementStatus === 'Signed on Mobile';
 
-      const updateValues: any = {
+      const updateValues: Partial<typeof enquiries.$inferInsert> = {
         updatedAt: new Date(),
       };
       if (status) updateValues.status = status;
@@ -233,8 +237,9 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
           performedBy,
           notes: logNotes,
         });
-      } catch (logErr: any) {
-        fastify.log.warn(`Change log insert error: ${logErr.message}`);
+      } catch (logErr: unknown) {
+        const msg = logErr instanceof Error ? logErr.message : 'Unknown error';
+        fastify.log.warn(`Change log insert error: ${msg}`);
       }
 
       return {
@@ -242,10 +247,11 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
         message: 'Enquiry updated successfully via Drizzle ORM.',
         data: updated,
       };
-    } catch (err: any) {
-      fastify.log.error(`Drizzle enquiry status update error: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      fastify.log.error(`Drizzle enquiry status update error: ${msg}`);
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -359,8 +365,9 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
           performedBy: 'Lead Planner (Devika Sharma)',
           notes: `Converted lead to active Wedding Project ${weddingCode} (${newWedding.primaryVenue}). Client Portal user provisioned for ${clientEmail} with default password: password123.`,
         });
-      } catch (logErr: any) {
-        fastify.log.warn(`Change log insert error: ${logErr.message}`);
+      } catch (logErr: unknown) {
+        const msg = logErr instanceof Error ? logErr.message : 'Unknown error';
+        fastify.log.warn(`Change log insert error: ${msg}`);
       }
 
       return {
@@ -376,10 +383,11 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
           defaultPassword: 'password123',
         },
       };
-    } catch (err: any) {
-      fastify.log.error(`Enquiry conversion error via Drizzle: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      fastify.log.error(`Enquiry conversion error via Drizzle: ${msg}`);
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -402,10 +410,11 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
         count: logs.length,
         data: logs,
       };
-    } catch (err: any) {
-      fastify.log.error(`Change log query error: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      fastify.log.error(`Change log query error: ${msg}`);
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -437,10 +446,11 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
         success: true,
         data: log,
       };
-    } catch (err: any) {
-      fastify.log.error(`Change log create error: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      fastify.log.error(`Change log create error: ${msg}`);
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 }

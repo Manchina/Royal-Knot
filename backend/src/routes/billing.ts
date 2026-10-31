@@ -85,6 +85,20 @@ export interface BillingChangelogItem {
   createdAt: string;
 }
 
+export interface AvailableQuoteItem {
+  quoteId: string;
+  rfqId: string;
+  serviceCategory: string;
+  description: string | null;
+  vendorId: string;
+  vendorName: string;
+  baseCost: string;
+  pricePerPlate: string | null;
+  quoteStatus: string;
+  isBilled: boolean;
+  formattedCost: string;
+}
+
 export interface ProjectBillingData {
   id: string;
   code: string;
@@ -125,7 +139,7 @@ export interface ProjectBillingData {
   extraCharges: ExtraChargeItem[];
   vendorBills: VendorDisbursementItem[];
   invoices: ClientInvoiceItem[];
-  availableQuotes?: any[];
+  availableQuotes?: AvailableQuoteItem[];
   changelog?: BillingChangelogItem[];
 }
 
@@ -153,9 +167,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
 
       reply.header('Cache-Control', 'public, max-age=60');
       return { success: true, data };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -418,9 +433,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
             activeList,
           },
         };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
         reply.status(500);
-        return { success: false, error: err.message };
+        return { success: false, error: msg };
       }
     }
   );
@@ -555,7 +571,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
           rawAdvancePaid: advNum,
           balanceDue: formatInr(balNum),
           rawBalanceDue: balNum,
-          status: r.status as any,
+          status: (r.status as VendorDisbursementItem['status']) || 'PENDING',
           awardedQuoteId: r.awardedQuoteId || undefined,
           settledAt: r.settledAt ? new Date(r.settledAt).toLocaleDateString('en-IN') : undefined,
           createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : undefined,
@@ -615,7 +631,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
           amountDue: formatInr(dueNum),
           rawAmountDue: dueNum,
           dueDate: r.dueDate ? new Date(r.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Due on Event',
-          status: r.status as any,
+          status: (r.status as ClientInvoiceItem['status']) || 'UNPAID',
           paidAmount: formatInr(paidNum),
           rawPaidAmount: paidNum,
           paidAt: r.paidAt ? new Date(r.paidAt).toLocaleString('en-IN') : undefined,
@@ -749,9 +765,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
         success: true,
         data: project,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 
@@ -828,9 +845,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
           message: 'Vendor bill added to ledger successfully',
           data: createdBill,
         };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
         reply.status(500);
-        return { success: false, error: err.message };
+        return { success: false, error: msg };
       }
     }
   );
@@ -922,9 +940,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
           syncedCount: createdCount,
           message: `Successfully synchronized ${createdCount} winning vendor quote(s) into billing ledger.`,
         };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
         reply.status(500);
-        return { success: false, error: err.message };
+        return { success: false, error: msg };
       }
     }
   );
@@ -1011,9 +1030,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
           message: 'Vendor disbursement successfully reconciled',
           data: updatedBill,
         };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
         reply.status(500);
-        return { success: false, error: err.message };
+        return { success: false, error: msg };
       }
     }
   );
@@ -1125,9 +1145,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
           message: 'Extra charge audited and added to client billing and vendor ledger',
           data: createdExtra,
         };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
         reply.status(500);
-        return { success: false, error: err.message };
+        return { success: false, error: msg };
       }
     }
   );
@@ -1205,9 +1226,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
           message: 'Client milestone invoice payment successfully recorded',
           data: updatedInvoice,
         };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
         reply.status(500);
-        return { success: false, error: err.message };
+        return { success: false, error: msg };
       }
     }
   );
@@ -1267,9 +1289,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
           message: `Project ${w.code} has been finalised and locked in the financial registry.`,
           data: updatedWedding,
         };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
         reply.status(500);
-        return { success: false, error: err.message };
+        return { success: false, error: msg };
       }
     }
   );
@@ -1300,9 +1323,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
           dateFormatted: l.createdAt ? new Date(l.createdAt).toLocaleString('en-IN') : undefined,
         })),
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       reply.status(500);
-      return { success: false, error: err.message };
+      return { success: false, error: msg };
     }
   });
 }

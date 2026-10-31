@@ -186,7 +186,7 @@ export const Procurement: React.FC = () => {
   const handleAssignVendorFromDirectory = (vendor: VendorItem) => {
     setAssignWeddingId(currentWedding?.id || '');
     if (vendor.category === 'CATERER' || vendor.category === 'DJ' || vendor.category === 'DECORATOR') {
-      setAssignCategory(vendor.category as any);
+      setAssignCategory(vendor.category as 'CATERER' | 'DJ' | 'DECORATOR');
     }
     setSelectedVendorIds([vendor.id]);
     setAssignOptionsOpen(true);
@@ -357,7 +357,7 @@ export const Procurement: React.FC = () => {
               <select
                 value={assignCategory}
                 onChange={(e) => {
-                  const newCat = e.target.value as any;
+                  const newCat = e.target.value as 'CATERER' | 'DJ' | 'DECORATOR';
                   setAssignCategory(newCat);
                   const targetWed = weddingsOverview.find((w) => w.id === assignWeddingId);
                   const existing = targetWed?.categories[newCat]?.quotes || [];
@@ -444,7 +444,7 @@ export const Procurement: React.FC = () => {
                 <Label className="text-xs font-semibold text-slate-700">Category *</Label>
                 <select
                   value={newVendorCategory}
-                  onChange={(e) => setNewVendorCategory(e.target.value as any)}
+                  onChange={(e) => setNewVendorCategory(e.target.value as 'CATERER' | 'DJ' | 'DECORATOR')}
                   className="mt-1 w-full h-8 text-xs bg-white border border-slate-200 rounded px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
                 >
                   <option value="CATERER">Catering & Banquets</option>

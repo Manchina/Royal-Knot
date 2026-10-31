@@ -67,38 +67,39 @@ export const SignAgreement: React.FC = () => {
     if (!id) return;
     try {
       setLoading(true);
-      const res = await api.get(`/enquiries/${id}`);
-      if (res.success && res.data) {
+      const res = await api.get<{
+        success: boolean;
+        data?: EnquiryData;
+      }>(`/enquiries/${id}`);
+      if (res?.success && res?.data) {
         const raw = res.data;
-        const budgetRaw = raw.budgetMax || raw.budget_max;
         let budgetStr = '₹2.50 Cr';
-        if (budgetRaw) {
-          const cr = Number(budgetRaw) / 10000000;
+        if (raw.budgetMax) {
+          const cr = Number(raw.budgetMax) / 10000000;
           budgetStr = `₹${cr.toFixed(2)} Cr`;
         }
 
-        const rawAgreement = raw.agreementStatus || raw.agreement_status || 'Drafting Agreement';
         let agreementSt = 'Drafting Agreement';
-        if (String(rawAgreement).includes('Signed')) agreementSt = 'Signed on Mobile';
-        else if (String(rawAgreement).includes('Sent')) agreementSt = 'Sent - Pending Signature';
+        if (raw.agreementStatus?.includes('Signed')) agreementSt = 'Signed on Mobile';
+        else if (raw.agreementStatus?.includes('Sent')) agreementSt = 'Sent - Pending Signature';
 
         setEnquiry({
           id: raw.id,
           code: raw.code || `ENQ-${String(raw.id).slice(0, 8)}`,
-          coupleName: raw.coupleName || raw.couple_name || 'Couple Consultation',
-          primaryContactName: raw.primaryContactName || raw.primary_contact_name,
+          coupleName: raw.coupleName || 'Couple Consultation',
+          primaryContactName: raw.primaryContactName,
           phone: raw.phone || '',
           email: raw.email || '',
-          cityPreference: (raw.cityPreference || raw.city_preference) === 'Jaipur' ? 'Jaipur' : 'Udaipur',
-          datesRough: raw.datesRough || raw.dates_rough || 'Winter 2026',
-          guestCount: Number(raw.guestCount || raw.guest_count) || 400,
+          cityPreference: raw.cityPreference === 'Jaipur' ? 'Jaipur' : 'Udaipur',
+          datesRough: raw.datesRough || 'Winter 2026',
+          guestCount: Number(raw.guestCount) || 400,
           budgetMax: budgetStr,
           agreementStatus: agreementSt,
-          agreementSignedAt: raw.agreementSignedAt || raw.agreement_signed_at,
+          agreementSignedAt: raw.agreementSignedAt,
           status: raw.status || 'Initial Discovery',
-          weddingId: raw.weddingId || raw.wedding_id,
+          weddingId: raw.weddingId,
           notes: raw.notes || '',
-          createdAt: raw.createdAt || raw.created_at,
+          createdAt: raw.createdAt,
         });
 
         const initialSigner = raw.primaryContactName || raw.coupleName || '';
@@ -199,7 +200,7 @@ export const SignAgreement: React.FC = () => {
         localStorage.setItem(`rk_sig_${enquiry.code}`, 'typed');
       }
 
-      const res = await api.patch(`/enquiries/${enquiry.id}/status`, {
+      const res = await api.patch<{ success: boolean; data?: unknown }>(`/enquiries/${enquiry.id}/status`, {
         agreementStatus: 'Signed on Mobile',
         status: 'Consultation Booked',
         signatoryName: signatoryName.trim(),
@@ -207,7 +208,7 @@ export const SignAgreement: React.FC = () => {
         notes: `Signed digitally via mobile magic link by ${signatoryName.trim()} (User ID: ${displayUserId})${signatureMode === 'draw' && hasDrawn ? ' with drawn electronic signature' : ''}.`,
       });
 
-      if (res.success) {
+      if (res?.success) {
         setSignedSuccess(true);
         setEnquiry((prev) =>
           prev

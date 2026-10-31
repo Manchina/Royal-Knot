@@ -347,7 +347,7 @@ export const Enquiries: React.FC = () => {
 
               <div className="space-y-1">
                 <Label htmlFor="channel">Channel</Label>
-                <Select value={newChannel} onValueChange={(val: any) => setNewChannel(val)}>
+                <Select value={newChannel} onValueChange={(val: string) => setNewChannel(val)}>
                   <SelectTrigger className="border-slate-300">
                     <SelectValue placeholder="Select channel" />
                   </SelectTrigger>
@@ -364,7 +364,7 @@ export const Enquiries: React.FC = () => {
             <div className="grid grid-cols-3 gap-2.5">
               <div className="space-y-1">
                 <Label htmlFor="city">City Preference</Label>
-                <Select value={newCity} onValueChange={(val: any) => setNewCity(val)}>
+                <Select value={newCity} onValueChange={(val: string) => setNewCity(val as 'Udaipur' | 'Jaipur')}>
                   <SelectTrigger className="border-slate-300">
                     <SelectValue placeholder="City" />
                   </SelectTrigger>
@@ -377,7 +377,7 @@ export const Enquiries: React.FC = () => {
 
               <div className="space-y-1">
                 <Label htmlFor="guests">Guest Count</Label>
-                <Select value={newGuests} onValueChange={(val: any) => setNewGuests(val)}>
+                <Select value={newGuests} onValueChange={(val: string) => setNewGuests(val)}>
                   <SelectTrigger className="border-slate-300">
                     <SelectValue placeholder="Guests" />
                   </SelectTrigger>
@@ -392,7 +392,7 @@ export const Enquiries: React.FC = () => {
 
               <div className="space-y-1">
                 <Label htmlFor="budget">Max Budget</Label>
-                <Select value={newBudget} onValueChange={(val: any) => setNewBudget(val)}>
+                <Select value={newBudget} onValueChange={(val: string) => setNewBudget(val)}>
                   <SelectTrigger className="border-slate-300">
                     <SelectValue placeholder="Budget" />
                   </SelectTrigger>

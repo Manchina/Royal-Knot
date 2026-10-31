@@ -74,10 +74,7 @@ export const BillingProjectDetail: React.FC = () => {
     unitPrice: number;
     vendor: string;
   }) => {
-    await createExtraCharge(idToFetch, {
-      ...data,
-      performedBy: 'Devika Sharma (Finance Manager)',
-    } as any);
+    await createExtraCharge(idToFetch, data);
   };
 
   // Submit New Vendor Bill
@@ -92,8 +89,7 @@ export const BillingProjectDetail: React.FC = () => {
       agreedBase: data.agreedBaseAmount,
       category: 'GENERAL',
       notes: data.notes,
-      performedBy: 'Devika Sharma (Finance Manager)',
-    } as any);
+    });
   };
 
   // Submit Reconcile / Record Vendor Bill Payment
@@ -104,9 +100,10 @@ export const BillingProjectDetail: React.FC = () => {
   }) => {
     if (!selectedBill) return;
     await reconcileVendorBill(idToFetch, selectedBill.id, {
-      ...data,
-      performedBy: 'Devika Sharma (Finance Manager)',
-    } as any);
+      reconciledAmount: data.paymentAmount,
+      status: 'RECONCILED_MATCHED',
+      notes: data.notes || data.paymentReference,
+    });
     setSelectedBill(null);
   };
 
@@ -119,8 +116,7 @@ export const BillingProjectDetail: React.FC = () => {
     await recordPayment(idToFetch, selectedInvoice.id, {
       amount: data.paidAmount,
       reference: data.paymentReference,
-      performedBy: 'Aditya Singhal (Finance Director)',
-    } as any);
+    });
     setSelectedInvoice(null);
   };
 

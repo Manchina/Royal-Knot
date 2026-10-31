@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { db } from '../db';
 import { weddingTasks, weddings, users } from '../db/schema';
-import { eq, desc, asc, ilike, or, and, sql } from 'drizzle-orm';
+import { eq, desc, asc, ilike, or, and, sql, type SQL } from 'drizzle-orm';
 
 interface TaskFilterQuery {
   weddingId?: string;
@@ -82,7 +82,7 @@ export async function tasksRoutes(fastify: FastifyInstance) {
     const { weddingId, stage, category, owner, isMilestone, search } = request.query;
 
     try {
-      const conditions: any[] = [];
+      const conditions: SQL[] = [];
 
       // Filter by weddingId or wedding code
       if (weddingId && weddingId !== 'ALL') {
@@ -121,7 +121,7 @@ export async function tasksRoutes(fastify: FastifyInstance) {
             ilike(weddingTasks.title, term),
             ilike(weddingTasks.notes, term),
             ilike(users.fullName, term)
-          )
+          )!
         );
       }
 
@@ -150,7 +150,7 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         .orderBy(asc(weddingTasks.dueDate), desc(weddingTasks.id));
 
       // Calculate stats based on scoped wedding (or all)
-      const statsConditions: any[] = [];
+      const statsConditions: SQL[] = [];
       if (weddingId && weddingId !== 'ALL') {
         if (UUID_REGEX.test(weddingId)) {
           statsConditions.push(eq(weddingTasks.weddingId, weddingId));
@@ -227,13 +227,14 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         data: tasks,
         stats,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
       fastify.log.error(err);
       reply.status(500);
       return {
         success: false,
         message: 'Failed to fetch checklist tasks',
-        error: err.message,
+        error: message,
       };
     }
   });
@@ -277,9 +278,10 @@ export async function tasksRoutes(fastify: FastifyInstance) {
       }
 
       return { success: true, data: rows[0] };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
       reply.status(500);
-      return { success: false, message: 'Failed to fetch task', error: err.message };
+      return { success: false, message: 'Failed to fetch task', error: message };
     }
   });
 
@@ -350,7 +352,7 @@ export async function tasksRoutes(fastify: FastifyInstance) {
           category: category.toUpperCase(),
           assignedTo: targetAssignedTo,
           dueDate: targetDueDate,
-          stage: stage as any,
+          stage: stage || 'TO_PLAN',
           isMilestone,
           notes: notes?.trim() || null,
         })
@@ -361,13 +363,14 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         message: 'Task created successfully',
         data: created,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
       fastify.log.error(err);
       reply.status(500);
       return {
         success: false,
         message: 'Failed to create task',
-        error: err.message,
+        error: message,
       };
     }
   });
@@ -420,13 +423,14 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         message: `Task stage moved from ${current} to ${nextStage}`,
         data: updated,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
       fastify.log.error(err);
       reply.status(500);
       return {
         success: false,
         message: 'Failed to toggle task stage',
-        error: err.message,
+        error: message,
       };
     }
   });
@@ -442,7 +446,7 @@ export async function tasksRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const updateData: Record<string, any> = {};
+      const updateData: Partial<typeof weddingTasks.$inferInsert> = {};
 
       if (title !== undefined) updateData.title = title.trim();
       if (category !== undefined) updateData.category = category.toUpperCase();
@@ -488,13 +492,14 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         message: 'Task updated successfully',
         data: updated,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
       fastify.log.error(err);
       reply.status(500);
       return {
         success: false,
         message: 'Failed to update task',
-        error: err.message,
+        error: message,
       };
     }
   });
@@ -524,13 +529,14 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         message: 'Task deleted successfully',
         data: deleted,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
       fastify.log.error(err);
       reply.status(500);
       return {
         success: false,
         message: 'Failed to delete task',
-        error: err.message,
+        error: message,
       };
     }
   });
