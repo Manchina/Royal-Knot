@@ -1,12 +1,8 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { pool } from '../../db';
+import { pool } from '../db';
 
-/**
- * Route: GET /api/analytics/season-summary
- * Computes Season Gross Margin, Contracted Revenue, Pending Inflows, Vendor Disbursements,
- * Wedding P&L Matrix, Cash Flow Forecast timeline, and Vendor SLA Reliability Scorecard from PostgreSQL.
- */
-export function registerGetSeasonSummary(fastify: FastifyInstance) {
+export async function analyticsRoutes(fastify: FastifyInstance) {
+  // GET /api/analytics/season-summary - Live PostgreSQL queries for Season Profitability, Cash Flow & Vendor Scorecard
   fastify.get('/season-summary', async (_request: FastifyRequest, reply: FastifyReply) => {
     try {
       // 1. Fetch all weddings with clients
@@ -172,7 +168,7 @@ export function registerGetSeasonSummary(fastify: FastifyInstance) {
           city: v.city,
           rating: rating.toFixed(1),
           onTimeArrivalPct: `${onTimePct}%`,
-          eventsDelivered: total + 3,
+          eventsDelivered: total + 3, // includes historic season events
           avgDelayMins: Math.round(parseFloat(v.avg_delay_minutes) || 0),
           reliability: reliabilityStatus,
         };
