@@ -8,7 +8,8 @@ import { enquiryRoutes } from './routes/enquiries';
 import { billingRoutes } from './routes/billing';
 import { analyticsRoutes } from './routes/analytics';
 import { tasksRoutes } from './routes/tasks';
-import { weddingsRoutes } from './routes/weddings';
+import { procurementRoutes } from './routes/procurement';
+import { weddingRoutes } from './routes/weddings';
 
 dotenv.config();
 
@@ -106,12 +107,15 @@ async function buildServer() {
   await fastify.register(tasksRoutes, { prefix: '/api/tasks' });
   await fastify.register(tasksRoutes, { prefix: '/api/checklists' });
 
-  // Mount Weddings Portfolio Routes under /api/weddings
-  await fastify.register(weddingsRoutes, { prefix: '/api/weddings' });
 
   // Mount Founder Analytics & Season P&L Routes under /api/analytics
   await fastify.register(analyticsRoutes, { prefix: '/api/analytics' });
 
+  // Mount Procurement & Vendor RFQs Routes under /api/procurement
+  await fastify.register(procurementRoutes, { prefix: '/api/procurement' });
+
+  // Mount Dedicated Weddings Routes under /api/weddings (Drizzle ORM)
+  await fastify.register(weddingRoutes, { prefix: '/api/weddings' });
   return fastify;
 }
 
@@ -120,7 +124,7 @@ async function start() {
     const server = await buildServer();
     await server.listen({ port: PORT, host: HOST });
     console.log(`\n🚀 Server listening at http://localhost:${PORT}`);
-    
+
     const dbCheck = await checkDatabaseConnection();
     if (dbCheck.connected) {
       console.log(`✅ PostgreSQL Connected successfully! (${dbCheck.version?.split(' ')[0]} ${dbCheck.version?.split(' ')[1]})\n`);

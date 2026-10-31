@@ -330,58 +330,44 @@ export const EnquiryDetail: React.FC = () => {
 
         {/* Right: Actions Moved to Detail Header + Activity Log */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Action Button: Single Popup Button when Unsigned, or Check Signed Agreement when Signed */}
-          {enquiry.agreementStatus !== 'Signed on Mobile' ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setMagicModalOpen(true)}
-              className="h-8 text-xs font-semibold border-[#714B67]/30 text-[#714B67] hover:bg-[#714B67]/10 bg-white cursor-pointer gap-1.5 shadow-2xs"
-              title="Open Digital Agreement & Magic Signing Link"
-            >
-              <Link2 className="w-3.5 h-3.5 text-[#714B67]" />
-              <span>Digital Agreement (Magic Link)</span>
-            </Button>
-          ) : (
-            <a
-              href={`/sign/${enquiry.code}?userId=${clientUserId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center h-8 px-3 rounded border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-xs text-emerald-800 font-semibold transition cursor-pointer gap-1.5 shadow-2xs"
-              title="Check signed agreement with embedded digital signature in new tab"
-            >
-              <FileCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Check Signed Agreement ↗</span>
-            </a>
-          )}
-
-          {/* When signed and not yet converted to wedding: Convert button */}
-          {enquiry.agreementStatus === 'Signed on Mobile' && !enquiry.weddingId && (
-            <Button
-              size="sm"
-              disabled={actionLoading}
-              onClick={handleConvertToWedding}
-              className="h-8 text-xs font-bold bg-[#714B67] hover:bg-[#5a3a52] text-white cursor-pointer shadow-2xs"
-            >
-              {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Building2 className="w-3.5 h-3.5 mr-1.5" />}
-              <span>Convert to Wedding Project</span>
-            </Button>
-          )}
-
-          {/* When converted to wedding: Link to active wedding */}
-          {enquiry.weddingId && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSelectedWeddingId(enquiry.weddingId || 'ALL');
-                navigate('/weddings');
-              }}
-              className="h-8 text-xs font-semibold text-emerald-800 bg-emerald-50 border-emerald-300 hover:bg-emerald-100 cursor-pointer flex items-center gap-1.5 shadow-2xs"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Active Wedding Project ({enquiry.weddingId.slice(0, 8)}) ➔</span>
-            </Button>
+          {/* Action Buttons: Only show when lead is NOT yet converted to wedding */}
+          {enquiry.status !== 'Converted to Wedding' && !enquiry.weddingId && (
+            <>
+              {enquiry.agreementStatus !== 'Signed on Mobile' ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMagicModalOpen(true)}
+                  className="h-8 text-xs font-semibold border-[#714B67]/30 text-[#714B67] hover:bg-[#714B67]/10 bg-white cursor-pointer gap-1.5 shadow-2xs"
+                  title="Open Digital Agreement & Magic Signing Link"
+                >
+                  <Link2 className="w-3.5 h-3.5 text-[#714B67]" />
+                  <span>Digital Agreement (Magic Link)</span>
+                </Button>
+              ) : (
+                <>
+                  <a
+                    href={`/sign/${enquiry.code}?userId=${clientUserId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center h-8 px-3 rounded border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-xs text-emerald-800 font-semibold transition cursor-pointer gap-1.5 shadow-2xs"
+                    title="Check signed agreement with embedded digital signature in new tab"
+                  >
+                    <FileCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Check Signed Agreement ↗</span>
+                  </a>
+                  <Button
+                    size="sm"
+                    disabled={actionLoading}
+                    onClick={handleConvertToWedding}
+                    className="h-8 text-xs font-bold bg-[#714B67] hover:bg-[#5a3a52] text-white cursor-pointer shadow-2xs"
+                  >
+                    {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Building2 className="w-3.5 h-3.5 mr-1.5" />}
+                    <span>Convert to Wedding Project</span>
+                  </Button>
+                </>
+              )}
+            </>
           )}
 
           {/* Quick Call Link */}
@@ -433,11 +419,6 @@ export const EnquiryDetail: React.FC = () => {
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
                   )}
                   <span>{stage}</span>
-                  {isCurrent && (
-                    <span className="text-[10px] font-normal text-slate-300">
-                      (Current)
-                    </span>
-                  )}
                 </div>
                 {!isCurrent && (
                   <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />

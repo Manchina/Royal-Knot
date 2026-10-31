@@ -1,1 +1,1 @@
-export { pool, checkDatabaseConnection } from '../db';
+export { pool, db, checkDatabaseConnection } from '../db';
