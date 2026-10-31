@@ -1,5 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { pool } from '../db';
+import { db } from '../db';
+import { users } from '../db/schema';
+import { sql } from 'drizzle-orm';
 import { DEMO_USERS } from '../seeds/users';
 
 export async function authRoutes(fastify: FastifyInstance) {
@@ -14,15 +16,15 @@ export async function authRoutes(fastify: FastifyInstance) {
 
     let user: any = null;
     try {
-      const res = await pool.query(
-        'SELECT id, full_name, email, role, title, password FROM users WHERE LOWER(email) = LOWER($1)',
-        [email.trim()]
-      );
-      if (res.rows.length > 0) {
-        user = res.rows[0];
+      const rows = await db
+        .select()
+        .from(users)
+        .where(sql`LOWER(${users.email}) = LOWER(${email.trim()})`);
+      if (rows.length > 0) {
+        user = rows[0];
       }
     } catch (e: any) {
-      fastify.log.warn(`DB user query error: ${e.message}`);
+      fastify.log.warn(`Drizzle DB user query error: ${e.message}`);
     }
 
     if (!user) {
@@ -68,17 +70,14 @@ export async function authRoutes(fastify: FastifyInstance) {
     
     let user: any = null;
     try {
-      const res = await pool.query(
-        'SELECT id, full_name, email, role, title FROM users WHERE id = $1',
-        [decoded.userId]
-      );
-      if (res.rows.length > 0) {
-        user = res.rows[0];
+      const rows = await db.select().from(users).where(sql`${users.id} = ${decoded.userId}`);
+      if (rows.length > 0) {
+        user = rows[0];
       }
     } catch {}
 
     if (!user) {
-      user = DEMO_USERS.find((u) => u.id === decoded.userId) || {
+      user = DEMO_USERS.find((u: any) => u.id === decoded.userId) || {
         id: decoded.userId,
         email: '',
         full_name: 'Authenticated User',
@@ -92,7 +91,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       user: {
         id: user.id,
         email: user.email,
-        full_name: user.full_name,
+        full_name: user.fullName || user.full_name,
         role: user.role,
         title: user.title || user.role,
       },
@@ -102,17 +101,19 @@ export async function authRoutes(fastify: FastifyInstance) {
   // Available roles for preview
   fastify.get('/roles', async () => {
     try {
-      const res = await pool.query(
-        'SELECT id, full_name, email, role, title FROM users WHERE is_active = TRUE ORDER BY created_at ASC'
-      );
-      if (res.rows.length > 0) {
+      const rows = await db
+        .select()
+        .from(users)
+        .where(sql`${users.isActive} = TRUE`)
+        .orderBy(sql`${users.createdAt} ASC`);
+      if (rows.length > 0) {
         return {
           success: true,
-          roles: res.rows.map((u) => ({
+          roles: rows.map((u: any) => ({
             id: u.id,
             role: u.role,
             email: u.email,
-            full_name: u.full_name,
+            full_name: u.fullName || u.full_name,
             title: u.title || u.role,
           })),
         };
