@@ -13,7 +13,6 @@ import {
   ExternalLink,
   Loader2,
   Clock,
-  Sparkles,
   ShieldCheck,
 } from 'lucide-react';
 import { api } from '../api/client';
@@ -81,13 +80,6 @@ interface WeddingDetailData {
   rfqs?: WeddingRfq[];
 }
 
-const STAGES = [
-  { key: 'ENQUIRY', label: 'Enquiry Capture' },
-  { key: 'AGREEMENT_SIGNED', label: 'Agreement Signed' },
-  { key: 'IN_PLANNING', label: 'In Planning' },
-  { key: 'LIVE_BIG_DAY', label: 'Live Big Day' },
-  { key: 'FINALISED', label: 'Finalised & Audited' },
-];
 
 export const WeddingDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -175,7 +167,6 @@ export const WeddingDetail: React.FC = () => {
             className="h-8 text-xs text-slate-700"
           >
             <ArrowLeft className="w-3.5 h-3.5 mr-1" />
-            Portfolio
           </Button>
           <div>
             <div className="flex items-center gap-2">
@@ -206,54 +197,6 @@ export const WeddingDetail: React.FC = () => {
             <SlidersHorizontal className="w-3.5 h-3.5 mr-1" />
             Source Vendors
           </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setSelectedWeddingId(wedding.id);
-              navigate('/day-of');
-            }}
-            className="h-8 text-xs text-slate-700 font-semibold"
-          >
-            <Clock className="w-3.5 h-3.5 mr-1 text-[#714B67]" />
-            Day-Of Ops
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(`/billing/${wedding.code}`)}
-            className="h-8 text-xs text-slate-700 font-semibold"
-          >
-            <ExternalLink className="w-3.5 h-3.5 mr-1 text-slate-400" />
-            Billing & Invoices
-          </Button>
-        </div>
-      </div>
-
-      {/* 2. Odoo Pipeline Chevron Status Bar */}
-      <div className="bg-white border border-slate-200 rounded p-2 shadow-2xs overflow-x-auto">
-        <div className="flex items-center min-w-[650px]">
-          {STAGES.map((st, idx) => {
-            const isCurrent = wedding.status === st.key;
-            const isPast = STAGES.findIndex((s) => s.key === wedding.status) >= idx;
-
-            return (
-              <div
-                key={st.key}
-                className={`flex-1 py-1.5 px-3 text-center text-xs font-semibold rounded transition-colors ${
-                  isCurrent
-                    ? 'bg-[#714B67] text-white font-bold shadow-xs'
-                    : isPast
-                    ? 'text-slate-700 bg-slate-100 font-medium'
-                    : 'text-slate-400'
-                }`}
-              >
-                <span>{st.label}</span>
-              </div>
-            );
-          })}
         </div>
       </div>
 
@@ -291,7 +234,6 @@ export const WeddingDetail: React.FC = () => {
             </span>
             <span className="text-slate-300">•</span>
             <span className="flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
               {wedding.theme || 'Palace Royal Heritage'}
             </span>
           </div>
@@ -320,26 +262,26 @@ export const WeddingDetail: React.FC = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="border-b border-slate-200 px-3 pt-1">
             <TabsList className="h-9 bg-transparent border-0 p-0 space-x-2">
-              <TabsTrigger 
-                value="dossier" 
+              <TabsTrigger
+                value="dossier"
                 className="text-xs font-bold border-b-2 border-transparent data-[state=active]:border-[#714B67] data-[state=active]:text-[#714B67] rounded-none px-3"
               >
                 Project & Client Dossier
               </TabsTrigger>
-              <TabsTrigger 
-                value="procurement" 
+              <TabsTrigger
+                value="procurement"
                 className="text-xs font-bold border-b-2 border-transparent data-[state=active]:border-[#714B67] data-[state=active]:text-[#714B67] rounded-none px-3"
               >
                 Vendor Sourcing ({awardedCount}/3 Awarded)
               </TabsTrigger>
-              <TabsTrigger 
-                value="ceremonies" 
+              <TabsTrigger
+                value="ceremonies"
                 className="text-xs font-bold border-b-2 border-transparent data-[state=active]:border-[#714B67] data-[state=active]:text-[#714B67] rounded-none px-3"
               >
                 Ceremonies & Timeline ({wedding.events?.length || 0})
               </TabsTrigger>
-              <TabsTrigger 
-                value="billing" 
+              <TabsTrigger
+                value="billing"
                 className="text-xs font-bold border-b-2 border-transparent data-[state=active]:border-[#714B67] data-[state=active]:text-[#714B67] rounded-none px-3"
               >
                 Financials & Settlement

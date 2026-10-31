@@ -10,7 +10,9 @@ import {
   SlidersHorizontal,
   Loader2,
   Edit2,
-  ShieldCheck
+  Tag,
+  Calendar,
+  Sparkles
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useWeddingStore } from '../store/useWeddingStore';
@@ -21,10 +23,6 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
   Dialog,
   DialogContent,
   DialogHeader,
@@ -33,34 +31,7 @@ import {
   DialogFooter,
   Input,
   Label,
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
 } from '../components/ui';
-
-interface VendorQuoteHistory {
-  quoteId: string;
-  quoteReference?: string;
-  baseCost: string;
-  pricePerPlate?: string;
-  overtimeHourlyRate?: string;
-  status: string;
-  decisionReason?: string;
-  decidedAt?: string;
-  inclusions?: string;
-  exclusions?: string;
-  rfqId: string;
-  serviceCategory: string;
-  weddingId?: string;
-  weddingCode?: string;
-  weddingCity?: string;
-  weddingVenue?: string;
-  weddingStartDate?: string;
-  coupleName?: string;
-}
 
 interface VendorDetailData {
   id: string;
@@ -74,27 +45,17 @@ interface VendorDetailData {
   bankAccountInfo?: {
     pricingEstimate?: string;
     specialties?: string;
-    accountNumber?: string;
-    ifscCode?: string;
-    bankName?: string;
   } | null;
   createdAt: string;
-  quotes?: VendorQuoteHistory[];
-  metrics?: {
-    totalQuotes: number;
-    awardedQuotes: number;
-    winRate: number;
-  };
 }
 
 export const VendorDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { weddingOptions, setSelectedWeddingId } = useWeddingStore();
+  const { weddingOptions } = useWeddingStore();
 
   const [vendor, setVendor] = useState<VendorDetailData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<string>('dossier');
 
   // Edit Vendor Modal State
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -175,7 +136,7 @@ export const VendorDetail: React.FC = () => {
         fetchVendorDetails();
       }
     } catch (err) {
-      console.error('Failed to update vendor:', err);
+      console.error('Failed to save vendor edit:', err);
       showToast('Error updating vendor profile.');
     } finally {
       setSubmittingEdit(false);
@@ -195,12 +156,12 @@ export const VendorDetail: React.FC = () => {
       });
 
       if (res?.success) {
-        showToast(`Assigned ${vendor.businessName} to wedding project.`);
+        showToast(`Vendor assigned to wedding project successfully.`);
         setAssignModalOpen(false);
-        fetchVendorDetails();
+        setTargetWeddingId('');
       }
     } catch (err) {
-      console.error('Failed to assign vendor:', err);
+      console.error('Failed to assign vendor to wedding:', err);
       showToast('Error assigning vendor.');
     } finally {
       setSubmittingAssign(false);
@@ -209,23 +170,20 @@ export const VendorDetail: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="bg-white border border-slate-200 rounded p-12 text-center shadow-2xs space-y-3">
-        <Loader2 className="w-8 h-8 animate-spin text-[#714B67] mx-auto" />
-        <p className="text-xs text-slate-500 font-medium">Loading vendor dossier...</p>
+      <div className="flex items-center justify-center min-h-[350px] text-xs text-slate-500">
+        <Loader2 className="w-5 h-5 animate-spin mr-2 text-[#714B67]" />
+        <span>Loading vendor dossier...</span>
       </div>
     );
   }
 
   if (!vendor) {
     return (
-      <div className="bg-white border border-slate-200 rounded p-12 text-center shadow-2xs space-y-4">
-        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
-          <Building2 className="w-6 h-6" />
-        </div>
-        <div className="space-y-1">
-          <h2 className="text-base font-bold text-slate-900">Vendor Not Found</h2>
-          <p className="text-xs text-slate-500">The requested vendor profile does not exist.</p>
-        </div>
+      <div className="bg-white border border-slate-200 rounded p-8 text-center max-w-md mx-auto my-12 shadow-2xs space-y-3">
+        <h2 className="text-sm font-bold text-slate-800">Vendor Not Found</h2>
+        <p className="text-xs text-slate-500">
+          The requested vendor profile does not exist or has been removed.
+        </p>
         <Button
           variant="outline"
           size="sm"
@@ -233,32 +191,13 @@ export const VendorDetail: React.FC = () => {
           className="text-xs h-8"
         >
           <ArrowLeft className="w-3.5 h-3.5 mr-1" />
-          Back to Procurement & Vendor Directory
         </Button>
       </div>
     );
   }
 
-  const quotes = vendor.quotes || [];
-  const metrics = vendor.metrics || {
-    totalQuotes: quotes.length,
-    awardedQuotes: quotes.filter((q) => q.status === 'ACCEPTED' || q.status === 'AWARDED').length,
-    winRate: 0,
-  };
-
-  const getQuoteBadge = (status: string) => {
-    const st = status?.toUpperCase() || '';
-    if (st === 'ACCEPTED' || st === 'AWARDED') {
-      return <Badge variant="success" className="text-[10px] py-0 font-bold">Awarded ✓</Badge>;
-    }
-    if (st === 'PENDING') {
-      return <Badge variant="secondary" className="text-[10px] py-0 text-amber-800 bg-amber-50 font-semibold">Under Review</Badge>;
-    }
-    if (st === 'AUTO_REJECTED' || st === 'REJECTED') {
-      return <Badge variant="outline" className="text-[10px] py-0 border-slate-300 text-slate-400">Closed</Badge>;
-    }
-    return <Badge variant="outline" className="text-[10px] py-0">{status}</Badge>;
-  };
+  const pricingEstimate = vendor.bankAccountInfo?.pricingEstimate || 'Standard rate on request';
+  const specialties = vendor.bankAccountInfo?.specialties || 'Verified partner registered in Royal Knot agency directory.';
 
   return (
     <div className="space-y-4">
@@ -270,7 +209,7 @@ export const VendorDetail: React.FC = () => {
         </div>
       )}
 
-      {/* 1. Odoo Breadcrumbs & Control Bar */}
+      {/* 1. Control Bar */}
       <div className="bg-white border border-slate-200 rounded p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
         <div className="flex items-center gap-3">
           <Button
@@ -280,12 +219,11 @@ export const VendorDetail: React.FC = () => {
             className="h-8 text-xs text-slate-700"
           >
             <ArrowLeft className="w-3.5 h-3.5 mr-1" />
-            Vendor Directory
           </Button>
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                Procurement / Master Vendors
+                Procurement / Vendor Directory
               </span>
               <span className="text-slate-300">•</span>
               <span className="font-mono text-xs font-bold text-[#714B67]">
@@ -321,382 +259,255 @@ export const VendorDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Hero Overview Card */}
-      <div className="bg-white border border-slate-200 rounded p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-5">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className="text-[10px] py-0 font-mono font-bold text-[#714B67] border-[#714B67]/30 bg-[#714B67]/5">
-              {vendor.category}
-            </Badge>
-            <Badge variant="outline" className="text-[10px] py-0 border-slate-300 text-slate-700 font-semibold">
-              {vendor.city || 'Jaipur'}
-            </Badge>
-            <div className="flex items-center gap-1 font-bold text-xs text-amber-700">
-              <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-600" />
-              <span>{vendor.ratingScore} ★ Verified Partner</span>
-            </div>
-          </div>
-
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-            {vendor.businessName}
-          </h2>
-
-          <div className="flex items-center gap-4 text-xs text-slate-600 flex-wrap pt-1">
-            {vendor.contactPerson && (
-              <span className="font-semibold text-slate-800">
-                Contact: {vendor.contactPerson}
-              </span>
-            )}
-            <span className="flex items-center gap-1.5 font-mono">
-              <Phone className="w-3.5 h-3.5 text-slate-400" />
-              {vendor.phone}
-            </span>
-            {vendor.email && (
-              <span className="flex items-center gap-1.5">
-                <Mail className="w-3.5 h-3.5 text-slate-400" />
-                {vendor.email}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Performance Metric Counters */}
-        <div className="grid grid-cols-3 gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-5 shrink-0">
-          <div className="space-y-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total RFQs</span>
-            <div className="text-base font-bold text-slate-900 font-mono">{metrics.totalQuotes}</div>
-          </div>
-
-          <div className="space-y-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Won Contracts</span>
-            <div className="text-base font-bold text-emerald-700 font-mono">{metrics.awardedQuotes}</div>
-          </div>
-
-          <div className="space-y-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Win Rate</span>
-            <div className="text-base font-bold text-[#714B67] font-mono">{metrics.winRate}%</div>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Tabbed Content Dossier */}
-      <div className="bg-white border border-slate-200 rounded shadow-2xs">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="border-b border-slate-200 px-3 pt-1">
-            <TabsList className="h-9 bg-transparent border-0 p-0 space-x-2">
-              <TabsTrigger
-                value="dossier"
-                className="text-xs font-bold border-b-2 border-transparent data-[state=active]:border-[#714B67] data-[state=active]:text-[#714B67] rounded-none px-3"
-              >
-                Commercial Dossier & Capabilities
-              </TabsTrigger>
-              <TabsTrigger
-                value="quotes"
-                className="text-xs font-bold border-b-2 border-transparent data-[state=active]:border-[#714B67] data-[state=active]:text-[#714B67] rounded-none px-3"
-              >
-                Quote History & Contracts ({quotes.length})
-              </TabsTrigger>
-              <TabsTrigger
-                value="compliance"
-                className="text-xs font-bold border-b-2 border-transparent data-[state=active]:border-[#714B67] data-[state=active]:text-[#714B67] rounded-none px-3"
-              >
-                Bank & Payout Profile
-              </TabsTrigger>
-            </TabsList>
-          </div>
-
-          {/* TAB 1: Commercial Dossier */}
-          <TabsContent value="dossier" className="p-5 m-0 space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <Card className="border border-slate-200 rounded shadow-2xs">
-                <CardHeader className="p-3.5 border-b border-slate-100 bg-slate-50/70">
-                  <CardTitle className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <Building2 className="w-3.5 h-3.5 text-[#714B67]" />
-                    Business & Commercial Overview
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 space-y-3 text-xs">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">Primary Category</span>
-                      <strong className="text-slate-800">{vendor.category}</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">Operational Hub</span>
-                      <strong className="text-slate-800">{vendor.city || 'Jaipur, Rajasthan'}</strong>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-100 space-y-2">
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">Baseline Pricing Estimate</span>
-                      <span className="font-mono font-bold text-slate-800">
-                        {vendor.bankAccountInfo?.pricingEstimate || '₹5,00,000 - ₹12,00,000 (Based on scale)'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">Specialties & Signature Services</span>
-                      <p className="text-slate-700 bg-slate-50 p-2.5 rounded text-[11px] leading-relaxed mt-1">
-                        {vendor.bankAccountInfo?.specialties || 'Palace-grade catering, certified royal banquet staff, silver chinaware, regional live counters, verified equipment.'}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border border-slate-200 rounded shadow-2xs">
-                <CardHeader className="p-3.5 border-b border-slate-100 bg-slate-50/70">
-                  <CardTitle className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    Quality & Audit Credentials
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 space-y-3 text-xs">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">Audit Rating</span>
-                      <strong className="text-amber-800">{vendor.ratingScore} / 5.00 Stars</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">Verification</span>
-                      <strong className="text-emerald-700 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                        Verified Enterprise Partner
-                      </strong>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-100 space-y-2">
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">Registered On</span>
-                      <span className="text-slate-700 font-mono">
-                        {new Date(vendor.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">Coverage Cities</span>
-                      <span className="text-slate-700">Jaipur, Udaipur, Jodhpur, Ranthambore</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* TAB 2: Quote History & Contracts */}
-          <TabsContent value="quotes" className="p-5 m-0 space-y-4">
-            <div className="flex items-center justify-between">
+      {/* 2. Primary Vendor Dossier Card */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Left Column: Vendor Profile & Contact (2 cols) */}
+        <div className="md:col-span-2 space-y-4">
+          <Card className="border border-slate-200 rounded shadow-2xs bg-white">
+            <CardHeader className="p-4 border-b border-slate-100 bg-slate-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">RFQs & Contract Decisions</h3>
-                <p className="text-xs text-slate-500">Historical proposals and contract award outcomes for this vendor.</p>
+                <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-[#714B67]" />
+                  <span>Vendor Profile</span>
+                </CardTitle>
+                <p className="text-[11px] text-slate-500">Registered commercial partner details</p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setAssignModalOpen(true)}
-                className="text-xs h-8 border-slate-300 font-semibold"
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5 mr-1 text-[#714B67]" />
-                Assign to Another Wedding
-              </Button>
-            </div>
-
-            {quotes.length === 0 ? (
-              <div className="border border-dashed border-slate-200 rounded p-8 text-center text-xs text-slate-400">
-                No past quotes or proposals recorded for this vendor yet.
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-[10px] py-0 font-mono font-bold text-[#714B67] border-[#714B67]/30 bg-[#714B67]/5">
+                  {vendor.category}
+                </Badge>
+                <div className="flex items-center gap-1 font-bold text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                  <Star className="w-3 h-3 fill-amber-500 text-amber-600" />
+                  <span>{vendor.ratingScore}</span>
+                </div>
               </div>
-            ) : (
-              <div className="border border-slate-200 rounded overflow-hidden shadow-2xs">
-                <Table>
-                  <TableHeader className="bg-slate-50 text-slate-700">
-                    <TableRow>
-                      <TableHead className="w-[120px] text-xs font-bold">Quote Ref</TableHead>
-                      <TableHead className="text-xs font-bold">Wedding Project</TableHead>
-                      <TableHead className="text-xs font-bold">Venue & City</TableHead>
-                      <TableHead className="text-xs font-bold">Base Rate</TableHead>
-                      <TableHead className="text-xs font-bold">Plate / Overtime</TableHead>
-                      <TableHead className="text-xs font-bold">Outcome</TableHead>
-                      <TableHead className="text-right text-xs font-bold pr-4">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {quotes.map((q) => (
-                      <TableRow key={q.quoteId} className="hover:bg-slate-50/50">
-                        <TableCell className="font-mono text-xs font-bold text-[#714B67]">
-                          {q.quoteReference || q.quoteId.slice(0, 8)}
-                        </TableCell>
+            </CardHeader>
 
-                        <TableCell>
-                          <div className="font-bold text-xs text-slate-900">
-                            {q.coupleName || 'Wedding Project'}
-                          </div>
-                          <div className="font-mono text-[11px] text-slate-400">
-                            {q.weddingCode}
-                          </div>
-                        </TableCell>
+            <CardContent className="p-5 space-y-5 text-xs">
+              {/* Basic Details Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <span className="text-slate-400 block text-[11px] font-medium">Business Name</span>
+                  <strong className="text-slate-900 text-sm">{vendor.businessName}</strong>
+                </div>
 
-                        <TableCell className="text-xs text-slate-700">
-                          <div>{q.weddingVenue || 'Luxury Palace'}</div>
-                          <div className="text-[11px] text-slate-400">{q.weddingCity}</div>
-                        </TableCell>
+                <div>
+                  <span className="text-slate-400 block text-[11px] font-medium">Category</span>
+                  <Badge variant="outline" className="font-mono text-xs mt-0.5 border-slate-300">
+                    {vendor.category}
+                  </Badge>
+                </div>
 
-                        <TableCell className="font-mono font-bold text-xs text-slate-900">
-                          ₹{Number(q.baseCost).toLocaleString('en-IN')}
-                        </TableCell>
+                <div>
+                  <span className="text-slate-400 block text-[11px] font-medium">Primary Contact Person</span>
+                  <span className="text-slate-800 font-semibold">{vendor.contactPerson || 'Not specified'}</span>
+                </div>
 
-                        <TableCell className="font-mono text-xs text-slate-600">
-                          {q.pricePerPlate ? `₹${Number(q.pricePerPlate).toLocaleString('en-IN')} / plate` : '—'}
-                        </TableCell>
-
-                        <TableCell>
-                          {getQuoteBadge(q.status)}
-                        </TableCell>
-
-                        <TableCell className="text-right pr-4">
-                          {q.weddingCode && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                if (q.weddingId) setSelectedWeddingId(q.weddingId);
-                                navigate(`/weddings/${q.weddingCode}`);
-                              }}
-                              className="h-7 text-xs text-[#714B67] hover:text-[#5b3c53] font-semibold"
-                            >
-                              View Wedding
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* TAB 3: Compliance & Bank Details */}
-          <TabsContent value="compliance" className="p-5 m-0 space-y-4">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Financial & Settlement Information</h3>
-              <p className="text-xs text-slate-500">Bank accounts for milestone disbursements and compliance audit logs.</p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="border border-slate-200 rounded p-4 bg-slate-50/50 space-y-2 text-xs">
-                <span className="font-bold text-slate-700 block">Bank Account Details</span>
-                <div className="space-y-1 font-mono text-[11px] text-slate-600">
-                  <div>Account: {vendor.bankAccountInfo?.accountNumber || '•••• •••• •••• 4402'}</div>
-                  <div>IFSC Code: {vendor.bankAccountInfo?.ifscCode || 'HDFC0001042'}</div>
-                  <div>Bank: {vendor.bankAccountInfo?.bankName || 'HDFC Bank, MI Road Branch, Jaipur'}</div>
+                <div>
+                  <span className="text-slate-400 block text-[11px] font-medium">Operational City</span>
+                  <span className="text-slate-800 font-semibold">{vendor.city || 'Jaipur'}</span>
                 </div>
               </div>
 
-              <div className="border border-slate-200 rounded p-4 bg-slate-50/50 space-y-2 text-xs">
-                <span className="font-bold text-slate-700 block">Disbursement Schedule</span>
-                <p className="text-slate-600 text-[11px] leading-relaxed">
-                  Standard PeopleFirst 3-tranche milestone payout: 25% Advance Booking, 50% Hall Rehearsal / Setup, 25% Post Event Final Settlement.
-                </p>
+              {/* Contact Information */}
+              <div className="pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <span className="text-slate-400 block text-[11px] font-medium">Phone Number</span>
+                  <a
+                    href={`tel:${vendor.phone}`}
+                    className="flex items-center gap-1.5 font-mono font-bold text-slate-900 hover:text-[#714B67] mt-0.5"
+                  >
+                    <Phone className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{vendor.phone}</span>
+                  </a>
+                </div>
+
+                <div>
+                  <span className="text-slate-400 block text-[11px] font-medium">Email Address</span>
+                  {vendor.email ? (
+                    <a
+                      href={`mailto:${vendor.email}`}
+                      className="flex items-center gap-1.5 text-slate-800 hover:text-[#714B67] mt-0.5"
+                    >
+                      <Mail className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{vendor.email}</span>
+                    </a>
+                  ) : (
+                    <span className="text-slate-400 mt-0.5 block">Not provided</span>
+                  )}
+                </div>
               </div>
-            </div>
-          </TabsContent>
-        </Tabs>
+
+              {/* Specialties & Pricing Section */}
+              <div className="pt-4 border-t border-slate-100 space-y-3">
+                <div>
+                  <span className="text-slate-400 block text-[11px] font-medium mb-1 flex items-center gap-1">
+                    <Tag className="w-3 h-3 text-[#714B67]" />
+                    Baseline Pricing Estimate
+                  </span>
+                  <div className="p-2.5 rounded bg-slate-50 border border-slate-200 text-slate-800 font-mono font-bold text-xs">
+                    {pricingEstimate}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-slate-400 block text-[11px] font-medium mb-1 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-[#714B67]" />
+                    Specialties & Description
+                  </span>
+                  <div className="p-3 rounded bg-slate-50 border border-slate-200 text-slate-700 text-xs leading-relaxed">
+                    {specialties}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column: Quick Info & Registration Meta */}
+        <div className="space-y-4">
+          <Card className="border border-slate-200 rounded shadow-2xs bg-white">
+            <CardHeader className="p-4 border-b border-slate-100 bg-slate-50/70">
+              <CardTitle className="text-xs font-bold text-slate-900">
+                Partner Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 space-y-3 text-xs">
+              <div>
+                <span className="text-slate-400 block text-[11px]">Vendor ID</span>
+                <span className="font-mono text-[11px] text-slate-600 select-all">{vendor.id}</span>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100">
+                <span className="text-slate-400 block text-[11px]">Partner Status</span>
+                <Badge variant="success" className="text-[10px] py-0 mt-0.5">
+                  Active Directory
+                </Badge>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100">
+                <span className="text-slate-400 block text-[11px] flex items-center gap-1">
+                  <Calendar className="w-3 h-3 text-slate-400" />
+                  Date Added
+                </span>
+                <span className="text-slate-700 font-medium mt-0.5 block">
+                  {new Date(vendor.createdAt).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </span>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAssignModalOpen(true)}
+                  className="w-full h-8 text-xs font-semibold text-[#714B67] border-[#714B67]/30 hover:bg-[#714B67]/5"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 mr-1" />
+                  Assign to Wedding Project
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      {/* MODAL 1: Edit Vendor Profile */}
+      {/* 3. Modal: Edit Vendor Profile */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-        <DialogContent className="max-w-md bg-white p-5">
+        <DialogContent className="max-w-md bg-white border border-slate-200 shadow-xl rounded">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900">
               Edit Vendor Profile
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Update commercial details, contact coordinates, and service inclusions.
+              Update commercial details, contact numbers, and service estimates.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSaveEdit} className="space-y-3 pt-2">
+          <form onSubmit={handleSaveEdit} className="space-y-3 text-xs">
             <div>
-              <Label className="text-xs font-semibold text-slate-700">Business Name *</Label>
+              <Label className="text-xs font-semibold">Business Name *</Label>
               <Input
+                required
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                className="mt-1 h-8 text-xs"
-                required
+                className="h-8 text-xs mt-1"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold text-slate-700">Contact Person</Label>
+                <Label className="text-xs font-semibold">Contact Person</Label>
                 <Input
                   value={editContact}
                   onChange={(e) => setEditContact(e.target.value)}
-                  className="mt-1 h-8 text-xs"
+                  className="h-8 text-xs mt-1"
                 />
               </div>
+
               <div>
-                <Label className="text-xs font-semibold text-slate-700">Phone Number *</Label>
+                <Label className="text-xs font-semibold">City</Label>
                 <Input
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  className="mt-1 h-8 text-xs"
-                  required
+                  value={editCity}
+                  onChange={(e) => setEditCity(e.target.value)}
+                  className="h-8 text-xs mt-1"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold text-slate-700">Email Address</Label>
+                <Label className="text-xs font-semibold">Phone *</Label>
+                <Input
+                  required
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="h-8 text-xs mt-1"
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold">Email</Label>
                 <Input
                   type="email"
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
-                  className="mt-1 h-8 text-xs"
-                />
-              </div>
-              <div>
-                <Label className="text-xs font-semibold text-slate-700">Operational City</Label>
-                <Input
-                  value={editCity}
-                  onChange={(e) => setEditCity(e.target.value)}
-                  className="mt-1 h-8 text-xs"
+                  className="h-8 text-xs mt-1"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold text-slate-700">Audit Rating (Stars)</Label>
+                <Label className="text-xs font-semibold">Rating Score</Label>
                 <Input
-                  type="number"
-                  step="0.05"
-                  min="1"
-                  max="5"
                   value={editRating}
                   onChange={(e) => setEditRating(e.target.value)}
-                  className="mt-1 h-8 text-xs font-mono"
+                  className="h-8 text-xs mt-1 font-mono"
                 />
               </div>
+
               <div>
-                <Label className="text-xs font-semibold text-slate-700">Pricing Estimate</Label>
+                <Label className="text-xs font-semibold">Pricing Estimate</Label>
                 <Input
                   value={editPricing}
                   onChange={(e) => setEditPricing(e.target.value)}
-                  placeholder="e.g. ₹8,00,000"
-                  className="mt-1 h-8 text-xs"
+                  placeholder="e.g. ₹8,500"
+                  className="h-8 text-xs mt-1 font-mono"
                 />
               </div>
             </div>
 
             <div>
-              <Label className="text-xs font-semibold text-slate-700">Specialties & Inclusions</Label>
-              <textarea
+              <Label className="text-xs font-semibold">Specialties / Notes</Label>
+              <Input
                 value={editSpecialties}
                 onChange={(e) => setEditSpecialties(e.target.value)}
-                rows={2}
-                className="mt-1 w-full text-xs bg-white border border-slate-200 rounded p-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
+                placeholder="e.g. silver chair, royal mandap"
+                className="h-8 text-xs mt-1"
               />
             </div>
 
@@ -712,48 +523,53 @@ export const VendorDetail: React.FC = () => {
               </Button>
               <Button
                 type="submit"
-                disabled={submittingEdit}
                 size="sm"
+                disabled={submittingEdit}
                 className="text-xs h-8 bg-[#714B67] hover:bg-[#5b3c53] text-white"
               >
-                {submittingEdit ? 'Saving...' : 'Save Changes'}
+                {submittingEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+                Save Changes
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* MODAL 2: Assign to Wedding */}
+      {/* 4. Modal: Assign Vendor to Wedding Project */}
       <Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
-        <DialogContent className="max-w-md bg-white p-5">
+        <DialogContent className="max-w-md bg-white border border-slate-200 shadow-xl rounded">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900">
-              Assign {vendor.businessName} to Wedding
+              Assign Vendor to Wedding
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Select the wedding project to add this vendor as a candidate {vendor.category} option.
+              Add {vendor.businessName} to the procurement options for a specific wedding.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleAssignToWedding} className="space-y-3 pt-2">
+          <form onSubmit={handleAssignToWedding} className="space-y-4 text-xs">
             <div>
-              <Label className="text-xs font-semibold text-slate-700">Target Wedding *</Label>
+              <Label className="text-xs font-semibold">Target Wedding Project</Label>
               <select
+                required
                 value={targetWeddingId}
                 onChange={(e) => setTargetWeddingId(e.target.value)}
-                className="mt-1 w-full h-8 text-xs bg-white border border-slate-200 rounded px-2 text-slate-800"
-                required
+                className="w-full mt-1.5 h-8 text-xs bg-white border border-slate-300 rounded px-2 text-slate-800"
               >
-                <option value="">Select Wedding Project...</option>
+                <option value="">Select a wedding...</option>
                 {weddingOptions.map((w) => (
                   <option key={w.id} value={w.id}>
-                    {w.code}: {w.couple} ({w.city})
+                    {w.code} • {w.couple} ({w.city})
                   </option>
                 ))}
               </select>
             </div>
 
-            <DialogFooter className="pt-2">
+            <div className="p-2.5 rounded bg-slate-50 border border-slate-200 text-[11px] text-slate-600">
+              This vendor will be assigned under category <strong className="text-slate-900">{vendor.category}</strong>.
+            </div>
+
+            <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
@@ -765,11 +581,12 @@ export const VendorDetail: React.FC = () => {
               </Button>
               <Button
                 type="submit"
-                disabled={submittingAssign || !targetWeddingId}
                 size="sm"
-                className="text-xs h-8 bg-[#714B67] hover:bg-[#5b3c53] text-white"
+                disabled={submittingAssign || !targetWeddingId}
+                className="text-xs h-8 bg-[#714B67] hover:bg-[#5b3c53] text-white font-semibold"
               >
-                {submittingAssign ? 'Assigning...' : 'Confirm Assignment'}
+                {submittingAssign ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+                Confirm Assignment
               </Button>
             </DialogFooter>
           </form>
