@@ -56,7 +56,9 @@ interface Enquiry {
 }
 export const Enquiries: React.FC = () => {
   const navigate = useNavigate();
+  const [stageFilter, setStageFilter] = useState<string>('ALL');
   const [channelFilter, setChannelFilter] = useState<string>('ALL');
+  const [cityFilter, setCityFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [_loading, setLoading] = useState<boolean>(false);
@@ -214,20 +216,22 @@ export const Enquiries: React.FC = () => {
 
 
   const filtered = enquiries.filter((e) => {
+    const matchesStage = stageFilter === 'ALL' || e.status === stageFilter;
     const matchesChannel = channelFilter === 'ALL' || (e.channel || '').includes(channelFilter);
+    const matchesCity = cityFilter === 'ALL' || e.cityPreference === cityFilter;
     const matchesSearch =
       (e.couple || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (e.phone || '').includes(searchTerm) ||
       (e.id || '').toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesChannel && matchesSearch;
+    return matchesStage && matchesChannel && matchesCity && matchesSearch;
   });
 
-  const channelCounts = {
+  const stageCounts = {
     ALL: enquiries.length,
-    Website: enquiries.filter((e) => (e.channel || '').includes('Website')).length,
-    WhatsApp: enquiries.filter((e) => (e.channel || '').includes('WhatsApp')).length,
-    Instagram: enquiries.filter((e) => (e.channel || '').includes('Instagram')).length,
-    Phone: enquiries.filter((e) => (e.channel || '').includes('Phone')).length,
+    'Initial Discovery': enquiries.filter((e) => e.status === 'Initial Discovery').length,
+    'Consultation Booked': enquiries.filter((e) => e.status === 'Consultation Booked').length,
+    'Agreement Awaited': enquiries.filter((e) => e.status === 'Agreement Awaited').length,
+    'Converted to Wedding': enquiries.filter((e) => e.status === 'Converted to Wedding').length,
   };
 
   return (
@@ -254,7 +258,30 @@ export const Enquiries: React.FC = () => {
         </Button>
       </div>
 
-      {/* Filter & Search Toolbar */}
+      {/* 1. Pipeline Stages Tabs with Live Counts */}
+      <div className="bg-white border border-slate-200 rounded p-1.5 shadow-2xs">
+        <Tabs value={stageFilter} onValueChange={setStageFilter} className="w-full">
+          <TabsList className="h-9 bg-slate-100 border border-slate-200 w-full justify-start overflow-x-auto p-1">
+            <TabsTrigger value="ALL" className="text-xs px-3 font-semibold">
+              All Stages ({stageCounts.ALL})
+            </TabsTrigger>
+            <TabsTrigger value="Initial Discovery" className="text-xs px-3 font-semibold">
+              Initial Discovery ({stageCounts['Initial Discovery']})
+            </TabsTrigger>
+            <TabsTrigger value="Consultation Booked" className="text-xs px-3 font-semibold">
+              Consultation Booked ({stageCounts['Consultation Booked']})
+            </TabsTrigger>
+            <TabsTrigger value="Agreement Awaited" className="text-xs px-3 font-semibold">
+              Agreement Awaited ({stageCounts['Agreement Awaited']})
+            </TabsTrigger>
+            <TabsTrigger value="Converted to Wedding" className="text-xs px-3 font-semibold">
+              Converted ({stageCounts['Converted to Wedding']})
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {/* 2. Filter & Search Toolbar (Search, Channel Filter Dropdown, City Filter Dropdown) */}
       <div className="bg-white border border-slate-200 rounded p-2.5 flex flex-col md:flex-row items-center justify-between gap-3 shadow-2xs">
         <div className="relative w-full md:w-80">
           <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -266,25 +293,48 @@ export const Enquiries: React.FC = () => {
           />
         </div>
 
-        <Tabs value={channelFilter} onValueChange={setChannelFilter} className="w-full md:w-auto">
-          <TabsList className="h-8 bg-slate-100 border border-slate-200">
-            <TabsTrigger value="ALL" className="text-xs px-3 font-semibold">
-              All Channels ({channelCounts.ALL})
-            </TabsTrigger>
-            <TabsTrigger value="Website" className="text-xs px-3 font-semibold">
-              Website Leads ({channelCounts.Website})
-            </TabsTrigger>
-            <TabsTrigger value="WhatsApp" className="text-xs px-3 font-semibold">
-              WhatsApp ({channelCounts.WhatsApp})
-            </TabsTrigger>
-            <TabsTrigger value="Instagram" className="text-xs px-3 font-semibold">
-              Instagram ({channelCounts.Instagram})
-            </TabsTrigger>
-            <TabsTrigger value="Phone" className="text-xs px-3 font-semibold">
-              Phone Calls ({channelCounts.Phone})
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+          {/* Channel Filter Dropdown */}
+          <Select value={channelFilter} onValueChange={setChannelFilter}>
+            <SelectTrigger className="w-[160px] h-8 text-xs border-slate-300 bg-white">
+              <SelectValue placeholder="All Channels" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Channels</SelectItem>
+              <SelectItem value="Website">Website Leads</SelectItem>
+              <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+              <SelectItem value="Instagram">Instagram</SelectItem>
+              <SelectItem value="Phone">Phone Calls</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* City Filter Dropdown */}
+          <Select value={cityFilter} onValueChange={setCityFilter}>
+            <SelectTrigger className="w-[130px] h-8 text-xs border-slate-300 bg-white">
+              <SelectValue placeholder="All Cities" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Cities</SelectItem>
+              <SelectItem value="Udaipur">Udaipur</SelectItem>
+              <SelectItem value="Jaipur">Jaipur</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Clear Filters Button */}
+          {(channelFilter !== 'ALL' || cityFilter !== 'ALL' || searchTerm) && (
+            <button
+              type="button"
+              onClick={() => {
+                setChannelFilter('ALL');
+                setCityFilter('ALL');
+                setSearchTerm('');
+              }}
+              className="text-xs text-slate-500 hover:text-slate-800 underline px-1 cursor-pointer"
+            >
+              Reset
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Table View */}
