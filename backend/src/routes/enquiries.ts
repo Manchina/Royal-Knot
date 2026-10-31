@@ -1,7 +1,9 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { db } from '../db';
-import { enquiries, clients, weddings } from '../db/schema';
-import { eq, desc, ilike, or, and, count } from 'drizzle-orm';
+import { enquiries, clients, weddings, enquiryChangeLogs, users } from '../db/schema';
+import { eq, desc, asc, ilike, or, and, count, sql } from 'drizzle-orm';
+
+const matchEnquiry = (param: string) => sql`(${enquiries.id}::text = ${param} OR ${enquiries.code} = ${param})`;
 
 interface CreateEnquiryBody {
   coupleName: string;
@@ -22,6 +24,8 @@ interface UpdateStatusBody {
   status?: string;
   agreementStatus?: string;
   notes?: string;
+  signatoryName?: string;
+  userId?: string;
 }
 
 export async function enquiryRoutes(fastify: FastifyInstance) {
@@ -76,6 +80,20 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
           notes,
         })
         .returning();
+
+      // Record audit change log
+      try {
+        await db.insert(enquiryChangeLogs).values({
+          enquiryId: created.id,
+          action: 'LEAD_CREATED',
+          fromStatus: null,
+          toStatus: 'Initial Discovery',
+          performedBy: created.channel || 'Website Portal',
+          notes: `Consultation lead submitted. Destination: ${created.cityPreference}, Guest count: ${created.guestCount}.`,
+        });
+      } catch (logErr: any) {
+        fastify.log.warn(`Change log insert error: ${logErr.message}`);
+      }
 
       return {
         success: true,
@@ -135,10 +153,31 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // Get single enquiry by code or UUID
+  fastify.get('/:id', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { id } = request.params;
+    try {
+      const [enquiry] = await db.select().from(enquiries).where(matchEnquiry(id));
+      if (!enquiry) {
+        reply.status(404);
+        return { success: false, message: 'Enquiry not found.' };
+      }
+
+      return {
+        success: true,
+        data: enquiry,
+      };
+    } catch (err: any) {
+      fastify.log.error(`Error querying single enquiry via Drizzle: ${err.message}`);
+      reply.status(500);
+      return { success: false, error: err.message };
+    }
+  });
+
   // Update enquiry status / Sign agreement on mobile (Drizzle ORM)
   fastify.patch('/:id/status', async (request: FastifyRequest<{ Params: { id: string }; Body: UpdateStatusBody }>, reply: FastifyReply) => {
     const { id } = request.params;
-    const { status, agreementStatus, notes } = request.body || {};
+    const { status, agreementStatus, notes, signatoryName, userId } = request.body || {};
 
     try {
       const isSigned = agreementStatus === 'Signed on Mobile';
@@ -149,21 +188,52 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
       if (status) updateValues.status = status;
       if (agreementStatus) updateValues.agreementStatus = agreementStatus;
       if (isSigned) updateValues.agreementSignedAt = new Date();
+      if (signatoryName) updateValues.primaryContactName = signatoryName;
       if (notes !== undefined) updateValues.notes = notes;
-
-      // Check if id is UUID or code
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-      const condition = isUUID ? eq(enquiries.id, id) : eq(enquiries.code, id);
 
       const [updated] = await db
         .update(enquiries)
         .set(updateValues)
-        .where(condition)
+        .where(matchEnquiry(id))
         .returning();
 
       if (!updated) {
         reply.status(404);
         return { success: false, message: 'Enquiry not found.' };
+      }
+
+      const isSent = agreementStatus === 'Sent - Pending Signature';
+
+      let action = 'STATUS_UPDATED';
+      let logNotes = `Status updated to "${updated.status}". ${notes || ''}`;
+      const performedBy = signatoryName
+        ? `${signatoryName}${userId ? ` (UID: ${userId})` : ''} (Authorized Signatory)`
+        : isSigned
+        ? `Client${userId ? ` (UID: ${userId})` : ''} (Mobile Magic Link)`
+        : 'Lead Planner (Devika Sharma)';
+
+      if (isSigned) {
+        action = 'AGREEMENT_SIGNED';
+        logNotes = signatoryName
+          ? `Client (${signatoryName}${userId ? `, UID: ${userId}` : ''}) reviewed and digitally signed royal wedding agreement via mobile magic link.`
+          : `Client${userId ? ` (UID: ${userId})` : ''} reviewed and digitally signed royal wedding agreement via mobile magic link.`;
+      } else if (isSent) {
+        action = 'AGREEMENT_SENT';
+        logNotes = `Dummy wedding service agreement generated and magic signing link dispatched to client via email & mobile.${userId ? ` (UID: ${userId})` : ''}`;
+      }
+
+      // Record audit change log
+      try {
+        await db.insert(enquiryChangeLogs).values({
+          enquiryId: updated.id,
+          action,
+          fromStatus: null,
+          toStatus: updated.status,
+          performedBy,
+          notes: logNotes,
+        });
+      } catch (logErr: any) {
+        fastify.log.warn(`Change log insert error: ${logErr.message}`);
       }
 
       return {
@@ -183,13 +253,10 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
     const { id } = request.params;
 
     try {
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-      const condition = isUUID ? eq(enquiries.id, id) : eq(enquiries.code, id);
-
       const [enquiry] = await db
         .select()
         .from(enquiries)
-        .where(condition);
+        .where(matchEnquiry(id));
 
       if (!enquiry) {
         reply.status(404);
@@ -251,7 +318,26 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
         })
         .returning();
 
-      // 4. Update enquiry link
+      // 4. Provision Couple User Account with default password password123
+      const clientEmail = enquiry.email || `client_${weddingCode.toLowerCase().replace(/[^a-z0-9]/g, '')}@royalknot.com`;
+      const [existingUser] = await db.select().from(users).where(eq(users.email, clientEmail));
+      let clientUser = existingUser;
+      if (!existingUser) {
+        [clientUser] = await db
+          .insert(users)
+          .values({
+            fullName: enquiry.coupleName,
+            email: clientEmail,
+            password: 'password123',
+            phone: enquiry.phone,
+            role: 'CLIENT',
+            title: 'Royal Couple',
+            isActive: true,
+          })
+          .returning();
+      }
+
+      // 5. Update enquiry link
       await db
         .update(enquiries)
         .set({
@@ -262,13 +348,96 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
         })
         .where(eq(enquiries.id, enquiry.id));
 
+      // 6. Record change log
+      try {
+        await db.insert(enquiryChangeLogs).values({
+          enquiryId: enquiry.id,
+          action: 'CONVERTED_TO_WEDDING',
+          fromStatus: enquiry.status,
+          toStatus: 'Converted to Wedding',
+          performedBy: 'Lead Planner (Devika Sharma)',
+          notes: `Converted lead to active Wedding Project ${weddingCode} (${newWedding.primaryVenue}). Client Portal user provisioned for ${clientEmail} with default password: password123.`,
+        });
+      } catch (logErr: any) {
+        fastify.log.warn(`Change log insert error: ${logErr.message}`);
+      }
+
       return {
         success: true,
-        message: `Enquiry successfully converted to Wedding Project ${weddingCode} via Drizzle ORM!`,
+        message: `Enquiry successfully converted to Wedding Project ${weddingCode} and client user provisioned!`,
         wedding: newWedding,
+        client: newClient,
+        user: {
+          id: clientUser?.id,
+          email: clientUser?.email,
+          fullName: clientUser?.fullName,
+          role: clientUser?.role,
+          defaultPassword: 'password123',
+        },
       };
     } catch (err: any) {
       fastify.log.error(`Enquiry conversion error via Drizzle: ${err.message}`);
+      reply.status(500);
+      return { success: false, error: err.message };
+    }
+  });
+
+  // Get change log history for a specific enquiry
+  fastify.get('/:id/logs', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { id } = request.params;
+
+    try {
+      const [found] = await db.select({ id: enquiries.id }).from(enquiries).where(matchEnquiry(id));
+      const enquiryId = found ? found.id : id;
+
+      const logs = await db
+        .select()
+        .from(enquiryChangeLogs)
+        .where(eq(enquiryChangeLogs.enquiryId, enquiryId))
+        .orderBy(desc(enquiryChangeLogs.createdAt));
+
+      return {
+        success: true,
+        count: logs.length,
+        data: logs,
+      };
+    } catch (err: any) {
+      fastify.log.error(`Change log query error: ${err.message}`);
+      reply.status(500);
+      return { success: false, error: err.message };
+    }
+  });
+
+  // Append an activity note to the change log
+  fastify.post('/:id/logs', async (request: FastifyRequest<{ Params: { id: string }; Body: { notes: string; action?: string; performedBy?: string } }>, reply: FastifyReply) => {
+    const { id } = request.params;
+    const { notes, action = 'PLANNER_NOTE', performedBy = 'Devika Sharma (Lead Planner)' } = request.body || {};
+
+    if (!notes) {
+      reply.status(400);
+      return { success: false, message: 'Notes are required.' };
+    }
+
+    try {
+      const [found] = await db.select({ id: enquiries.id }).from(enquiries).where(matchEnquiry(id));
+      const enquiryId = found ? found.id : id;
+
+      const [log] = await db
+        .insert(enquiryChangeLogs)
+        .values({
+          enquiryId,
+          action,
+          performedBy,
+          notes,
+        })
+        .returning();
+
+      return {
+        success: true,
+        data: log,
+      };
+    } catch (err: any) {
+      fastify.log.error(`Change log create error: ${err.message}`);
       reply.status(500);
       return { success: false, error: err.message };
     }

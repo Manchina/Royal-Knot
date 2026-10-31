@@ -6,7 +6,8 @@ import {
   Calendar, 
   Users, 
   Building2,
-  ArrowRight
+  ArrowRight,
+  FileCheck,
 } from 'lucide-react';
 import { useWeddingStore } from '../store/useWeddingStore';
 import {
@@ -279,10 +280,17 @@ export const Weddings: React.FC = () => {
               </div>
             </CardContent>
 
-            <CardFooter className="p-3 bg-slate-50/80 border-t border-slate-200 flex items-center justify-between">
-              <span className="text-[11px] text-slate-500 font-mono">
-                Standard Operations Lifecycle
-              </span>
+            <CardFooter className="p-3 bg-slate-50/80 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+              <a
+                href={`/sign/ENQ-2026-101`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-[#714B67] hover:text-slate-900 font-semibold inline-flex items-center gap-1 cursor-pointer"
+                title="View signed wedding agreement"
+              >
+                <FileCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Signed Agreement (PDF) ↗</span>
+              </a>
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"

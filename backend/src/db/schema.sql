@@ -91,6 +91,18 @@ CREATE TABLE IF NOT EXISTS enquiries (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Table 5b: Enquiry Change Logs (Audit Trail & Activity History)
+CREATE TABLE IF NOT EXISTS enquiry_change_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    enquiry_id UUID NOT NULL REFERENCES enquiries(id) ON DELETE CASCADE,
+    action VARCHAR(60) NOT NULL,
+    from_status VARCHAR(40),
+    to_status VARCHAR(40),
+    performed_by VARCHAR(120) DEFAULT 'System',
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Table 6: Wedding Events (Sub-Ceremonies)
 CREATE TABLE IF NOT EXISTS wedding_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

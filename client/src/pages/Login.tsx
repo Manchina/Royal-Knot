@@ -292,6 +292,17 @@ export const Login: React.FC = () => {
             </form>
           </CardContent>
         </Card>
+
+        {/* Public Website / Consultation Link */}
+        <div className="text-center pt-2">
+          <button
+            type="button"
+            onClick={() => navigate('/enquire')}
+            className="text-xs text-slate-500 hover:text-[#714B67] hover:underline transition-colors cursor-pointer"
+          >
+            ← Looking for luxury destination wedding planning? Explore Public Consultation
+          </button>
+        </div>
       </div>
     </div>
   );

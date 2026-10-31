@@ -1,30 +1,38 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { ProtectedRoute } from '../components/ProtectedRoute';
+import { Landing } from '../pages/Landing';
 import { Login } from '../pages/Login';
 import { Dashboard } from '../pages/Dashboard';
 import { Weddings } from '../pages/Weddings';
 import { Enquiries } from '../pages/Enquiries';
+import { EnquiryDetail } from '../pages/EnquiryDetail';
 import { Procurement } from '../pages/Procurement';
 import { Tasks } from '../pages/Tasks';
 import { DayOf } from '../pages/DayOf';
 import { Billing } from '../pages/Billing';
 import { BillingProjectDetail } from '../pages/BillingProjectDetail';
 import { SettingsPage } from '../pages/Settings';
+import { SignAgreement } from '../pages/SignAgreement';
 
 export const AppRoutes: React.FC = () => {
   return (
     <Routes>
+      {/* Public Landing & Consultation Routes */}
+      <Route path="/" element={<Landing />} />
+      <Route path="/enquire" element={<Landing defaultScrollToForm={true} />} />
+      <Route path="/sign/:id" element={<SignAgreement />} />
+
       {/* Public Login Route */}
       <Route path="/login" element={<Login />} />
 
       {/* Protected Application Routes */}
       <Route element={<ProtectedRoute />}>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route element={<Layout />}>
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="weddings" element={<Weddings />} />
           <Route path="enquiries" element={<Enquiries />} />
+          <Route path="enquiries/:id" element={<EnquiryDetail />} />
           <Route path="procurement" element={<Procurement />} />
           <Route path="tasks" element={<Tasks />} />
           <Route path="day-of" element={<DayOf />} />
@@ -35,7 +43,7 @@ export const AppRoutes: React.FC = () => {
       </Route>
 
       {/* Fallback Catch-all Route */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };
