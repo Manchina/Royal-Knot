@@ -52,6 +52,32 @@ interface CatererBid {
   isRecommended?: boolean;
 }
 
+interface ClientPortalInvoice {
+  id?: string;
+  stage?: string;
+  stageLabel?: string;
+  amount?: string;
+  percentage?: number;
+  status?: string;
+  dueDate?: string;
+}
+
+interface ProjectDetailData {
+  couple?: string;
+  brideName?: string;
+  groomName?: string;
+  venue?: string;
+  city?: string;
+  startDate?: string;
+  endDate?: string;
+  guestCount?: number;
+  actualHeadcount?: number;
+  status?: string;
+  budget?: string;
+  invoices?: ClientPortalInvoice[];
+  availableQuotes?: unknown[];
+}
+
 export const ClientPortalView: React.FC<ClientPortalViewProps> = ({
   selectedCouple = 'ALL',
   couplesList = [],
@@ -74,13 +100,13 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({
   }, [selectedCouple, couplesList]);
 
   // Live PostgreSQL project & billing details
-  const [projectData, setProjectData] = useState<any>(null);
+  const [projectData, setProjectData] = useState<ProjectDetailData | null>(null);
 
   useEffect(() => {
     let isMounted = true;
     const fetchProjectDetails = async () => {
       try {
-        const res = await api.get<any>(`/api/billing/projects/${activeCouple.code}`);
+        const res = await api.get<{ success: boolean; data?: ProjectDetailData }>(`/api/billing/projects/${activeCouple.code}`);
         if (isMounted && res?.success && res.data) {
           setProjectData(res.data);
         }
@@ -184,12 +210,12 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({
 
   // 3. Dynamic Payment Schedule from live PostgreSQL invoices
   const paymentSchedule = useMemo(() => {
-    const invoices = Array.isArray(weddingInfo.invoices) ? weddingInfo.invoices : [];
-    const paidInvoices = invoices.filter((i: any) => i.status === 'PAID');
-    const unpaidInvoices = invoices.filter((i: any) => i.status !== 'PAID');
+    const invoices = Array.isArray(weddingInfo.invoices) ? (weddingInfo.invoices as ClientPortalInvoice[]) : [];
+    const paidInvoices = invoices.filter((i) => i.status === 'PAID');
+    const unpaidInvoices = invoices.filter((i) => i.status !== 'PAID');
 
     let totalPct = 0;
-    paidInvoices.forEach((i: any) => {
+    paidInvoices.forEach((i) => {
       totalPct += Number(i.percentage) || 0;
     });
 

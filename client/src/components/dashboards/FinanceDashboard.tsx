@@ -95,7 +95,7 @@ export const FinanceDashboard: React.FC<FinanceDashboardProps> = ({
       setLoading(true);
 
       const [projectsRes] = await Promise.allSettled([
-        api.get<any>('/api/billing/projects'),
+        api.get<{ success: boolean; data: BillingProjectItem[] | { ongoing?: BillingProjectItem[]; finalised?: BillingProjectItem[] } }>('/api/billing/projects'),
       ]);
 
       if (projectsRes.status === 'fulfilled' && projectsRes.value?.success) {
