@@ -1,14 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { 
+import {
   BarChart3,
-  CalendarDays, 
-  MessageSquareHeart, 
-  Utensils, 
-  CheckSquare, 
-  Clock, 
-  CreditCard, 
-  Settings, 
+  CalendarDays,
+  MessageSquareHeart,
+  Utensils,
+  CheckSquare,
+  Clock,
+  CreditCard,
+  Settings,
   Menu,
   X,
   LogOut,
@@ -20,7 +20,6 @@ import {
   Pin
 } from 'lucide-react';
 import { useAuthStore, type UserRole } from '../store/useAuthStore';
-import { useWeddingStore } from '../store/useWeddingStore';
 import {
   Avatar,
   AvatarFallback,
@@ -41,11 +40,6 @@ const SIDEBAR_STORAGE_KEY = 'rk_sidebar_open';
 
 export const Layout: React.FC = () => {
   const { user, logout } = useAuthStore();
-  const { weddings, selectedWeddingId, setSelectedWeddingId, fetchWeddings } = useWeddingStore();
-
-  useEffect(() => {
-    fetchWeddings();
-  }, [fetchWeddings]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -100,56 +94,56 @@ export const Layout: React.FC = () => {
 
   // Sidebar Navigation Modules
   const allNavItems = [
-    { 
-      name: 'Dashboard', 
-      path: '/dashboard', 
-      icon: BarChart3, 
-      roles: ['FOUNDER', 'SUPER_ADMIN', 'FINANCE_MANAGER'] 
+    {
+      name: 'Dashboard',
+      path: '/dashboard',
+      icon: BarChart3,
+      roles: ['FOUNDER', 'SUPER_ADMIN', 'FINANCE_MANAGER']
     },
-    { 
-      name: 'Weddings', 
-      path: '/weddings', 
-      icon: CalendarDays, 
+    {
+      name: 'Weddings',
+      path: '/weddings',
+      icon: CalendarDays,
       roles: ['FOUNDER', 'SUPER_ADMIN', 'LEAD_PLANNER', 'COORDINATOR'],
       count: '25'
     },
-    { 
-      name: 'Enquiries', 
-      path: '/enquiries', 
-      icon: MessageSquareHeart, 
+    {
+      name: 'Enquiries',
+      path: '/enquiries',
+      icon: MessageSquareHeart,
       roles: ['SUPER_ADMIN', 'LEAD_PLANNER'],
       count: '3'
     },
-    { 
-      name: 'Vendor RFQs', 
-      path: '/procurement', 
-      icon: Utensils, 
-      roles: ['SUPER_ADMIN', 'LEAD_PLANNER', 'CLIENT'] 
+    {
+      name: 'Vendor RFQs',
+      path: '/procurement',
+      icon: Utensils,
+      roles: ['SUPER_ADMIN', 'LEAD_PLANNER', 'CLIENT']
     },
-    { 
-      name: 'Checklists', 
-      path: '/tasks', 
-      icon: CheckSquare, 
-      roles: ['SUPER_ADMIN', 'LEAD_PLANNER', 'COORDINATOR'] 
+    {
+      name: 'Checklists',
+      path: '/tasks',
+      icon: CheckSquare,
+      roles: ['SUPER_ADMIN', 'LEAD_PLANNER', 'COORDINATOR']
     },
-    { 
-      name: 'Day-Of Ops', 
-      path: '/day-of', 
-      icon: Clock, 
+    {
+      name: 'Day-Of Ops',
+      path: '/day-of',
+      icon: Clock,
       roles: ['SUPER_ADMIN', 'COORDINATOR', 'LEAD_PLANNER'],
       badge: 'Live'
     },
-    { 
-      name: 'Billing & Extras', 
-      path: '/billing', 
-      icon: CreditCard, 
-      roles: ['SUPER_ADMIN', 'FINANCE_MANAGER', 'FOUNDER'] 
+    {
+      name: 'Billing & Extras',
+      path: '/billing',
+      icon: CreditCard,
+      roles: ['SUPER_ADMIN', 'FINANCE_MANAGER', 'FOUNDER']
     },
-    { 
-      name: 'Configuration', 
-      path: '/settings', 
-      icon: Settings, 
-      roles: ['SUPER_ADMIN'] 
+    {
+      name: 'Configuration',
+      path: '/settings',
+      icon: Settings,
+      roles: ['SUPER_ADMIN']
     },
   ];
 
@@ -177,23 +171,20 @@ export const Layout: React.FC = () => {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#F8F9FA] text-slate-800 antialiased">
       {/* Desktop spacer rail: dynamically expands and contracts with sidebar open state (w-16 to w-60), smoothly reducing main card size like Apexon */}
-      <div 
-        className={`hidden md:block shrink-0 transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-          open ? 'w-60' : 'w-16'
-        }`} 
+      <div
+        className={`hidden md:block shrink-0 transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${open ? 'w-60' : 'w-16'
+          }`}
       />
 
       {/* Apexon-Style Left Sidebar: w-16 icon rail by default, expands to w-60 on hover */}
       <aside
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`fixed inset-y-0 left-0 z-40 bg-[#714B67] text-white flex flex-col shrink-0 select-none transition-[width,transform,box-shadow] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-          mobileMenuOpen 
-            ? 'w-60 translate-x-0 shadow-2xl' 
-            : '-translate-x-full md:translate-x-0'
-        } ${
-          !mobileMenuOpen && (open ? 'w-60 shadow-2xl md:shadow-xl' : 'w-16 shadow-xs border-r border-white/10')
-        }`}
+        className={`fixed inset-y-0 left-0 z-40 bg-[#714B67] text-white flex flex-col shrink-0 select-none transition-[width,transform,box-shadow] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${mobileMenuOpen
+          ? 'w-60 translate-x-0 shadow-2xl'
+          : '-translate-x-full md:translate-x-0'
+          } ${!mobileMenuOpen && (open ? 'w-60 shadow-2xl md:shadow-xl' : 'w-16 shadow-xs border-r border-white/10')
+          }`}
       >
         <div className="flex flex-col h-full min-h-0 overflow-hidden">
           {/* Sidebar Header: Logo, Brand & Pin Toggle */}
@@ -248,13 +239,11 @@ export const Layout: React.FC = () => {
                     key={item.path}
                     to={item.path}
                     onClick={() => setMobileMenuOpen(false)}
-                    className={`group flex items-center ${
-                      open ? 'justify-between px-2.5 py-2' : 'justify-center h-10 w-10 mx-auto'
-                    } rounded text-xs transition-all relative ${
-                      isActive
+                    className={`group flex items-center ${open ? 'justify-between px-2.5 py-2' : 'justify-center h-10 w-10 mx-auto'
+                      } rounded text-xs transition-all relative ${isActive
                         ? 'bg-black/35 text-white font-bold border-l-2 border-white pl-2'
                         : 'text-white/80 hover:text-white hover:bg-white/10 font-medium'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <Icon className="w-4 h-4 shrink-0 transition-transform group-hover:scale-105" />
@@ -336,38 +325,10 @@ export const Layout: React.FC = () => {
             <span className="font-bold text-xs text-slate-800 tracking-tight shrink-0">
               {currentModule}
             </span>
-
-            <div className="h-3.5 w-px bg-slate-200 shrink-0 hidden sm:block" />
-
-            {/* Global Wedding Context Filter (Replaced by PeopleFirst Tab Navigation on /billing) */}
-            {location.pathname !== '/billing' && location.pathname !== '/tasks' ? (
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider shrink-0 hidden lg:inline">
-                  Project:
-                </span>
-                <select
-                  value={selectedWeddingId}
-                  onChange={(e) => setSelectedWeddingId(e.target.value)}
-                  className="h-6 text-[11px] font-semibold bg-slate-50 border border-slate-200 rounded px-2 text-slate-700 hover:bg-white focus:outline-none focus:ring-1 focus:ring-[#714B67] cursor-pointer max-w-[190px] sm:max-w-[260px] truncate"
-                  title="Active Wedding Filter"
-                >
-                  <option value="ALL">All Weddings (Agency View)</option>
-                  {weddings.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.code} • {w.couple}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded bg-purple-50 text-[#714B67] text-[10px] font-bold border border-purple-200/60">
-                <span>Ongoing & Finalised Tabs</span>
-              </div>
-            )}
-          </div>
+          </div >
 
           {/* Top Right: Season Tracker & User Profile with Sign Out */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          < div className="flex items-center gap-2.5 shrink-0" >
             <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-mono border border-slate-200">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
               <span>Season 2026: 25 Projects Active</span>
@@ -445,14 +406,14 @@ export const Layout: React.FC = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-        </header>
+          </div >
+        </header >
 
         {/* Scrollable Page Body */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 min-w-0">
+        < main className="flex-1 overflow-y-auto p-4 sm:p-6 min-w-0" >
           <Outlet />
-        </main>
-      </div>
-    </div>
+        </main >
+      </div >
+    </div >
   );
 };

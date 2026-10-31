@@ -2,8 +2,9 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { db } from '../db';
 import { enquiries, clients, weddings, enquiryChangeLogs, users } from '../db/schema';
 import { eq, desc, asc, ilike, or, and, count, sql } from 'drizzle-orm';
+import { isUUID } from '../utils';
 
-const matchEnquiry = (param: string) => sql`(${enquiries.id}::text = ${param} OR ${enquiries.code} = ${param})`;
+const matchEnquiry = (param: string) => (isUUID(param) ? eq(enquiries.id, param) : eq(enquiries.code, param));
 
 interface CreateEnquiryBody {
   coupleName: string;

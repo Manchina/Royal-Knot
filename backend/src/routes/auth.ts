@@ -1,8 +1,9 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { db } from '../db';
 import { users } from '../db/schema';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { DEMO_USERS } from '../seeds/users';
+import { isUUID } from '../utils';
 
 export async function authRoutes(fastify: FastifyInstance) {
   // Login route
@@ -69,12 +70,14 @@ export async function authRoutes(fastify: FastifyInstance) {
     const decoded = request.user as { userId: string; role: string };
     
     let user: any = null;
-    try {
-      const rows = await db.select().from(users).where(sql`${users.id} = ${decoded.userId}`);
-      if (rows.length > 0) {
-        user = rows[0];
-      }
-    } catch {}
+    if (isUUID(decoded.userId)) {
+      try {
+        const rows = await db.select().from(users).where(eq(users.id, decoded.userId));
+        if (rows.length > 0) {
+          user = rows[0];
+        }
+      } catch {}
+    }
 
     if (!user) {
       user = DEMO_USERS.find((u: any) => u.id === decoded.userId) || {
