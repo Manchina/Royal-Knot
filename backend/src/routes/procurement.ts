@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { db } from '../db';
-import { vendors, rfqRequests, vendorQuotes, weddings, clients } from '../db/schema';
+import { vendors, rfqRequests, vendorQuotes, weddings, clients, masterOptions } from '../db/schema';
 import { eq, desc, ilike, and, ne, sql, count } from 'drizzle-orm';
 import { isUUID } from '../utils';
 
@@ -58,14 +58,20 @@ export async function procurementRoutes(fastify: FastifyInstance) {
         .from(vendors)
         .groupBy(vendors.category);
 
+      const categoryRows = await db
+        .select({
+          key: masterOptions.optionKey,
+        })
+        .from(masterOptions)
+        .where(eq(masterOptions.category, 'VENDOR_CATEGORY'));
+
       const countsMap: Record<string, number> = {
         ALL: allVendors.length,
-        CATERER: 0,
-        DJ: 0,
-        DECORATOR: 0,
-        PHOTOGRAPHY: 0,
-        DRUMMERS: 0,
       };
+
+      for (const cat of categoryRows) {
+        countsMap[cat.key] = 0;
+      }
 
       for (const row of countsResult) {
         countsMap[row.category] = Number(row.total);

@@ -19,10 +19,12 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
           w.total_budget as "totalBudget",
           w.agency_fee as "agencyFee",
           w.status,
+          COALESCE(u.full_name, 'Lead Planner') as "leadPlanner",
           TO_CHAR(w.start_date, 'Mon DD') || ' - ' || TO_CHAR(w.end_date, 'DD, YYYY') as date,
           w.season_year as "seasonYear"
         FROM weddings w
         JOIN clients c ON w.client_id = c.id
+        LEFT JOIN users u ON w.lead_planner_id = u.id
         ORDER BY w.start_date ASC
       `);
 
@@ -110,7 +112,7 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
           marginPct: `${marginPctNum.toFixed(1)}%`,
           marginPctNum,
           status: profitStatus,
-          leadPlanner: w.city === 'Jaipur' ? 'Devika Sharma' : 'Karan Verma',
+          leadPlanner: w.leadPlanner || 'Lead Planner',
           date: w.date,
         };
       });

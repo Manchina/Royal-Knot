@@ -47,17 +47,10 @@ async function resolveWeddingId(weddingIdOrCode?: string): Promise<string | null
     const defaultWedding = await db
       .select({ id: weddings.id })
       .from(weddings)
-      .where(eq(weddings.code, 'RW-2026-001'))
+      .orderBy(asc(weddings.startDate))
       .limit(1);
 
-    if (defaultWedding.length) return defaultWedding[0].id;
-
-    const anyWedding = await db
-      .select({ id: weddings.id })
-      .from(weddings)
-      .limit(1);
-
-    return anyWedding.length ? anyWedding[0].id : null;
+    return defaultWedding.length ? defaultWedding[0].id : null;
   }
 
   const trimmed = weddingIdOrCode.trim();

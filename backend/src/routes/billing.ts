@@ -235,6 +235,18 @@ export async function billingRoutes(fastify: FastifyInstance) {
           ])
         );
 
+        // Fetch changelog entries for finalised sign-offs strictly from DB
+        const finalLogRows = await db
+          .select({
+            weddingId: billingChangeLogs.weddingId,
+            performedBy: billingChangeLogs.performedBy,
+            createdAt: billingChangeLogs.createdAt,
+          })
+          .from(billingChangeLogs)
+          .where(eq(billingChangeLogs.action, 'PROJECT_FINALISED'));
+
+        const finalLogMap = new Map(finalLogRows.map((l) => [l.weddingId, l]));
+
         // Format all projects
         const allProjects: ProjectBillingData[] = weddingRows.map((w) => {
           const baseContractNum = parseFloat(w.totalBudget) || 0;
@@ -245,14 +257,22 @@ export async function billingRoutes(fastify: FastifyInstance) {
           const billData = billsMap.get(w.id) || { payable: 0, advance: 0, balance: 0, count: 0 };
           const isFinal = w.status === 'FINALISED' || w.status === 'FINALISED_SETTLED';
           const grossMarginNum =
-            totalInvoicedNum > 0 ? ((totalInvoicedNum - billData.payable) / totalInvoicedNum) * 100 : 22.5;
+            totalInvoicedNum > 0 ? ((totalInvoicedNum - billData.payable) / totalInvoicedNum) * 100 : 0;
 
           const coupleStr =
             w.brideName && w.groomName ? `${w.brideName} & ${w.groomName}` : 'Royal Couple';
 
           const formattedStart = w.startDate
             ? new Date(w.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-            : 'Winter 2026';
+            : 'Scheduled 2026';
+
+          const finalLog = finalLogMap.get(w.id);
+          const finalisedDate = isFinal
+            ? finalLog?.createdAt
+              ? new Date(finalLog.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+              : 'Concluded'
+            : undefined;
+          const finalisedBy = isFinal ? finalLog?.performedBy || 'Finance Director' : undefined;
 
           return {
             id: w.id,
@@ -271,11 +291,11 @@ export async function billingRoutes(fastify: FastifyInstance) {
             packageType: w.packageType || 'Full-Service Royal Wedding',
             status: w.status,
             isFinalised: isFinal,
-            finalisedDate: isFinal ? 'Feb 2026' : undefined,
-            finalisedBy: isFinal ? 'Aditya Singhal (Super Admin)' : undefined,
+            finalisedDate,
+            finalisedBy,
             budget: `₹${(baseContractNum / 10000000).toFixed(2)} Cr`,
             rawBudget: baseContractNum,
-            coordinator: w.coordinator || (w.city === 'Jaipur' ? 'Devika Sharma' : 'Karan Verma'),
+            coordinator: w.coordinator || 'Lead Planner',
             baseContract: formatInr(baseContractNum),
             rawBaseContract: baseContractNum,
             totalExtras: extrasNum > 0 ? `+${extrasCount} (${formatInr(extrasNum)})` : 'None',
@@ -303,11 +323,6 @@ export async function billingRoutes(fastify: FastifyInstance) {
         const counts: Record<string, number> = {
           ALL_ONGOING: 0,
           ALL_FINALISED: 0,
-          LIVE_BIG_DAY: 0,
-          IN_PLANNING: 0,
-          BOOKED: 0,
-          FINALISED: 0,
-          FINALISED_SETTLED: 0,
         };
 
         for (const p of allProjects) {
@@ -335,17 +350,36 @@ export async function billingRoutes(fastify: FastifyInstance) {
           }
         }
 
+        // Fetch dynamic status options from master_options in DB
+        const masterStatusRows = await db
+          .select({
+            key: masterOptions.optionKey,
+            label: masterOptions.label,
+          })
+          .from(masterOptions)
+          .where(and(eq(masterOptions.category, 'WEDDING_STATUS'), eq(masterOptions.isActive, true)))
+          .orderBy(asc(masterOptions.sortOrder));
+
         const ongoingStatusTabs = [
           { id: 'ALL', label: 'All Projects', count: counts.ALL_ONGOING },
-          { id: 'LIVE_BIG_DAY', label: 'Live Big Day', count: counts.LIVE_BIG_DAY || 0 },
-          { id: 'IN_PLANNING', label: 'In Planning', count: counts.IN_PLANNING || 0 },
-          { id: 'BOOKED', label: 'Booked', count: counts.BOOKED || 0 },
+          ...masterStatusRows
+            .filter((s) => !['FINALISED', 'FINALISED_SETTLED'].includes(s.key))
+            .map((s) => ({
+              id: s.key,
+              label: s.label,
+              count: counts[s.key] || 0,
+            })),
         ];
 
         const finalisedStatusTabs = [
           { id: 'ALL', label: 'All Projects', count: counts.ALL_FINALISED },
-          { id: 'FINALISED', label: 'Finalised', count: counts.FINALISED || 0 },
-          { id: 'FINALISED_SETTLED', label: 'Finalised & Settled', count: counts.FINALISED_SETTLED || 0 },
+          ...masterStatusRows
+            .filter((s) => ['FINALISED', 'FINALISED_SETTLED'].includes(s.key))
+            .map((s) => ({
+              id: s.key,
+              label: s.label,
+              count: counts[s.key] || 0,
+            })),
         ];
 
         let activeList = tab === 'ongoing' ? ongoingAll : finalisedAll;
@@ -363,7 +397,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
         const totalInvoicedSum = allProjects.reduce((sum, p) => sum + p.rawTotalInvoiced, 0);
         const totalVendorCommitmentsSum = allProjects.reduce((sum, p) => sum + p.rawVendorCommitments, 0);
         const avgGrossMargin =
-          totalInvoicedSum > 0 ? ((totalInvoicedSum - totalVendorCommitmentsSum) / totalInvoicedSum) * 100 : 23.4;
+          totalInvoicedSum > 0 ? ((totalInvoicedSum - totalVendorCommitmentsSum) / totalInvoicedSum) * 100 : 0;
 
         reply.header('Cache-Control', 'private, max-age=2');
         return {
@@ -468,7 +502,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
           vendorId: r.vendorId || undefined,
           isBilledToClient: !!r.isBilledToClient,
           status: 'ADDED_TO_CLIENT_INVOICE',
-          approvedBy: r.approvedByName || 'Devika Sharma',
+          approvedBy: r.approvedByName || w.coordinator || 'Lead Planner',
           createdAt: r.createdAt ? new Date(r.createdAt).toLocaleString('en-IN') : undefined,
         };
       });
@@ -545,19 +579,29 @@ export async function billingRoutes(fastify: FastifyInstance) {
         .where(eq(clientInvoices.weddingId, weddingUuid))
         .orderBy(asc(clientInvoices.dueDate));
 
+      // Fetch dynamic payment stages from master_options in DB
+      const masterPaymentStages = await db
+        .select({
+          key: masterOptions.optionKey,
+          label: masterOptions.label,
+        })
+        .from(masterOptions)
+        .where(eq(masterOptions.category, 'PAYMENT_STAGE'));
+
+      const stageLabelMap = new Map(masterPaymentStages.map((s) => [s.key, s.label]));
+
       const invoices: ClientInvoiceItem[] = invoicesRows.map((r) => {
-        let stageLabel = 'Milestone Payment';
         let pct = 30;
-        if (r.stageKey === 'BOOKING_DEPOSIT') {
-          stageLabel = 'Booking Deposit (20%)';
-          pct = 20;
-        } else if (r.stageKey === 'PRE_WEDDING_ADVANCE') {
-          stageLabel = '30-Day Pre-Wedding Advance (50%)';
-          pct = 50;
-        } else if (r.stageKey === 'FINAL_SETTLEMENT') {
-          stageLabel = 'Post-Event Final Settlement (30% + Extras)';
-          pct = 30;
-        }
+        if (r.stageKey === 'BOOKING_DEPOSIT') pct = 20;
+        else if (r.stageKey === 'PRE_WEDDING_ADVANCE') pct = 50;
+
+        const stageLabel =
+          stageLabelMap.get(r.stageKey) ||
+          (r.stageKey === 'BOOKING_DEPOSIT'
+            ? 'Booking Deposit (20%)'
+            : r.stageKey === 'PRE_WEDDING_ADVANCE'
+            ? '30-Day Pre-Wedding Advance (50%)'
+            : 'Post-Event Final Settlement (30% + Extras)');
 
         const dueNum = parseFloat(r.amountDue) || 0;
         const paidNum = parseFloat(r.paidAmount || '0') || 0;
@@ -630,6 +674,9 @@ export async function billingRoutes(fastify: FastifyInstance) {
         createdAt: c.createdAt ? new Date(c.createdAt).toLocaleString('en-IN') : new Date().toLocaleString('en-IN'),
       }));
 
+      // Extract final signoff from changelog if project finalised
+      const finalSignoffLog = changelogRows.find((c) => c.action === 'PROJECT_FINALISED');
+
       // Aggregations
       const baseContractNum = parseFloat(w.totalBudget) || 0;
       const totalExtrasNum = extraCharges.reduce((sum, e) => sum + e.rawTotal, 0);
@@ -640,10 +687,17 @@ export async function billingRoutes(fastify: FastifyInstance) {
 
       const isFinal = w.status === 'FINALISED' || w.status === 'FINALISED_SETTLED';
       const grossMarginNum =
-        totalInvoicedNum > 0 ? ((totalInvoicedNum - totalVendorPayable) / totalInvoicedNum) * 100 : 22.4;
+        totalInvoicedNum > 0 ? ((totalInvoicedNum - totalVendorPayable) / totalInvoicedNum) * 100 : 0;
 
       const coupleStr =
         w.brideName && w.groomName ? `${w.brideName} & ${w.groomName}` : 'Royal Couple';
+
+      const finalisedDate = isFinal
+        ? finalSignoffLog?.createdAt
+          ? new Date(finalSignoffLog.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+          : 'Concluded'
+        : undefined;
+      const finalisedBy = isFinal ? finalSignoffLog?.performedBy || 'Finance Director' : undefined;
 
       const project: ProjectBillingData = {
         id: w.id,
@@ -657,18 +711,18 @@ export async function billingRoutes(fastify: FastifyInstance) {
         venue: w.venue || 'Palace Venue',
         startDate: w.startDate
           ? new Date(w.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-          : 'Winter 2026',
+          : 'Scheduled',
         endDate: w.endDate ? String(w.endDate) : undefined,
         guestCount: w.actualHeadcount || w.guestCount || 400,
         actualHeadcount: w.actualHeadcount || undefined,
         packageType: w.packageType || 'Full-Service Royal Wedding',
         status: w.status,
         isFinalised: isFinal,
-        finalisedDate: isFinal ? 'Feb 2026' : undefined,
-        finalisedBy: isFinal ? 'Aditya Singhal (Super Admin)' : undefined,
+        finalisedDate,
+        finalisedBy,
         budget: `₹${(baseContractNum / 10000000).toFixed(2)} Cr`,
         rawBudget: baseContractNum,
-        coordinator: w.coordinator || 'Devika Sharma',
+        coordinator: w.coordinator || 'Lead Planner',
         baseContract: formatInr(baseContractNum),
         rawBaseContract: baseContractNum,
         totalExtras: formatInr(totalExtrasNum),
