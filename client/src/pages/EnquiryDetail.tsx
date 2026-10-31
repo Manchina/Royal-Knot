@@ -16,6 +16,7 @@ import {
   ExternalLink,
   Link2,
   KeyRound,
+  RefreshCw,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useWeddingStore } from '../store/useWeddingStore';
@@ -78,7 +79,9 @@ export const EnquiryDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Magic link copy state
+  // Magic link modal and token state
+  const [magicModalOpen, setMagicModalOpen] = useState(false);
+  const [magicToken, setMagicToken] = useState('');
   const [magicLinkCopied, setMagicLinkCopied] = useState(false);
 
   // Activity Log modal state
@@ -154,18 +157,24 @@ export const EnquiryDetail: React.FC = () => {
     fetchEnquiryDetails();
   }, [id]);
 
-  const handleCopyMagicLink = async () => {
-    if (!enquiry) return;
-    const signUrl = `${window.location.origin}/sign/${enquiry.code}`;
-    await navigator.clipboard.writeText(signUrl);
+  // Derived Client User ID and Magic URL
+  const clientUserId = enquiry ? `USR-${enquiry.code.replace('ENQ-', '')}` : '';
+  const magicUrl = enquiry
+    ? `${window.location.origin}/sign/${enquiry.code}?userId=${clientUserId}${magicToken ? `&t=${magicToken}` : ''}`
+    : '';
+
+  const handleCopyMagicUrl = async () => {
+    if (!magicUrl) return;
+    await navigator.clipboard.writeText(magicUrl);
     setMagicLinkCopied(true);
     setTimeout(() => setMagicLinkCopied(false), 2500);
 
-    // If still drafting, mark as Sent - Pending Signature
-    if (enquiry.agreementStatus === 'Drafting Agreement') {
+    // If still drafting, transition to Sent - Pending Signature
+    if (enquiry && enquiry.agreementStatus === 'Drafting Agreement') {
       try {
         await api.patch(`/enquiries/${enquiry.id}/status`, {
           agreementStatus: 'Sent - Pending Signature',
+          userId: clientUserId,
         });
         await fetchEnquiryDetails();
       } catch (err) {
@@ -174,15 +183,39 @@ export const EnquiryDetail: React.FC = () => {
     }
   };
 
-  // Action: Confirm Signed Agreement
-  const handleSignAgreement = async () => {
+  // Regenerate fresh signed URL with token timestamp
+  const handleRegenerateMagicLink = async () => {
+    if (!enquiry) return;
+    try {
+      setActionLoading(true);
+      const newTimestamp = Date.now();
+      setMagicToken(String(newTimestamp));
+      await api.patch(`/enquiries/${enquiry.id}/status`, {
+        agreementStatus: 'Sent - Pending Signature',
+        userId: clientUserId,
+        notes: `Fresh signing magic link regenerated (token: ${newTimestamp}) and dispatched.`,
+      });
+      await fetchEnquiryDetails();
+    } catch (err) {
+      console.error('Failed to regenerate magic link:', err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Action: Confirm Signed Agreement (Manual Override)
+  const handleConfirmSigned = async () => {
     if (!enquiry) return;
     try {
       setActionLoading(true);
       await api.patch(`/enquiries/${enquiry.id}/status`, {
         agreementStatus: 'Signed on Mobile',
         status: 'Consultation Booked',
+        signatoryName: enquiry.primaryContactName || enquiry.coupleName,
+        userId: clientUserId,
+        notes: 'Signed agreement confirmed via Lead Planner manual override.',
       });
+      setMagicModalOpen(false);
       await fetchEnquiryDetails();
     } catch (err) {
       console.error('Sign agreement error:', err);
@@ -292,42 +325,33 @@ export const EnquiryDetail: React.FC = () => {
 
         {/* Right: Actions Moved to Detail Header + Activity Log */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Action Button depending on status */}
+          {/* Action Button: Single Popup Button when Unsigned, or Check Signed Agreement when Signed */}
           {enquiry.agreementStatus !== 'Signed on Mobile' ? (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCopyMagicLink}
-                className="h-8 text-xs font-medium border-slate-300 hover:bg-slate-50 cursor-pointer gap-1.5"
-                title="Copy digital agreement signing magic link"
-              >
-                {magicLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Link2 className="w-3.5 h-3.5 text-slate-500" />}
-                <span>{magicLinkCopied ? 'Link Copied!' : 'Copy Magic Sign Link'}</span>
-              </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMagicModalOpen(true)}
+              className="h-8 text-xs font-semibold border-[#714B67]/30 text-[#714B67] hover:bg-[#714B67]/10 bg-white cursor-pointer gap-1.5 shadow-2xs"
+              title="Open Digital Agreement & Magic Signing Link"
+            >
+              <Link2 className="w-3.5 h-3.5 text-[#714B67]" />
+              <span>Digital Agreement (Magic Link)</span>
+            </Button>
+          ) : (
+            <a
+              href={`/sign/${enquiry.code}?userId=${clientUserId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center h-8 px-3 rounded border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-xs text-emerald-800 font-semibold transition cursor-pointer gap-1.5 shadow-2xs"
+              title="Check signed agreement with embedded digital signature in new tab"
+            >
+              <FileCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Check Signed Agreement ↗</span>
+            </a>
+          )}
 
-              <a
-                href={`/sign/${enquiry.code}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center h-8 px-2.5 rounded border border-slate-300 bg-white hover:bg-slate-50 text-xs text-slate-700 font-medium transition cursor-pointer gap-1"
-                title="Open dummy agreement signing page in new tab"
-              >
-                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-                <span>Sign Page ↗</span>
-              </a>
-
-              <Button
-                size="sm"
-                disabled={actionLoading}
-                onClick={handleSignAgreement}
-                className="h-8 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-2xs"
-              >
-                {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <FileCheck className="w-3.5 h-3.5 mr-1.5" />}
-                <span>Confirm Signed</span>
-              </Button>
-            </>
-          ) : !enquiry.weddingId ? (
+          {/* When signed and not yet converted to wedding: Convert button */}
+          {enquiry.agreementStatus === 'Signed on Mobile' && !enquiry.weddingId && (
             <Button
               size="sm"
               disabled={actionLoading}
@@ -337,7 +361,10 @@ export const EnquiryDetail: React.FC = () => {
               {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Building2 className="w-3.5 h-3.5 mr-1.5" />}
               <span>Convert to Wedding Project</span>
             </Button>
-          ) : (
+          )}
+
+          {/* When converted to wedding: Link to active wedding */}
+          {enquiry.weddingId && (
             <Button
               variant="outline"
               size="sm"
@@ -634,6 +661,121 @@ export const EnquiryDetail: React.FC = () => {
                 </div>
               ))
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 5. Digital Agreement Magic Link Modal */}
+      <Dialog open={magicModalOpen} onOpenChange={setMagicModalOpen}>
+        <DialogContent className="max-w-md bg-white border border-slate-200 shadow-2xl rounded-lg p-0 overflow-hidden">
+          <DialogHeader className="p-4 border-b border-slate-200 bg-slate-50">
+            <DialogTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Link2 className="w-4 h-4 text-[#714B67]" />
+              <span>Digital Agreement Magic Link ({enquiry.code})</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="p-5 space-y-4">
+            {/* Sent via Email & SMS Notification */}
+            <div className="bg-emerald-50 border border-emerald-200 rounded p-3 flex items-start gap-2.5 text-xs text-emerald-900 shadow-2xs">
+              <Mail className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+              <div>
+                <span className="font-bold block">Dispatched via Email & SMS</span>
+                <p className="text-[11px] text-emerald-800 mt-0.5 leading-relaxed">
+                  We sent this digital agreement magic link via email to <strong>{enquiry.email || `${enquiry.coupleName.toLowerCase().replace(/[^a-z0-9]/g, '')}@client.com`}</strong> and mobile SMS to <strong>{enquiry.phone}</strong>.
+                </p>
+              </div>
+            </div>
+
+            {/* Client User ID and Contracting Party */}
+            <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded border border-slate-200 text-xs">
+              <div>
+                <span className="text-slate-400 text-[10px] uppercase font-bold block">Assigned Client UID</span>
+                <span className="font-mono font-bold text-slate-800 mt-0.5 block">{clientUserId}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 text-[10px] uppercase font-bold block">Contracting Couple</span>
+                <span className="font-semibold text-slate-800 mt-0.5 block truncate">{enquiry.coupleName}</span>
+              </div>
+            </div>
+
+            {/* Magic Link Field + Copy Button */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 block">
+                Mobile Signing URL
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={magicUrl}
+                  className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-xs font-mono text-slate-700 select-all focus:outline-none focus:ring-1 focus:ring-[#714B67]"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleCopyMagicUrl}
+                  className={`h-8 px-3 text-xs font-semibold shrink-0 cursor-pointer ${
+                    magicLinkCopied
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      : 'bg-slate-900 hover:bg-slate-800 text-white'
+                  }`}
+                >
+                  {magicLinkCopied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 mr-1" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Link2 className="w-3.5 h-3.5 mr-1" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                The client opens this URL to review the contract and enter their legal name to sign.
+              </p>
+            </div>
+
+            {/* Modal Actions: Open Sign Page, Regenerate URL, Confirm Signed */}
+            <div className="pt-3 border-t border-slate-200 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href={magicUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center h-8.5 px-3 rounded border border-slate-300 bg-white hover:bg-slate-50 text-xs text-slate-700 font-medium transition cursor-pointer gap-1.5"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Open Sign Page ↗</span>
+                </a>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={actionLoading}
+                  onClick={handleRegenerateMagicLink}
+                  className="h-8.5 text-xs font-medium border-slate-300 hover:bg-slate-50 text-slate-700 cursor-pointer gap-1.5"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${actionLoading ? 'animate-spin' : ''}`} />
+                  <span>Regenerate Signed URL</span>
+                </Button>
+              </div>
+
+              <Button
+                type="button"
+                size="sm"
+                disabled={actionLoading}
+                onClick={handleConfirmSigned}
+                className="w-full h-8.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer gap-1.5 shadow-2xs"
+              >
+                {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileCheck className="w-3.5 h-3.5" />}
+                <span>Confirm Signed (Manual Override)</span>
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

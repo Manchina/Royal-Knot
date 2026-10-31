@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FileCheck,
   CheckCircle2,
@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Loader2,
   Crown,
+  Printer,
 } from 'lucide-react';
 import { api } from '../api/client';
 import {
@@ -34,11 +35,13 @@ interface EnquiryData {
   agreementSignedAt?: string;
   status: string;
   weddingId?: string;
+  notes?: string;
   createdAt: string;
 }
 
 export const SignAgreement: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const [enquiry, setEnquiry] = useState<EnquiryData | null>(null);
@@ -47,6 +50,9 @@ export const SignAgreement: React.FC = () => {
   const [signatoryName, setSignatoryName] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [signedSuccess, setSignedSuccess] = useState(false);
+
+  // User ID from query param or system
+  const queryUserId = searchParams.get('userId') || searchParams.get('user') || '';
 
   const fetchEnquiry = async () => {
     if (!id) return;
@@ -82,10 +88,13 @@ export const SignAgreement: React.FC = () => {
           agreementSignedAt: raw.agreementSignedAt || raw.agreement_signed_at,
           status: raw.status || 'Initial Discovery',
           weddingId: raw.weddingId || raw.wedding_id,
+          notes: raw.notes || '',
           createdAt: raw.createdAt || raw.created_at,
         });
 
-        setSignatoryName(raw.primaryContactName || raw.coupleName || '');
+        const initialSigner = raw.primaryContactName || raw.coupleName || '';
+        setSignatoryName(initialSigner);
+
         if (agreementSt === 'Signed on Mobile') {
           setSignedSuccess(true);
         }
@@ -101,6 +110,8 @@ export const SignAgreement: React.FC = () => {
     fetchEnquiry();
   }, [id]);
 
+  const displayUserId = queryUserId || (enquiry ? `USR-${enquiry.code.replace('ENQ-', '')}` : 'USR-2026-CLIENT');
+
   const handleSign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!enquiry || !termsAccepted || !signatoryName.trim()) return;
@@ -110,12 +121,23 @@ export const SignAgreement: React.FC = () => {
       const res = await api.patch(`/enquiries/${enquiry.id}/status`, {
         agreementStatus: 'Signed on Mobile',
         status: 'Consultation Booked',
-        notes: `Signed digitally via mobile magic link by ${signatoryName.trim()}.`,
+        signatoryName: signatoryName.trim(),
+        userId: displayUserId,
+        notes: `Signed digitally via mobile magic link by ${signatoryName.trim()} (User ID: ${displayUserId}).`,
       });
 
       if (res.success) {
         setSignedSuccess(true);
-        setEnquiry((prev) => prev ? { ...prev, agreementStatus: 'Signed on Mobile' } : null);
+        setEnquiry((prev) =>
+          prev
+            ? {
+                ...prev,
+                agreementStatus: 'Signed on Mobile',
+                primaryContactName: signatoryName.trim(),
+                agreementSignedAt: new Date().toISOString(),
+              }
+            : null
+        );
       }
     } catch (err) {
       console.error('Signing error:', err);
@@ -150,6 +172,9 @@ export const SignAgreement: React.FC = () => {
     );
   }
 
+  const isExecuted = signedSuccess || enquiry.agreementStatus === 'Signed on Mobile';
+  const effectiveSignatory = signatoryName || enquiry.primaryContactName || enquiry.coupleName;
+
   return (
     <div className="min-h-screen bg-slate-100/70 py-8 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto space-y-6">
@@ -163,21 +188,43 @@ export const SignAgreement: React.FC = () => {
             Digital Wedding Planning Service Agreement
           </h1>
           <p className="text-xs text-slate-500 font-mono">
-            Agreement Document ID: RK-AGR-{enquiry.code}
+            Agreement Document ID: RK-AGR-{enquiry.code} • Signatory UID: {displayUserId}
           </p>
         </div>
 
-        {/* The Digital Contract Sheet */}
+        {/* The Digital Contract Sheet (Mimics Official PDF Agreement) */}
         <div className="bg-white border border-slate-200 rounded-lg p-6 sm:p-8 shadow-sm space-y-6">
+          {/* Executive Certification Banner when Signed */}
+          {isExecuted && (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs flex flex-wrap items-center justify-between gap-2 text-emerald-900 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  <strong>Certified Agreement Record:</strong> Digitally signed by <strong>{effectiveSignatory}</strong> (UID: <span className="font-mono font-bold text-emerald-950">{displayUserId}</span>) on {new Date(enquiry.agreementSignedAt || enquiry.createdAt).toLocaleDateString()}.
+                </span>
+              </div>
+              <span className="font-mono text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded font-bold border border-emerald-300">
+                ✓ IT Act 2000 Certified
+              </span>
+            </div>
+          )}
+
           {/* Document Parties & Summary */}
           <div className="border-b border-slate-200 pb-5">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                Client Specification
+                Official Engagement Dossier
               </span>
-              <Badge variant="outline" className="text-xs font-mono font-bold">
-                {enquiry.code}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs font-mono font-bold">
+                  {enquiry.code}
+                </Badge>
+                {isExecuted && (
+                  <Badge variant="success" className="text-xs font-semibold">
+                    ✓ Executed on Mobile
+                  </Badge>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -186,7 +233,7 @@ export const SignAgreement: React.FC = () => {
                 <span className="font-bold text-slate-900 text-sm">{enquiry.coupleName}</span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[11px]">Primary Contact</span>
+                <span className="text-slate-400 block text-[11px]">Primary Authorized Contact</span>
                 <span className="font-semibold text-slate-900">{enquiry.primaryContactName || enquiry.coupleName} ({enquiry.phone})</span>
               </div>
             </div>
@@ -233,7 +280,7 @@ export const SignAgreement: React.FC = () => {
               Terms of Royal Engagement
             </h3>
 
-            <div className="space-y-2.5 bg-slate-50/70 border border-slate-200 rounded p-4 text-xs">
+            <div className="space-y-3 bg-slate-50/70 border border-slate-200 rounded p-4 text-xs">
               <div className="flex items-start gap-2">
                 <span className="font-bold text-slate-900 min-w-[20px]">1.</span>
                 <p>
@@ -264,34 +311,102 @@ export const SignAgreement: React.FC = () => {
             </div>
           </div>
 
-          {/* E-Signature Section */}
-          <div className="border-t border-slate-200 pt-5">
-            {signedSuccess ? (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-5 text-center space-y-2">
-                <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-700">
-                  <CheckCircle2 className="w-6 h-6" />
+          {/* Embedded Signature Block (The User's Name Embedded to the Agreement) */}
+          <div className="border-t border-slate-200 pt-6">
+            {isExecuted ? (
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-5 rounded-lg border border-slate-300 bg-slate-50/50">
+                  {/* Agency Side Signature */}
+                  <div className="space-y-2 border-b sm:border-b-0 sm:border-r border-slate-200 pb-4 sm:pb-0 sm:pr-4">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                      For The Royal Knot Events Ltd.
+                    </span>
+                    <div className="font-serif italic text-xl font-bold text-[#714B67] pt-2">
+                      Devika Sharma
+                    </div>
+                    <div className="text-xs font-semibold text-slate-900">
+                      Devika Sharma
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      Managing Partner & Lead Planner
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400">
+                      Signed: {new Date(enquiry.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+
+                  {/* Client Side Embedded Signature */}
+                  <div className="space-y-2 sm:pl-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                        For The Client / Contracting Couple
+                      </span>
+                      <span className="text-[10px] font-mono font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                        UID: {displayUserId}
+                      </span>
+                    </div>
+
+                    {/* Embedded User's Signature in Royal Cursive Style */}
+                    <div className="font-serif italic text-2xl sm:text-3xl font-bold text-slate-900 pt-1 tracking-wide border-b-2 border-slate-800 pb-1 font-['Playfair_Display',Georgia,serif]">
+                      {effectiveSignatory}
+                    </div>
+                    <div className="text-xs font-semibold text-slate-900">
+                      {effectiveSignatory}
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      Authorized Signatory ({enquiry.phone})
+                    </div>
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-300">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+                      <span>Digitally Executed via Mobile Magic Link</span>
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400 pt-0.5">
+                      Timestamp: {new Date(enquiry.agreementSignedAt || Date.now()).toLocaleString()} • Ref: RK-SIG-{enquiry.code.replace('ENQ-', '')}-CERT
+                    </div>
+                  </div>
                 </div>
-                <h4 className="text-sm font-bold text-emerald-900">
-                  Agreement Digitally Signed & Validated
-                </h4>
-                <p className="text-xs text-emerald-700 max-w-md mx-auto">
-                  Thank you, <strong>{enquiry.coupleName}</strong>. Your royal destination wedding agreement has been securely executed on mobile. Your lead planner Devika Sharma will initiate venue locks immediately.
-                </p>
-                <div className="pt-2">
-                  <Button
-                    onClick={() => navigate('/')}
-                    variant="outline"
-                    size="sm"
-                    className="text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-100"
-                  >
-                    Return to Homepage
-                  </Button>
+
+                {/* Print & Action Toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <div className="text-xs text-emerald-800 font-medium flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Legally binding digital signature embedded & verified under Information Technology Act.</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.print()}
+                      className="text-xs gap-1.5 border-slate-300"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Print / Save PDF</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => navigate('/')}
+                      className="text-xs bg-slate-900 text-white hover:bg-slate-800"
+                    >
+                      Return Home
+                    </Button>
+                  </div>
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleSign} className="space-y-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
-                <div className="space-y-1">
-                  <Label htmlFor="signatory" className="text-xs font-bold text-slate-800">
+              /* If Not Yet Signed: Form to Enter Signatory Name & Sign */
+              <form onSubmit={handleSign} className="space-y-4 bg-slate-50 p-5 rounded-lg border border-slate-200">
+                <div className="flex items-center justify-between bg-white px-3 py-2 rounded border border-slate-200 text-xs">
+                  <span className="text-slate-500 font-medium">Assigned Signatory User ID</span>
+                  <span className="font-mono font-bold text-slate-800 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                    {displayUserId}
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="signatory" className="text-xs font-bold text-slate-900">
                     Signatory Full Name
                   </Label>
                   <Input
@@ -299,10 +414,24 @@ export const SignAgreement: React.FC = () => {
                     value={signatoryName}
                     onChange={(e) => setSignatoryName(e.target.value)}
                     required
-                    placeholder="Enter full name of Bride / Groom"
+                    placeholder="Enter full legal name of Bride or Groom"
                     className="bg-white text-xs h-9 border-slate-300"
                   />
+                  <p className="text-[11px] text-slate-500">
+                    This legal name will be embedded as your digital signature on the official Royal Knot agreement certificate.
+                  </p>
                 </div>
+
+                {signatoryName.trim() && (
+                  <div className="p-3 bg-white border border-slate-200 rounded text-center">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                      Live Signature Preview (Embedded on Contract)
+                    </span>
+                    <div className="font-serif italic text-2xl font-bold text-slate-900 font-['Playfair_Display',Georgia,serif]">
+                      {signatoryName}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-start gap-2 pt-1">
                   <input
@@ -314,7 +443,7 @@ export const SignAgreement: React.FC = () => {
                     className="mt-0.5 rounded border-slate-300 text-[#714B67] focus:ring-[#714B67] cursor-pointer"
                   />
                   <label htmlFor="terms" className="text-xs text-slate-700 cursor-pointer select-none">
-                    I / We confirm that we have reviewed the wedding terms, agency fee schedule, and destination parameters, and hereby digitally execute this agreement.
+                    I / We confirm that we have reviewed the terms of royal engagement and hereby execute this bespoke agreement.
                   </label>
                 </div>
 
@@ -327,12 +456,12 @@ export const SignAgreement: React.FC = () => {
                     {signing ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Digitally Signing Agreement...</span>
+                        <span>Embedding Digital Signature...</span>
                       </>
                     ) : (
                       <>
                         <FileCheck className="w-4 h-4" />
-                        <span>Sign & Confirm Royal Knot Agreement on Mobile</span>
+                        <span>Embed Signature & Sign Agreement on Mobile</span>
                       </>
                     )}
                   </Button>
@@ -340,7 +469,7 @@ export const SignAgreement: React.FC = () => {
 
                 <div className="text-center text-[10px] text-slate-400 flex items-center justify-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
-                  <span>256-Bit Encrypted Mobile Digital Contract • Information Technology Act Compliant</span>
+                  <span>256-Bit Encrypted Mobile Digital Contract • Information Technology Act, 2000 Compliant</span>
                 </div>
               </form>
             )}

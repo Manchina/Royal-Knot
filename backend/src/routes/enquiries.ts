@@ -24,6 +24,8 @@ interface UpdateStatusBody {
   status?: string;
   agreementStatus?: string;
   notes?: string;
+  signatoryName?: string;
+  userId?: string;
 }
 
 export async function enquiryRoutes(fastify: FastifyInstance) {
@@ -175,7 +177,7 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
   // Update enquiry status / Sign agreement on mobile (Drizzle ORM)
   fastify.patch('/:id/status', async (request: FastifyRequest<{ Params: { id: string }; Body: UpdateStatusBody }>, reply: FastifyReply) => {
     const { id } = request.params;
-    const { status, agreementStatus, notes } = request.body || {};
+    const { status, agreementStatus, notes, signatoryName, userId } = request.body || {};
 
     try {
       const isSigned = agreementStatus === 'Signed on Mobile';
@@ -186,6 +188,7 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
       if (status) updateValues.status = status;
       if (agreementStatus) updateValues.agreementStatus = agreementStatus;
       if (isSigned) updateValues.agreementSignedAt = new Date();
+      if (signatoryName) updateValues.primaryContactName = signatoryName;
       if (notes !== undefined) updateValues.notes = notes;
 
       const [updated] = await db
@@ -203,12 +206,20 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
 
       let action = 'STATUS_UPDATED';
       let logNotes = `Status updated to "${updated.status}". ${notes || ''}`;
+      const performedBy = signatoryName
+        ? `${signatoryName}${userId ? ` (UID: ${userId})` : ''} (Authorized Signatory)`
+        : isSigned
+        ? `Client${userId ? ` (UID: ${userId})` : ''} (Mobile Magic Link)`
+        : 'Lead Planner (Devika Sharma)';
+
       if (isSigned) {
         action = 'AGREEMENT_SIGNED';
-        logNotes = 'Client reviewed and digitally signed royal wedding agreement via mobile magic link.';
+        logNotes = signatoryName
+          ? `Client (${signatoryName}${userId ? `, UID: ${userId}` : ''}) reviewed and digitally signed royal wedding agreement via mobile magic link.`
+          : `Client${userId ? ` (UID: ${userId})` : ''} reviewed and digitally signed royal wedding agreement via mobile magic link.`;
       } else if (isSent) {
         action = 'AGREEMENT_SENT';
-        logNotes = 'Dummy wedding service agreement generated and magic signing link dispatched to client.';
+        logNotes = `Dummy wedding service agreement generated and magic signing link dispatched to client via email & mobile.${userId ? ` (UID: ${userId})` : ''}`;
       }
 
       // Record audit change log
@@ -218,7 +229,7 @@ export async function enquiryRoutes(fastify: FastifyInstance) {
           action,
           fromStatus: null,
           toStatus: updated.status,
-          performedBy: 'Lead Planner (Devika Sharma)',
+          performedBy,
           notes: logNotes,
         });
       } catch (logErr: any) {
