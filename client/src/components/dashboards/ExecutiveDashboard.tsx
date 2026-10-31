@@ -347,7 +347,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
             variant="default"
             size="sm"
             onClick={handleGoToBillingModule}
-            className="text-xs gap-1.5 h-8 bg-emerald-800 hover:bg-emerald-900 text-white shadow-2xs"
+            className="text-xs gap-1.5 h-8 bg-[#714B67] hover:bg-[#5b3c53] text-white font-semibold shadow-2xs"
             title="Open Billing & Extra Charges Module with current filters"
           >
             <span>Go to Billing Module</span>
@@ -423,8 +423,9 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
               </div>
 
               {/* Local View Toggle */}
-              {/* <div className="flex items-center bg-slate-200/70 p-0.5 rounded border border-slate-300">
+              <div className="flex items-center bg-slate-200/70 p-0.5 rounded border border-slate-300">
                 <button
+                  type="button"
                   onClick={() => setProfitViewMode('table')}
                   title="Table View"
                   className={`p-1 rounded text-xs transition ${
@@ -434,6 +435,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                   <TableIcon className="w-3.5 h-3.5" />
                 </button>
                 <button
+                  type="button"
                   onClick={() => setProfitViewMode('chart')}
                   title="Chart View"
                   className={`p-1 rounded text-xs transition ${
@@ -442,7 +444,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                 >
                   <BarChart3 className="w-3.5 h-3.5" />
                 </button>
-              </div> */}
+              </div>
 
               <Badge variant="outline" className="text-xs font-mono py-1">
                 {filteredWeddings.length} Weddings

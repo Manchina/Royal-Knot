@@ -298,7 +298,7 @@ export const FinanceDashboard: React.FC<FinanceDashboardProps> = ({
             variant="default"
             size="sm"
             onClick={handleGoToBillingModule}
-            className="text-xs gap-1.5 h-8 bg-emerald-800 hover:bg-emerald-900 shadow-2xs"
+            className="text-xs gap-1.5 h-8 bg-[#714B67] hover:bg-[#5b3c53] text-white font-semibold shadow-2xs"
             title="Open Billing & Extra Charges Module with current filters"
           >
             <span>Go to Billing & Extras Module</span>
