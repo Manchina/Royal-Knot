@@ -15,6 +15,7 @@ interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
+  isInitialized: boolean;
   loading: boolean;
   error: string | null;
   
@@ -34,10 +35,23 @@ const ROLE_EMAILS: Record<UserRole, string> = {
   CLIENT: 'client@royalknot.com',
 };
 
+const getStoredUser = (): User | null => {
+  try {
+    const raw = localStorage.getItem('rk_user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const initialToken = localStorage.getItem('rk_jwt_token');
+const initialUser = getStoredUser();
+
 export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null,
-  token: localStorage.getItem('rk_jwt_token'),
-  isAuthenticated: !!localStorage.getItem('rk_jwt_token'),
+  user: initialUser,
+  token: initialToken,
+  isAuthenticated: !!initialToken && !!initialUser,
+  isInitialized: false,
   loading: false,
   error: null,
 
@@ -56,10 +70,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       localStorage.setItem('rk_jwt_token', data.token);
+      localStorage.setItem('rk_user', JSON.stringify(data.user));
+
       set({
         user: data.user,
         token: data.token,
         isAuthenticated: true,
+        isInitialized: true,
         loading: false,
         error: null,
       });
@@ -77,37 +94,65 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: () => {
     localStorage.removeItem('rk_jwt_token');
+    localStorage.removeItem('rk_user');
     set({
       user: null,
       token: null,
       isAuthenticated: false,
+      isInitialized: true,
       error: null,
     });
   },
 
   initAuth: async () => {
     const token = localStorage.getItem('rk_jwt_token');
+    const storedUser = getStoredUser();
+
     if (!token) {
-      await get().quickLogin('FOUNDER');
+      set({
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        isInitialized: true,
+        loading: false,
+      });
       return;
     }
 
     try {
       const data = await api.get<{ success: boolean; user: User }>('/api/auth/me');
       if (data.success && data.user) {
+        localStorage.setItem('rk_user', JSON.stringify(data.user));
         set({
           user: data.user,
           token,
           isAuthenticated: true,
+          isInitialized: true,
           loading: false,
         });
         return;
       }
-      await get().quickLogin('FOUNDER');
-    } catch {
-      if (!get().user) {
-        await get().quickLogin('FOUNDER');
+    } catch (e) {
+      console.warn('Token verify failed or server offline, keeping cached user session:', e);
+      if (storedUser) {
+        set({
+          user: storedUser,
+          token,
+          isAuthenticated: true,
+          isInitialized: true,
+          loading: false,
+        });
+        return;
       }
     }
+
+    // If token was invalid and no stored user
+    set({
+      user: storedUser,
+      token,
+      isAuthenticated: !!storedUser,
+      isInitialized: true,
+      loading: false,
+    });
   },
 }));

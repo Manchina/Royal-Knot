@@ -101,6 +101,18 @@ export const enquiries = pgTable('enquiries', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 
+// Enquiry Change Logs (Audit Trail & Activity History)
+export const enquiryChangeLogs = pgTable('enquiry_change_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  enquiryId: uuid('enquiry_id').references(() => enquiries.id, { onDelete: 'cascade' }).notNull(),
+  action: varchar('action', { length: 60 }).notNull(),
+  fromStatus: varchar('from_status', { length: 40 }),
+  toStatus: varchar('to_status', { length: 40 }),
+  performedBy: varchar('performed_by', { length: 120 }).default('System'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
 // Wedding Events (Sub-Ceremonies)
 export const weddingEvents = pgTable('wedding_events', {
   id: uuid('id').defaultRandom().primaryKey(),

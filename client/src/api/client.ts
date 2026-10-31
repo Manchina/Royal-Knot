@@ -48,6 +48,7 @@ export async function apiClient<T = any>(
   // Handle unauthorized gracefully
   if (res.status === 401) {
     localStorage.removeItem('rk_jwt_token');
+    localStorage.removeItem('rk_user');
   }
 
   const contentType = res.headers.get('content-type');

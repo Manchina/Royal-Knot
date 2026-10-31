@@ -1,15 +1,19 @@
-import { useState } from 'react';
-import { 
-  Plus, 
-  Phone, 
-  FileCheck, 
-  Clock, 
-  Search,
-  CheckCircle2
-} from 'lucide-react';
+import { useState, useEffect } from 'react';
 import {
-  Card,
-  CardContent,
+  Plus,
+  Phone,
+  Search,
+  ChevronRight,
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { api } from '../api/client';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
   Button,
   Badge,
   Input,
@@ -19,7 +23,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
   Tabs,
   TabsList,
   TabsTrigger,
@@ -32,30 +35,38 @@ import {
 
 interface Enquiry {
   id: string;
+  dbId?: string;
   couple: string;
-  channel: 'WhatsApp Inquiry' | 'Instagram DM' | 'Phone Call Referral';
+  primaryContactName?: string;
+  channel: string;
   phone: string;
+  email?: string;
   cityPreference: 'Udaipur' | 'Jaipur';
   datesRough: string;
   guestCount: number;
   theme: string;
   budgetMax: string;
+  packagePreference?: string;
   agreementStatus: 'Signed on Mobile' | 'Sent - Pending Signature' | 'Drafting Agreement';
   agreementSignedAt?: string;
-  status: 'Consultation Booked' | 'Agreement Awaited' | 'Initial Discovery';
+  status: 'Consultation Booked' | 'Agreement Awaited' | 'Initial Discovery' | 'Converted to Wedding';
+  weddingId?: string;
+  notes?: string;
+  createdAt?: string;
 }
-
 export const Enquiries: React.FC = () => {
+  const navigate = useNavigate();
   const [channelFilter, setChannelFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [modalOpen, setModalOpen] = useState<boolean>(false);
+  const [_loading, setLoading] = useState<boolean>(false);
 
-  // Form states
+  // New lead form state
   const [newCouple, setNewCouple] = useState('');
   const [newPhone, setNewPhone] = useState('');
-  const [newChannel, setNewChannel] = useState<'WhatsApp Inquiry' | 'Instagram DM' | 'Phone Call Referral'>('WhatsApp Inquiry');
+  const [newChannel, setNewChannel] = useState<string>('Website Consultation');
   const [newCity, setNewCity] = useState<'Udaipur' | 'Jaipur'>('Udaipur');
-  const [newBudget, setNewBudget] = useState('₹2.00 Cr');
+  const [newBudget, setNewBudget] = useState('₹2.50 Cr');
   const [newGuests, setNewGuests] = useState('400');
 
   const [enquiries, setEnquiries] = useState<Enquiry[]>([
@@ -101,53 +112,123 @@ export const Enquiries: React.FC = () => {
     },
   ]);
 
-  const handleCreateEnquiry = (e: React.FormEvent) => {
+  // Load enquiries from backend API
+  const fetchEnquiries = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/enquiries');
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        const mapped: Enquiry[] = res.data.map((row: any) => {
+          const budgetRaw = row.budgetMax || row.budget_max;
+          let budgetStr = '₹2.50 Cr';
+          if (budgetRaw) {
+            const cr = Number(budgetRaw) / 10000000;
+            budgetStr = `₹${cr.toFixed(2)} Cr`;
+          }
+
+          const rawAgreement = row.agreementStatus || row.agreement_status || 'Drafting Agreement';
+          let agreementSt: any = 'Drafting Agreement';
+          if (String(rawAgreement).includes('Signed')) agreementSt = 'Signed on Mobile';
+          else if (String(rawAgreement).includes('Sent')) agreementSt = 'Sent - Pending Signature';
+
+          const signedAt = row.agreementSignedAt || row.agreement_signed_at;
+          const cityPref = (row.cityPreference || row.city_preference) === 'Jaipur' ? 'Jaipur' : 'Udaipur';
+
+          return {
+            id: row.code || `ENQ-${String(row.id || '').slice(0, 8)}`,
+            dbId: row.id,
+            couple: row.coupleName || row.couple_name || 'Couple Consultation',
+            primaryContactName: row.primaryContactName || row.primary_contact_name,
+            channel: row.channel || 'Website Consultation',
+            phone: row.phone || '',
+            email: row.email || '',
+            cityPreference: cityPref,
+            datesRough: row.datesRough || row.dates_rough || 'Winter 2026',
+            guestCount: Number(row.guestCount || row.guest_count) || 400,
+            theme: row.theme || 'Royal Heritage',
+            budgetMax: budgetStr,
+            packagePreference: row.packagePreference || row.package_preference || 'FULL_SERVICE',
+            agreementStatus: agreementSt,
+            agreementSignedAt: signedAt ? new Date(signedAt).toLocaleDateString() : undefined,
+            status: row.status || 'Initial Discovery',
+            weddingId: row.weddingId || row.wedding_id,
+            notes: row.notes || '',
+            createdAt: row.createdAt || row.created_at,
+          };
+        });
+        setEnquiries(mapped);
+      }
+    } catch (e) {
+      console.warn('Using seeded / local enquiries fallback:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEnquiries();
+  }, []);
+
+  const handleCreateEnquiry = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCouple) return;
 
-    const newEnq: Enquiry = {
-      id: `ENQ-2026-${100 + enquiries.length + 2}`,
-      couple: newCouple,
-      channel: newChannel,
-      phone: newPhone || '+91 98000 00000',
-      cityPreference: newCity,
-      datesRough: 'Spring 2027',
-      guestCount: parseInt(newGuests, 10) || 400,
-      theme: 'Palace Regal',
-      budgetMax: newBudget,
-      agreementStatus: 'Drafting Agreement',
-      status: 'Initial Discovery',
-    };
+    try {
+      const budgetNum = parseFloat(newBudget.replace(/[^0-9.]/g, '')) * 10000000 || 25000000;
+      const res = await api.post('/enquiries', {
+        coupleName: newCouple,
+        phone: newPhone || '+91 98000 00000',
+        channel: newChannel,
+        cityPreference: newCity,
+        guestCount: parseInt(newGuests, 10) || 400,
+        budgetMax: budgetNum,
+        datesRough: 'Winter 2026',
+      });
 
-    setEnquiries([newEnq, ...enquiries]);
+      if (res.success) {
+        await fetchEnquiries();
+      }
+    } catch (err) {
+      console.warn('Local lead creation fallback:', err);
+      const newEnq: Enquiry = {
+        id: `ENQ-2026-${100 + enquiries.length + 2}`,
+        couple: newCouple,
+        channel: newChannel,
+        phone: newPhone || '+91 98000 00000',
+        cityPreference: newCity,
+        datesRough: 'Winter 2026',
+        guestCount: parseInt(newGuests, 10) || 400,
+        theme: 'Palace Regal',
+        budgetMax: newBudget,
+        agreementStatus: 'Drafting Agreement',
+        status: 'Initial Discovery',
+      };
+      setEnquiries([newEnq, ...enquiries]);
+    }
+
     setModalOpen(false);
     setNewCouple('');
     setNewPhone('');
   };
 
-  const handleSignAgreement = (id: string) => {
-    setEnquiries((prev) =>
-      prev.map((e) =>
-        e.id === id
-          ? {
-              ...e,
-              agreementStatus: 'Signed on Mobile',
-              agreementSignedAt: 'Just Now',
-              status: 'Consultation Booked',
-            }
-          : e
-      )
-    );
-  };
+
 
   const filtered = enquiries.filter((e) => {
-    const matchesChannel = channelFilter === 'ALL' || e.channel.includes(channelFilter);
+    const matchesChannel = channelFilter === 'ALL' || (e.channel || '').includes(channelFilter);
     const matchesSearch =
-      e.couple.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.phone.includes(searchTerm) ||
-      e.id.toLowerCase().includes(searchTerm.toLowerCase());
+      (e.couple || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (e.phone || '').includes(searchTerm) ||
+      (e.id || '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesChannel && matchesSearch;
   });
+
+  const channelCounts = {
+    ALL: enquiries.length,
+    Website: enquiries.filter((e) => (e.channel || '').includes('Website')).length,
+    WhatsApp: enquiries.filter((e) => (e.channel || '').includes('WhatsApp')).length,
+    Instagram: enquiries.filter((e) => (e.channel || '').includes('Instagram')).length,
+    Phone: enquiries.filter((e) => (e.channel || '').includes('Phone')).length,
+  };
 
   return (
     <div className="space-y-4">
@@ -173,7 +254,7 @@ export const Enquiries: React.FC = () => {
         </Button>
       </div>
 
-      {/* Odoo Filter & Search Toolbar */}
+      {/* Filter & Search Toolbar */}
       <div className="bg-white border border-slate-200 rounded p-2.5 flex flex-col md:flex-row items-center justify-between gap-3 shadow-2xs">
         <div className="relative w-full md:w-80">
           <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -188,117 +269,134 @@ export const Enquiries: React.FC = () => {
         <Tabs value={channelFilter} onValueChange={setChannelFilter} className="w-full md:w-auto">
           <TabsList className="h-8 bg-slate-100 border border-slate-200">
             <TabsTrigger value="ALL" className="text-xs px-3 font-semibold">
-              All Channels ({enquiries.length})
+              All Channels ({channelCounts.ALL})
+            </TabsTrigger>
+            <TabsTrigger value="Website" className="text-xs px-3 font-semibold">
+              Website Leads ({channelCounts.Website})
             </TabsTrigger>
             <TabsTrigger value="WhatsApp" className="text-xs px-3 font-semibold">
-              WhatsApp
+              WhatsApp ({channelCounts.WhatsApp})
             </TabsTrigger>
             <TabsTrigger value="Instagram" className="text-xs px-3 font-semibold">
-              Instagram
+              Instagram ({channelCounts.Instagram})
             </TabsTrigger>
             <TabsTrigger value="Phone" className="text-xs px-3 font-semibold">
-              Phone Calls
+              Phone Calls ({channelCounts.Phone})
             </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
-      {/* Enquiry Cards */}
-      <div className="space-y-3">
-        {filtered.map((enq) => (
-          <Card key={enq.id} className="border border-slate-200 shadow-2xs rounded bg-white">
-            <CardContent className="p-4">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                {/* Left Info */}
-                <div className="space-y-1.5 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-slate-500">{enq.id}</span>
+      {/* Main Table View */}
+      <div className="bg-white border border-slate-200 rounded shadow-2xs overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+              <TableHead className="w-28">Ref Code</TableHead>
+              <TableHead>Couple & Contact</TableHead>
+              <TableHead>Channel</TableHead>
+              <TableHead>City & Season</TableHead>
+              <TableHead>Scale & Budget</TableHead>
+              <TableHead>Agreement Status</TableHead>
+              <TableHead>Pipeline Stage</TableHead>
+              <TableHead className="w-10"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-10 text-slate-400 text-xs">
+                  No enquiries found matching your filter criteria.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filtered.map((enq) => (
+                <TableRow
+                  key={enq.id}
+                  onClick={() => navigate(`/enquiries/${enq.id}`)}
+                  className="cursor-pointer hover:bg-slate-50/80 transition-colors text-xs"
+                >
+                  {/* Ref Code */}
+                  <TableCell className="font-mono font-bold text-slate-700 py-3">
+                    {enq.id}
+                  </TableCell>
+
+                  {/* Couple Name */}
+                  <TableCell>
+                    <div className="font-bold text-slate-900">{enq.couple}</div>
+                    <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                      <Phone className="w-3 h-3 text-slate-400" />
+                      <span>{enq.phone}</span>
+                      {enq.primaryContactName && (
+                        <>
+                          <span>•</span>
+                          <span>{enq.primaryContactName}</span>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+
+                  {/* Channel */}
+                  <TableCell>
                     <Badge variant="outline" className="text-[10px] font-mono">
                       {enq.channel}
                     </Badge>
-                    <Badge variant="odoo" className="text-[10px]">
-                      {enq.cityPreference}
-                    </Badge>
+                  </TableCell>
+
+                  {/* City & Season */}
+                  <TableCell>
+                    <div className="font-medium text-slate-800">{enq.cityPreference}</div>
+                    <div className="text-[10px] text-slate-500">{enq.datesRough}</div>
+                  </TableCell>
+
+                  {/* Scale & Budget */}
+                  <TableCell>
+                    <div className="font-bold text-slate-900">{enq.budgetMax}</div>
+                    <div className="text-[10px] text-slate-500">{enq.guestCount} guests</div>
+                  </TableCell>
+
+                  {/* Agreement Status */}
+                  <TableCell>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border ${enq.agreementStatus === 'Signed on Mobile'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        : enq.agreementStatus === 'Sent - Pending Signature'
+                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                          : 'bg-slate-100 text-slate-700 border-slate-200'
+                      }`}>
+                      {enq.agreementStatus}
+                    </span>
+                  </TableCell>
+
+                  {/* Pipeline Stage */}
+                  <TableCell>
                     <Badge
                       variant={
                         enq.status === 'Consultation Booked'
                           ? 'success'
                           : enq.status === 'Agreement Awaited'
-                          ? 'warning'
-                          : 'secondary'
+                            ? 'warning'
+                            : enq.status === 'Converted to Wedding'
+                              ? 'odoo'
+                              : 'secondary'
                       }
                       className="text-[10px]"
                     >
                       {enq.status}
                     </Badge>
-                  </div>
+                  </TableCell>
 
-                  <h3 className="font-bold text-sm text-slate-900 tracking-tight">{enq.couple}</h3>
-
-                  <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-slate-600">
-                    <div className="flex items-center gap-1">
-                      <Phone className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="font-mono text-slate-800">{enq.phone}</span>
-                    </div>
-                    <div>
-                      Guests: <strong className="text-slate-900">{enq.guestCount}</strong>
-                    </div>
-                    <div>
-                      Target: <strong className="text-slate-900">{enq.datesRough}</strong>
-                    </div>
-                    <div>
-                      Budget Cap: <strong className="text-slate-900 font-mono">{enq.budgetMax}</strong>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Agreement Box */}
-                <div className="lg:w-72 shrink-0 p-3 rounded bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 text-[11px]">Agreement:</span>
-                    <span
-                      className={`font-bold text-xs flex items-center gap-1 ${
-                        enq.agreementStatus === 'Signed on Mobile'
-                          ? 'text-emerald-800'
-                          : 'text-amber-800'
-                      }`}
-                    >
-                      {enq.agreementStatus === 'Signed on Mobile' ? (
-                        <FileCheck className="w-3.5 h-3.5" />
-                      ) : (
-                        <Clock className="w-3.5 h-3.5" />
-                      )}
-                      {enq.agreementStatus}
-                    </span>
-                  </div>
-
-                  <div className="pt-1.5 border-t border-slate-200">
-                    {enq.agreementStatus !== 'Signed on Mobile' ? (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => handleSignAgreement(enq.id)}
-                        className="w-full text-xs h-7"
-                      >
-                        Confirm Signed Agreement
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full text-xs h-7 text-emerald-800 border-emerald-300 bg-emerald-50"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                        Converted to Project
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                  {/* Row Navigation Indicator */}
+                  <TableCell className="text-right pr-4 text-slate-400">
+                    <ChevronRight className="w-4 h-4 ml-auto text-slate-400" />
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
+
+
 
       {/* Modal: New Lead Intake */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
@@ -330,22 +428,22 @@ export const Enquiries: React.FC = () => {
                 <Label htmlFor="phone">Phone / WhatsApp</Label>
                 <Input
                   id="phone"
-                  placeholder="+91 98..."
+                  placeholder="+91 98290 00000"
                   value={newPhone}
                   onChange={(e) => setNewPhone(e.target.value)}
+                  required
                   className="border-slate-300"
                 />
               </div>
+
               <div className="space-y-1">
-                <Label htmlFor="channel">Source Channel</Label>
-                <Select
-                  value={newChannel}
-                  onValueChange={(val) => setNewChannel(val as any)}
-                >
-                  <SelectTrigger id="channel" className="h-8 text-xs border-slate-300">
-                    <SelectValue placeholder="Source" />
+                <Label htmlFor="channel">Channel</Label>
+                <Select value={newChannel} onValueChange={(val: any) => setNewChannel(val)}>
+                  <SelectTrigger className="border-slate-300">
+                    <SelectValue placeholder="Select channel" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="Website Consultation">Website Lead</SelectItem>
                     <SelectItem value="WhatsApp Inquiry">WhatsApp Inquiry</SelectItem>
                     <SelectItem value="Instagram DM">Instagram DM</SelectItem>
                     <SelectItem value="Phone Call Referral">Phone Call Referral</SelectItem>
@@ -354,54 +452,64 @@ export const Enquiries: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-3 gap-2.5">
               <div className="space-y-1">
-                <Label htmlFor="city_pref">City Preference</Label>
-                <Select
-                  value={newCity}
-                  onValueChange={(val) => setNewCity(val as any)}
-                >
-                  <SelectTrigger id="city_pref" className="h-8 text-xs border-slate-300">
+                <Label htmlFor="city">City Preference</Label>
+                <Select value={newCity} onValueChange={(val: any) => setNewCity(val)}>
+                  <SelectTrigger className="border-slate-300">
                     <SelectValue placeholder="City" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Udaipur">Udaipur (Palaces & Lakes)</SelectItem>
-                    <SelectItem value="Jaipur">Jaipur (Forts & Heritage)</SelectItem>
+                    <SelectItem value="Udaipur">Udaipur</SelectItem>
+                    <SelectItem value="Jaipur">Jaipur</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-1">
-                <Label htmlFor="guests_count">Expected Guests</Label>
-                <Input
-                  id="guests_count"
-                  type="number"
-                  placeholder="400"
-                  value={newGuests}
-                  onChange={(e) => setNewGuests(e.target.value)}
-                  className="border-slate-300"
-                />
+                <Label htmlFor="guests">Guest Count</Label>
+                <Select value={newGuests} onValueChange={(val: any) => setNewGuests(val)}>
+                  <SelectTrigger className="border-slate-300">
+                    <SelectValue placeholder="Guests" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="350">350 Guests</SelectItem>
+                    <SelectItem value="400">400 Guests</SelectItem>
+                    <SelectItem value="450">450 Guests</SelectItem>
+                    <SelectItem value="500">500 Guests</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="budget">Max Budget</Label>
+                <Select value={newBudget} onValueChange={(val: any) => setNewBudget(val)}>
+                  <SelectTrigger className="border-slate-300">
+                    <SelectValue placeholder="Budget" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="₹1.80 Cr">₹1.80 Cr</SelectItem>
+                    <SelectItem value="₹2.50 Cr">₹2.50 Cr</SelectItem>
+                    <SelectItem value="₹3.00 Cr">₹3.00 Cr</SelectItem>
+                    <SelectItem value="₹4.50 Cr">₹4.50 Cr</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="budget_max">Budget Cap</Label>
-              <Input
-                id="budget_max"
-                placeholder="₹2.50 Cr"
-                value={newBudget}
-                onChange={(e) => setNewBudget(e.target.value)}
-                className="border-slate-300"
-              />
-            </div>
-
-            <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setModalOpen(false)}>
+            <div className="pt-2 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setModalOpen(false)}
+              >
                 Cancel
               </Button>
-              <Button type="submit" variant="default" size="sm">
-                Save & Open Proposal
+              <Button type="submit" size="sm" variant="default">
+                Register Lead
               </Button>
-            </DialogFooter>
+            </div>
           </form>
         </DialogContent>
       </Dialog>
