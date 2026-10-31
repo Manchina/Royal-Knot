@@ -4,9 +4,65 @@ import {
   CheckCircle2, 
   ShieldCheck
 } from 'lucide-react';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Button,
+  Badge,
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  Input,
+  Label,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '../components/ui';
+
+interface ExtraCharge {
+  id: string;
+  category: string;
+  description: string;
+  qty: number;
+  unitPrice: string;
+  total: string;
+  vendor: string;
+  status: 'ADDED_TO_CLIENT_INVOICE' | 'PENDING_APPROVAL';
+  approvedBy: string;
+}
+
+interface VendorBill {
+  vendor: string;
+  category: string;
+  agreedBase: string;
+  extras: string;
+  totalPayable: string;
+  advancePaid: string;
+  balanceDue: string;
+  status: 'RECONCILED_MATCHED' | 'DISPUTED';
+}
 
 export const Billing: React.FC = () => {
-  const [extraCharges] = useState([
+  const [modalOpen, setModalOpen] = useState(false);
+  const [desc, setDesc] = useState('');
+  const [qty, setQty] = useState('50');
+  const [unitPrice, setUnitPrice] = useState('2100');
+  const [vendor, setVendor] = useState('Marwar Gourmet Kitchens');
+
+  const [extraCharges, setExtraCharges] = useState<ExtraCharge[]>([
     {
       id: 'EXT-01',
       category: 'EXTRA_PLATES',
@@ -31,9 +87,10 @@ export const Billing: React.FC = () => {
     },
   ]);
 
-  const vendorBills = [
+  const vendorBills: VendorBill[] = [
     {
-      vendor: 'Marwar Gourmet Kitchens (Caterer)',
+      vendor: 'Marwar Gourmet Kitchens',
+      category: 'Catering & Banquets',
       agreedBase: '₹8,40,000',
       extras: '+₹1,26,000 (60 Plates)',
       totalPayable: '₹9,66,000',
@@ -42,7 +99,8 @@ export const Billing: React.FC = () => {
       status: 'RECONCILED_MATCHED',
     },
     {
-      vendor: 'Jaipur Floral Wonders (Decor)',
+      vendor: 'Jaipur Floral Wonders',
+      category: 'Mandap & Courtyard Decor',
       agreedBase: '₹14,00,000',
       extras: '₹0',
       totalPayable: '₹14,00,000',
@@ -51,7 +109,8 @@ export const Billing: React.FC = () => {
       status: 'RECONCILED_MATCHED',
     },
     {
-      vendor: 'Desert Beat Sounds (DJ & Lights)',
+      vendor: 'Desert Beat Sounds',
+      category: 'Sound & DJ Tech Rider',
       agreedBase: '₹3,50,000',
       extras: '+₹30,000 (Overtime)',
       totalPayable: '₹3,80,000',
@@ -61,107 +120,258 @@ export const Billing: React.FC = () => {
     },
   ];
 
+  const handleAddExtra = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!desc) return;
+
+    const numQty = parseFloat(qty) || 1;
+    const numPrice = parseFloat(unitPrice) || 1000;
+    const calcTotal = numQty * numPrice;
+
+    const newExtra: ExtraCharge = {
+      id: `EXT-0${extraCharges.length + 1}`,
+      category: 'OVERRUN_ADDITION',
+      description: desc,
+      qty: numQty,
+      unitPrice: `₹${numPrice.toLocaleString('en-IN')}`,
+      total: `₹${calcTotal.toLocaleString('en-IN')}`,
+      vendor,
+      status: 'ADDED_TO_CLIENT_INVOICE',
+      approvedBy: 'Finance Manager',
+    };
+
+    setExtraCharges([...extraCharges, newExtra]);
+    setModalOpen(false);
+    setDesc('');
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* Odoo Control Panel */}
+      <div className="bg-white border border-slate-200 rounded p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-[#222222]">Billing & Extra Charges</h1>
-          <p className="text-xs md:text-sm text-neutral-500 mt-0.5">
-            Client additions, extra guest plates, and vendor payment reconciliation.
-          </p>
+          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            Invoicing & Vendor Settlements
+          </div>
+          <h1 className="text-lg font-bold text-slate-900 tracking-tight">
+            Billing & Extra Charges Reconciliation
+          </h1>
         </div>
 
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-[#FF385C] text-white rounded-xl text-xs font-semibold hover:bg-[#E00B41] transition shadow-sm self-start sm:self-auto">
-          <Plus className="w-4 h-4" />
-          <span>Add Extra Charge</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-xs font-mono font-bold py-1 px-2.5">
+            Total Extras: ₹1,56,000
+          </Badge>
+
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => setModalOpen(true)}
+            className="gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Extra Charge</span>
+          </Button>
+        </div>
       </div>
 
       {/* Extra Charges Section */}
-      <div className="bg-white rounded-2xl border border-neutral-200 p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="font-bold text-base text-[#222222]">Extra Additions Billed to Client</h2>
-            <p className="text-xs text-neutral-500">Day-of additions added to the final client settlement</p>
+      <Card className="border border-slate-200 shadow-2xs rounded bg-white">
+        <CardHeader className="p-3.5 border-b border-slate-200 bg-slate-50/70">
+          <CardTitle className="text-sm font-bold text-slate-900">
+            Day-of Additions Invoiced to Client
+          </CardTitle>
+          <div className="text-xs text-slate-500">
+            Headcount additions and overtime adjustments added to final settlement
           </div>
-          <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-            Total Extras: ₹1,56,000
-          </span>
-        </div>
+        </CardHeader>
 
-        <div className="space-y-3">
+        <CardContent className="p-3.5 space-y-2.5">
           {extraCharges.map((ext) => (
-            <div key={ext.id} className="p-4 rounded-xl border border-neutral-200 bg-neutral-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-              <div className="space-y-1">
+            <div
+              key={ext.id}
+              className="p-3 rounded border border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs"
+            >
+              <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-neutral-400">{ext.id}</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-200 text-neutral-800">
+                  <span className="font-mono font-bold text-slate-500 text-xs">{ext.id}</span>
+                  <Badge variant="outline" className="text-[10px] font-mono">
                     {ext.category}
-                  </span>
+                  </Badge>
+                  <span className="text-slate-500 text-xs">&bull; {ext.vendor}</span>
                 </div>
-                <div className="font-bold text-sm text-neutral-900">{ext.description}</div>
-                <div className="text-neutral-500">
-                  Vendor: <strong>{ext.vendor}</strong> &bull; Rate: {ext.unitPrice} &bull; Approved by: {ext.approvedBy}
+                <div className="font-bold text-slate-900 text-xs">{ext.description}</div>
+                <div className="text-slate-500 text-xs">
+                  Rate: {ext.qty} units &times; {ext.unitPrice} = <strong className="font-mono text-slate-900">{ext.total}</strong>
                 </div>
               </div>
 
-              <div className="text-right sm:shrink-0">
-                <div className="text-base font-bold text-[#222222]">{ext.total}</div>
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 mt-0.5">
-                  <CheckCircle2 className="w-3 h-3" /> Billed to Client
-                </span>
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="text-right">
+                  <Badge variant="success" className="text-[10px] flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Invoiced to Couple
+                  </Badge>
+                  <div className="text-[10px] text-slate-400 mt-0.5">
+                    Authorized: {ext.approvedBy}
+                  </div>
+                </div>
               </div>
             </div>
           ))}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Vendor Bills Matching Table */}
-      <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-neutral-100 flex items-center justify-between">
-          <div>
-            <h2 className="font-bold text-base text-[#222222]">Vendor Accounts Payable</h2>
-            <p className="text-xs text-neutral-500">Advances matched against agreed quotes</p>
+      {/* Vendor Payment Reconciliation Matrix */}
+      <Card className="border border-slate-200 shadow-2xs rounded bg-white">
+        <CardHeader className="p-3.5 border-b border-slate-200 bg-slate-50/70">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-sm font-bold text-slate-900">
+                Vendor Disbursement Ledger
+              </CardTitle>
+              <div className="text-xs text-slate-500">
+                Agreed contract vs extras, advances paid, and balance payable
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-emerald-800 font-bold">
+              <ShieldCheck className="w-4 h-4 text-emerald-700" />
+              <span>Duplicate Payment Protected</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 font-semibold">
-            <ShieldCheck className="w-3.5 h-3.5" /> Reconciled
-          </div>
-        </div>
+        </CardHeader>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-neutral-50/80 text-neutral-500 font-semibold border-b border-neutral-100">
-              <tr>
-                <th className="py-3 px-4">Vendor Partner</th>
-                <th className="py-3 px-4">Agreed Base Quote</th>
-                <th className="py-3 px-4">Approved Extras</th>
-                <th className="py-3 px-4">Total Payable</th>
-                <th className="py-3 px-4">Advance Paid</th>
-                <th className="py-3 px-4">Remaining Balance</th>
-                <th className="py-3 px-4">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100">
-              {vendorBills.map((b, i) => (
-                <tr key={i} className="hover:bg-neutral-50/60 transition">
-                  <td className="py-3.5 px-4 font-semibold text-neutral-900">{b.vendor}</td>
-                  <td className="py-3.5 px-4 text-neutral-600">{b.agreedBase}</td>
-                  <td className="py-3.5 px-4 font-medium text-emerald-600">{b.extras}</td>
-                  <td className="py-3.5 px-4 font-bold text-neutral-900">{b.totalPayable}</td>
-                  <td className="py-3.5 px-4 text-neutral-600">{b.advancePaid}</td>
-                  <td className="py-3.5 px-4 font-bold text-rose-600">{b.balanceDue}</td>
-                  <td className="py-3.5 px-4">
-                    <button className="px-3 py-1 bg-neutral-900 text-white rounded-lg text-[11px] font-semibold hover:bg-black transition">
-                      Disburse Balance
-                    </button>
-                  </td>
-                </tr>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-slate-100/80 border-b border-slate-200">
+              <TableRow>
+                <TableHead className="font-bold text-slate-700 text-xs">Vendor & Service Account</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs text-right">Contract Base</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs text-right">Extras</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs text-right">Total Payable</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs text-right">Advance Paid</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs text-right">Balance Due</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs text-right">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-slate-100">
+              {vendorBills.map((vb, i) => (
+                <TableRow key={i} className="hover:bg-slate-50 transition">
+                  <TableCell className="py-2.5">
+                    <div className="font-bold text-xs text-slate-900">{vb.vendor}</div>
+                    <div className="text-[11px] text-slate-500">{vb.category}</div>
+                  </TableCell>
+
+                  <TableCell className="py-2.5 text-right font-mono text-xs text-slate-600">
+                    {vb.agreedBase}
+                  </TableCell>
+
+                  <TableCell className="py-2.5 text-right font-mono text-xs font-semibold text-amber-800">
+                    {vb.extras}
+                  </TableCell>
+
+                  <TableCell className="py-2.5 text-right font-mono text-xs font-bold text-slate-900">
+                    {vb.totalPayable}
+                  </TableCell>
+
+                  <TableCell className="py-2.5 text-right font-mono text-xs text-slate-600">
+                    {vb.advancePaid}
+                  </TableCell>
+
+                  <TableCell className="py-2.5 text-right font-mono text-xs font-bold text-emerald-800">
+                    {vb.balanceDue}
+                  </TableCell>
+
+                  <TableCell className="py-2.5 text-right">
+                    <Badge variant="odoo" className="text-[10px]">
+                      Reconciled Matched
+                    </Badge>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Modal: Add Extra Charge */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="max-w-md bg-white border border-slate-200 shadow-xl rounded">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900">
+              Add Operational Extra Charge
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Record verified event overrun to invoice couple and reconcile vendor payable.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleAddExtra} className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="vendor_name">Vendor Account</Label>
+              <Select
+                value={vendor}
+                onValueChange={(val) => setVendor(val)}
+              >
+                <SelectTrigger id="vendor_name" className="h-8 text-xs border-slate-300">
+                  <SelectValue placeholder="Select Vendor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Marwar Gourmet Kitchens">Marwar Gourmet Kitchens (Catering)</SelectItem>
+                  <SelectItem value="Desert Beat Sounds">Desert Beat Sounds (DJ & Audio)</SelectItem>
+                  <SelectItem value="Jaipur Floral Wonders">Jaipur Floral Wonders (Mandap)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="charge_desc">Reason / Item Description</Label>
+              <Input
+                id="charge_desc"
+                placeholder="e.g. 50 Extra Banquet Plates for unannounced guests"
+                value={desc}
+                onChange={(e) => setDesc(e.target.value)}
+                required
+                className="border-slate-300"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="space-y-1">
+                <Label htmlFor="charge_qty">Quantity / Units</Label>
+                <Input
+                  id="charge_qty"
+                  type="number"
+                  placeholder="50"
+                  value={qty}
+                  onChange={(e) => setQty(e.target.value)}
+                  className="border-slate-300"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="charge_unit">Rate per Unit (₹)</Label>
+                <Input
+                  id="charge_unit"
+                  type="number"
+                  placeholder="2100"
+                  value={unitPrice}
+                  onChange={(e) => setUnitPrice(e.target.value)}
+                  className="border-slate-300"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="default" size="sm">
+                Append to Invoice
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

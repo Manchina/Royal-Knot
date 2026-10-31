@@ -15,7 +15,8 @@
     "@fastify/postgres": "^6.0.3",
     "dotenv": "^16.4.7",
     "fastify": "^5.2.1",
-    "pg": "^8.13.3"
+    "pg": "^8.13.3",
+    "royal-knot-root": "file:.."
   },
   "devDependencies": {
     "@types/node": "^22.13.1",

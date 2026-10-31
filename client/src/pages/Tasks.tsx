@@ -1,16 +1,62 @@
 import { useState } from 'react';
 import { 
   Plus, 
-  CheckCircle2, 
-  Clock, 
   User, 
-  CreditCard
+  CreditCard,
+  Search,
+  Check
 } from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  Button,
+  Badge,
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  Input,
+  Label,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '../components/ui';
+
+interface Task {
+  id: string;
+  title: string;
+  category: 'FINANCE' | 'VENUE' | 'VENDORS' | 'DESIGN' | 'PERMITS' | 'DAY_OF';
+  owner: string;
+  stage: 'DONE' | 'IN_PROGRESS' | 'TO_PLAN';
+  stagePayment?: string;
+  daysBefore: string;
+}
 
 export const Tasks: React.FC = () => {
   const [activeStageFilter, setActiveStageFilter] = useState<string>('ALL');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [modalOpen, setModalOpen] = useState<boolean>(false);
 
-  const tasks = [
+  // New task form state
+  const [newTitle, setNewTitle] = useState('');
+  const [newCategory, setNewCategory] = useState<Task['category']>('VENUE');
+  const [newOwner, setNewOwner] = useState('Devika Sharma');
+  const [newDays, setNewDays] = useState('20 Days');
+
+  const [tasks, setTasks] = useState<Task[]>([
     { id: 'TSK-01', title: 'Collect Booking Deposit (20%)', category: 'FINANCE', owner: 'Finance Team', stage: 'DONE', stagePayment: 'Stage 1: Booking Deposit', daysBefore: '90 Days' },
     { id: 'TSK-02', title: 'Lock Palace Venue Contract & Heritage Permits', category: 'VENUE', owner: 'Devika Sharma', stage: 'DONE', daysBefore: '75 Days' },
     { id: 'TSK-03', title: 'Issue Catering RFQ for 400 Guests', category: 'VENDORS', owner: 'Devika Sharma', stage: 'DONE', daysBefore: '60 Days' },
@@ -23,109 +69,273 @@ export const Tasks: React.FC = () => {
     { id: 'TSK-10', title: 'Minute-by-Minute Run Sheet Distribution to Family', category: 'DAY_OF', owner: 'Priya Joshi', stage: 'TO_PLAN', daysBefore: '5 Days' },
     { id: 'TSK-11', title: 'Post-Event Banquet Headcount Audit (+ Extras)', category: 'FINANCE', owner: 'Finance Team', stage: 'TO_PLAN', stagePayment: 'Stage 3: Final Settlement', daysBefore: '+1 Day' },
     { id: 'TSK-12', title: 'Disburse Final Vendor Balance Payments', category: 'FINANCE', owner: 'Finance Team', stage: 'TO_PLAN', daysBefore: '+3 Days' },
-  ];
+  ]);
 
-  const filtered = activeStageFilter === 'ALL' ? tasks : tasks.filter((t) => t.stage === activeStageFilter);
+  const toggleTaskStatus = (id: string) => {
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id === id) {
+          const nextStage: Task['stage'] =
+            t.stage === 'DONE' ? 'TO_PLAN' : t.stage === 'TO_PLAN' ? 'IN_PROGRESS' : 'DONE';
+          return { ...t, stage: nextStage };
+        }
+        return t;
+      })
+    );
+  };
+
+  const handleAddTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle) return;
+
+    const newTask: Task = {
+      id: `TSK-${String(tasks.length + 1).padStart(2, '0')}`,
+      title: newTitle,
+      category: newCategory,
+      owner: newOwner,
+      stage: 'TO_PLAN',
+      daysBefore: newDays,
+    };
+
+    setTasks([...tasks, newTask]);
+    setModalOpen(false);
+    setNewTitle('');
+  };
+
+  const filtered = tasks.filter((t) => {
+    const matchesStage = activeStageFilter === 'ALL' || t.stage === activeStageFilter;
+    const matchesSearch =
+      t.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.owner.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.id.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesStage && matchesSearch;
+  });
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* Odoo Control Panel */}
+      <div className="bg-white border border-slate-200 rounded p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-[#222222]">Wedding Checklists & Milestones</h1>
-          <p className="text-xs md:text-sm text-neutral-500 mt-0.5">
-            Structured task workflows across venue, design, permits, and payment milestones.
-          </p>
+          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            Project Task Management
+          </div>
+          <h1 className="text-lg font-bold text-slate-900 tracking-tight">
+            Checklists & Stage Milestones
+          </h1>
         </div>
 
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-[#FF385C] text-white rounded-xl text-xs font-semibold hover:bg-[#E00B41] transition shadow-sm self-start sm:self-auto">
+        <Button
+          variant="default"
+          size="sm"
+          onClick={() => setModalOpen(true)}
+          className="gap-1.5"
+        >
           <Plus className="w-4 h-4" />
-          <span>Add Custom Task</span>
-        </button>
+          <span>Add Task</span>
+        </Button>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {[
-          { key: 'ALL', label: 'All Tasks (12 shown / 25 template)' },
-          { key: 'TO_PLAN', label: 'To Plan' },
-          { key: 'IN_PROGRESS', label: 'In Progress' },
-          { key: 'DONE', label: 'Completed' },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveStageFilter(tab.key)}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition shrink-0 ${
-              activeStageFilter === tab.key
-                ? 'bg-neutral-900 text-white shadow-sm'
-                : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Odoo Filter & Search Toolbar */}
+      <div className="bg-white border border-slate-200 rounded p-2.5 flex flex-col md:flex-row items-center justify-between gap-3 shadow-2xs">
+        <div className="relative w-full md:w-80">
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Input
+            placeholder="Search task, owner, or ID..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 h-8 text-xs border-slate-300"
+          />
+        </div>
+
+        <Tabs value={activeStageFilter} onValueChange={setActiveStageFilter} className="w-full md:w-auto">
+          <TabsList className="h-8 bg-slate-100 border border-slate-200">
+            <TabsTrigger value="ALL" className="text-xs px-3 font-semibold">
+              All Tasks ({tasks.length})
+            </TabsTrigger>
+            <TabsTrigger value="TO_PLAN" className="text-xs px-3 font-semibold">
+              To Plan ({tasks.filter((t) => t.stage === 'TO_PLAN').length})
+            </TabsTrigger>
+            <TabsTrigger value="IN_PROGRESS" className="text-xs px-3 font-semibold">
+              In Progress ({tasks.filter((t) => t.stage === 'IN_PROGRESS').length})
+            </TabsTrigger>
+            <TabsTrigger value="DONE" className="text-xs px-3 font-semibold">
+              Completed ({tasks.filter((t) => t.stage === 'DONE').length})
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* Tasks Table */}
-      <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-neutral-50/80 text-neutral-500 font-semibold border-b border-neutral-100">
-              <tr>
-                <th className="py-3 px-4">Task</th>
-                <th className="py-3 px-4">Category</th>
-                <th className="py-3 px-4">Owner</th>
-                <th className="py-3 px-4">Timeline</th>
-                <th className="py-3 px-4">Payment Link</th>
-                <th className="py-3 px-4">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100">
-              {filtered.map((t) => (
-                <tr key={t.id} className="hover:bg-neutral-50/60 transition">
-                  <td className="py-3.5 px-4">
-                    <div className="font-semibold text-neutral-900">{t.title}</div>
-                    <div className="text-[11px] text-neutral-400 font-mono">{t.id}</div>
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 text-neutral-700">
-                      {t.category}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <div className="flex items-center gap-1.5 text-neutral-800 font-medium">
-                      <User className="w-3.5 h-3.5 text-neutral-400" />
-                      {t.owner}
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-4 text-neutral-600 font-medium">{t.daysBefore}</td>
-                  <td className="py-3.5 px-4">
-                    {t.stagePayment ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        <CreditCard className="w-3 h-3" /> {t.stagePayment}
-                      </span>
-                    ) : (
-                      <span className="text-neutral-400 text-[11px]">&mdash;</span>
-                    )}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                      t.stage === 'DONE'
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : t.stage === 'IN_PROGRESS'
-                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                        : 'bg-neutral-100 text-neutral-600'
-                    }`}>
-                      {t.stage === 'DONE' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                      {t.stage.replace('_', ' ')}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <Card className="border border-slate-200 shadow-2xs rounded bg-white">
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-slate-100/80 border-b border-slate-200">
+              <TableRow>
+                <TableHead className="w-12 text-center font-bold text-slate-700 text-xs">Status</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs">Task Name & Identifier</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs">Category</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs">Owner</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs">Timeline</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs">Linked Payment Milestone</TableHead>
+                <TableHead className="font-bold text-slate-700 text-xs text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-slate-100">
+              {filtered.map((t) => {
+                const isDone = t.stage === 'DONE';
+                const isInProgress = t.stage === 'IN_PROGRESS';
+
+                return (
+                  <TableRow key={t.id} className="hover:bg-slate-50 transition">
+                    <TableCell className="text-center py-2.5">
+                      <button
+                        onClick={() => toggleTaskStatus(t.id)}
+                        className={`w-4 h-4 rounded border flex items-center justify-center transition cursor-pointer mx-auto ${
+                          isDone
+                            ? 'bg-emerald-700 border-emerald-700 text-white'
+                            : isInProgress
+                            ? 'bg-amber-100 border-amber-500 text-amber-800'
+                            : 'border-slate-300 hover:border-slate-500 bg-white'
+                        }`}
+                      >
+                        {isDone && <Check className="w-3 h-3" />}
+                        {isInProgress && <span className="w-1.5 h-1.5 rounded-full bg-amber-700" />}
+                      </button>
+                    </TableCell>
+
+                    <TableCell className="py-2.5">
+                      <div className={`font-semibold text-xs ${isDone ? 'line-through text-slate-400' : 'text-slate-900'}`}>
+                        {t.title}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono">{t.id}</div>
+                    </TableCell>
+
+                    <TableCell className="py-2.5">
+                      <Badge variant="outline" className="text-[10px] font-mono">
+                        {t.category}
+                      </Badge>
+                    </TableCell>
+
+                    <TableCell className="py-2.5">
+                      <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium">
+                        <User className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{t.owner}</span>
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="py-2.5 font-mono text-xs text-slate-600">
+                      {t.daysBefore}
+                    </TableCell>
+
+                    <TableCell className="py-2.5">
+                      {t.stagePayment ? (
+                        <Badge variant="odoo" className="text-[10px] gap-1 font-mono">
+                          <CreditCard className="w-3 h-3 text-[#714B67]" />
+                          {t.stagePayment}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
+                      )}
+                    </TableCell>
+
+                    <TableCell className="py-2.5 text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => toggleTaskStatus(t.id)}
+                        className="h-6 text-xs text-slate-700"
+                      >
+                        {t.stage.replace('_', ' ')}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Modal: Add Custom Task */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="max-w-md bg-white border border-slate-200 shadow-xl rounded">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900">
+              Create Project Task
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Attach specialized operational task to event checklist.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleAddTask} className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="task_title">Task Description</Label>
+              <Input
+                id="task_title"
+                placeholder="e.g. Vintage Car Baraat Escort Permits"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                required
+                className="border-slate-300"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="space-y-1">
+                <Label htmlFor="cat">Category</Label>
+                <Select
+                  value={newCategory}
+                  onValueChange={(val) => setNewCategory(val as any)}
+                >
+                  <SelectTrigger id="cat" className="h-8 text-xs border-slate-300">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="FINANCE">FINANCE</SelectItem>
+                    <SelectItem value="VENUE">VENUE</SelectItem>
+                    <SelectItem value="VENDORS">VENDORS</SelectItem>
+                    <SelectItem value="DESIGN">DESIGN</SelectItem>
+                    <SelectItem value="PERMITS">PERMITS</SelectItem>
+                    <SelectItem value="DAY_OF">DAY_OF</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="timeline">Timeline (Days Before)</Label>
+                <Input
+                  id="timeline"
+                  placeholder="e.g. 15 Days"
+                  value={newDays}
+                  onChange={(e) => setNewDays(e.target.value)}
+                  className="border-slate-300"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="owner">Assignee Owner</Label>
+              <Input
+                id="owner"
+                placeholder="Devika Sharma"
+                value={newOwner}
+                onChange={(e) => setNewOwner(e.target.value)}
+                className="border-slate-300"
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="default" size="sm">
+                Add to Checklist
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

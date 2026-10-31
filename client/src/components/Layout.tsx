@@ -11,9 +11,15 @@ import {
   Settings, 
   Menu,
   X,
-  LogOut
+  LogOut,
+  Layers
 } from 'lucide-react';
 import { useAuthStore, type UserRole } from '../store/useAuthStore';
+import {
+  Avatar,
+  AvatarFallback,
+  Button,
+} from './ui';
 
 export const Layout: React.FC = () => {
   const { user, logout } = useAuthStore();
@@ -28,64 +34,116 @@ export const Layout: React.FC = () => {
     navigate('/login');
   };
 
-  // Navigation Items
+  // Sidebar Navigation Modules
   const allNavItems = [
-    { name: 'Analytics & P&L', path: '/dashboard', icon: BarChart3, roles: ['FOUNDER', 'SUPER_ADMIN', 'FINANCE_MANAGER'] },
-    { name: 'Weddings', path: '/weddings', icon: CalendarDays, roles: ['FOUNDER', 'SUPER_ADMIN', 'LEAD_PLANNER', 'COORDINATOR'] },
-    { name: 'Enquiries', path: '/enquiries', icon: MessageSquareHeart, roles: ['SUPER_ADMIN', 'LEAD_PLANNER'] },
-    { name: 'Vendor Quotes', path: '/procurement', icon: Utensils, roles: ['SUPER_ADMIN', 'LEAD_PLANNER', 'CLIENT'] },
-    { name: 'Checklists', path: '/tasks', icon: CheckSquare, roles: ['SUPER_ADMIN', 'LEAD_PLANNER', 'COORDINATOR'] },
-    { name: 'Day-of Schedule', path: '/day-of', icon: Clock, roles: ['SUPER_ADMIN', 'COORDINATOR', 'LEAD_PLANNER'] },
-    { name: 'Billing & Extras', path: '/billing', icon: CreditCard, roles: ['SUPER_ADMIN', 'FINANCE_MANAGER', 'FOUNDER'] },
-    { name: 'Settings', path: '/settings', icon: Settings, roles: ['SUPER_ADMIN'] },
+    { 
+      name: 'Dashboard', 
+      path: '/dashboard', 
+      icon: BarChart3, 
+      roles: ['FOUNDER', 'SUPER_ADMIN', 'FINANCE_MANAGER'] 
+    },
+    { 
+      name: 'Weddings', 
+      path: '/weddings', 
+      icon: CalendarDays, 
+      roles: ['FOUNDER', 'SUPER_ADMIN', 'LEAD_PLANNER', 'COORDINATOR'],
+      count: '25'
+    },
+    { 
+      name: 'Enquiries', 
+      path: '/enquiries', 
+      icon: MessageSquareHeart, 
+      roles: ['SUPER_ADMIN', 'LEAD_PLANNER'],
+      count: '3'
+    },
+    { 
+      name: 'Vendor RFQs', 
+      path: '/procurement', 
+      icon: Utensils, 
+      roles: ['SUPER_ADMIN', 'LEAD_PLANNER', 'CLIENT'] 
+    },
+    { 
+      name: 'Checklists', 
+      path: '/tasks', 
+      icon: CheckSquare, 
+      roles: ['SUPER_ADMIN', 'LEAD_PLANNER', 'COORDINATOR'] 
+    },
+    { 
+      name: 'Day-Of Ops', 
+      path: '/day-of', 
+      icon: Clock, 
+      roles: ['SUPER_ADMIN', 'COORDINATOR', 'LEAD_PLANNER'],
+      badge: 'Live'
+    },
+    { 
+      name: 'Billing & Extras', 
+      path: '/billing', 
+      icon: CreditCard, 
+      roles: ['SUPER_ADMIN', 'FINANCE_MANAGER', 'FOUNDER'] 
+    },
+    { 
+      name: 'Configuration', 
+      path: '/settings', 
+      icon: Settings, 
+      roles: ['SUPER_ADMIN'] 
+    },
   ];
 
   const visibleNavItems = allNavItems.filter((item) => item.roles.includes(activeRole));
 
+  const roleLabels: Record<UserRole, string> = {
+    FOUNDER: 'Founder & CEO',
+    SUPER_ADMIN: 'Super Admin',
+    LEAD_PLANNER: 'Lead Planner',
+    COORDINATOR: 'Coordinator',
+    FINANCE_MANAGER: 'Finance Manager',
+    CLIENT: 'Client Portal',
+  };
+
+  const roleInitials = (user?.full_name || 'RK')
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
+
+  const currentModule = allNavItems.find((item) => item.path === location.pathname)?.name || 'Dashboard';
+
   return (
-    <div className="min-h-screen bg-[#F7F7F7] flex flex-col text-[#222222]">
-      {/* Clean Minimalist Top Header */}
-      <header className="bg-white border-b border-neutral-200 sticky top-0 z-50 px-4 md:px-8 py-3.5 flex items-center justify-between shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-        {/* Left: Clean Brand */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-1.5 rounded-lg text-neutral-600 hover:bg-neutral-100"
-          >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
+    <div className="flex h-screen w-screen overflow-hidden bg-[#F8F9FA] text-slate-800 antialiased">
+      {/* Odoo Style Left Sidebar (Fixed 240px) */}
+      <aside
+        className={`fixed md:static inset-y-0 left-0 z-40 w-60 bg-[#714B67] text-white flex flex-col shrink-0 select-none shadow-sm transition-transform duration-200 ease-in-out ${
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
+      >
+        <div className="flex flex-col h-full min-h-0">
+          {/* Sidebar Header: Brand & Platform Title */}
+          <div className="h-12 px-4 border-b border-white/15 flex items-center justify-between shrink-0">
+            <NavLink to="/dashboard" className="flex items-center gap-2.5">
+              <div className="w-6 h-6 rounded bg-white/20 text-white flex items-center justify-center font-bold text-xs">
+                <Layers className="w-3.5 h-3.5" />
+              </div>
+              <div>
+                <div className="font-bold text-xs tracking-tight uppercase leading-none">The Royal Knot</div>
+                <div className="text-[10px] text-white/60 leading-none mt-0.5">Wedding Operations</div>
+              </div>
+            </NavLink>
 
-          <NavLink to="/dashboard" className="flex items-center gap-2">
-            <span className="font-bold text-[#222222] tracking-tight text-lg">The Royal Knot</span>
-          </NavLink>
-        </div>
-
-        {/* Right: Authenticated User & Sign Out */}
-        <div className="flex items-center gap-3 text-xs">
-          <div className="text-right hidden sm:block">
-            <div className="font-semibold text-neutral-900">{user?.full_name || 'Staff User'}</div>
-            <div className="text-[11px] text-neutral-500">{user?.title || activeRole.replace('_', ' ')}</div>
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="md:hidden p-1 rounded hover:bg-white/10 text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          <button
-            onClick={handleLogout}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-neutral-600 hover:text-black hover:bg-neutral-100 rounded-xl font-medium transition border border-neutral-200"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
-          </button>
-        </div>
-      </header>
+          {/* Navigation Modules */}
+          <nav className="p-2 space-y-0.5 overflow-y-auto flex-1">
+            <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/50">
+              Modules
+            </div>
 
-      {/* Main Body */}
-      <div className="flex-1 flex max-w-[1600px] w-full mx-auto">
-        {/* Left Navigation Sidebar */}
-        <aside
-          className={`fixed md:sticky top-[57px] z-40 h-[calc(100vh-57px)] w-60 bg-white border-r border-neutral-200 p-3 flex flex-col justify-between transition-transform duration-200 ease-in-out ${
-            mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-          }`}
-        >
-          <nav className="flex flex-col gap-1 mt-2">
             {visibleNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
@@ -94,22 +152,90 @@ export const Layout: React.FC = () => {
                   key={item.path}
                   to={item.path}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                  className={`flex items-center justify-between px-2.5 py-2 rounded text-xs transition-colors ${
                     isActive
-                      ? 'bg-[#FF385C] text-white font-semibold shadow-sm'
-                      : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
+                      ? 'bg-black/30 text-white font-bold border-l-2 border-white pl-2'
+                      : 'text-white/80 hover:text-white hover:bg-white/10 font-medium'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-neutral-500'}`} />
-                  <span>{item.name}</span>
+                  <div className="flex items-center gap-2.5">
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span>{item.name}</span>
+                  </div>
+
+                  {item.badge && (
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-rose-500/80 text-white">
+                      {item.badge}
+                    </span>
+                  )}
+                  {item.count && (
+                    <span className="text-[10px] font-mono text-white/60 font-semibold">
+                      {item.count}
+                    </span>
+                  )}
                 </NavLink>
               );
             })}
           </nav>
-        </aside>
+        </div>
+      </aside>
 
-        {/* Page Content */}
-        <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+      {/* Main App Workspace Canvas */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        {/* Top Utility Bar */}
+        <header className="h-10 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shrink-0 shadow-2xs z-10">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="md:hidden p-1 rounded hover:bg-slate-100 text-slate-600"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+            <span className="font-bold text-xs text-slate-800 tracking-tight">
+              {currentModule}
+            </span>
+          </div>
+
+          {/* Top Right: Season Tracker & User Profile with Sign Out */}
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-mono border border-slate-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+              <span>Season 2026: 25 Projects Active</span>
+            </div>
+
+            <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+
+            <div className="flex items-center gap-2">
+              <Avatar className="h-6 w-6 rounded">
+                <AvatarFallback className="bg-[#714B67] text-white text-[10px] font-bold">
+                  {roleInitials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="hidden md:block text-left leading-tight">
+                <div className="font-bold text-xs text-slate-800 leading-none">
+                  {user?.full_name || 'Staff User'}
+                </div>
+                <div className="text-[10px] text-slate-500 font-medium leading-none mt-0.5">
+                  {roleLabels[activeRole]}
+                </div>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                title="Sign Out"
+                className="h-7 px-2 text-xs text-slate-600 hover:text-rose-600 hover:bg-rose-50 ml-1 gap-1.5 cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Sign Out</span>
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Scrollable Page Body */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 min-w-0">
           <Outlet />
         </main>
       </div>
