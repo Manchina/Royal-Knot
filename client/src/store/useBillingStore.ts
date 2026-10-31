@@ -1,321 +1,264 @@
 import { create } from 'zustand';
+import { api } from '../api/client';
+import type { ProjectFinancials } from '../components/billing/types';
 
-export interface EditHistoryRecord {
-  date: string;
-  action: string;
-  by: string;
-  details: string;
-}
-
-export interface ExtraCharge {
+export interface ProjectBillingItem {
   id: string;
-  weddingId: string;
-  category: string;
-  description: string;
-  qty: number;
-  unitPrice: string;
-  total: string;
-  vendor: string;
-  status: 'ADDED_TO_CLIENT_INVOICE' | 'PENDING_APPROVAL';
-  approvedBy: string;
-  lastEditedAt?: string;
-  editHistory?: EditHistoryRecord[];
+  code: string;
+  couple: string;
+  brideName?: string;
+  groomName?: string;
+  city: string;
+  venue: string;
+  startDate: string;
+  guestCount: number;
+  packageType: string;
+  status: string;
+  isFinalised: boolean;
+  budget: string;
+  rawBudget: number;
+  coordinator: string;
+  baseContract: string;
+  totalExtras: string;
+  rawTotalExtras: number;
+  extrasCount: number;
+  totalInvoiced: string;
+  rawTotalInvoiced: number;
+  vendorCommitments: string;
+  rawVendorCommitments: number;
+  vendorAdvancePaid: string;
+  rawVendorAdvancePaid: number;
+  vendorBalanceDue: string;
+  rawVendorBalanceDue: number;
+  grossMargin: string;
+  billsCount: number;
 }
 
-export interface VendorBill {
-  weddingId: string;
-  vendor: string;
-  category: string;
-  agreedBase: string;
-  extras: string;
-  totalPayable: string;
-  advancePaid: string;
-  balanceDue: string;
-  status: 'RECONCILED_MATCHED' | 'SETTLEMENT_CLEARED' | 'DISPUTED';
+export interface BillingSummary {
+  totalBudget: string;
+  totalInvoiced: string;
+  totalVendorCommitments: string;
+  averageGrossMargin: string;
 }
 
 interface BillingState {
-  extraCharges: ExtraCharge[];
-  vendorBills: VendorBill[];
-  finalisedProjects: Record<string, { finalisedDate: string; finalisedBy: string }>;
-  addExtraCharge: (extra: Omit<ExtraCharge, 'id'>) => ExtraCharge;
-  finaliseProject: (weddingId: string, finalisedBy?: string) => void;
-  getProjectExtras: (weddingId: string) => ExtraCharge[];
-  getProjectVendorBills: (weddingId: string) => VendorBill[];
+  projects: ProjectBillingItem[];
+  summary: BillingSummary;
+  currentProject: ProjectFinancials | null;
+  loading: boolean;
+  isLoading: boolean;
+  error: string | null;
+
+  fetchBillingProjects: () => Promise<ProjectBillingItem[]>;
+  fetchProjectDossier: (projectId: string) => Promise<ProjectFinancials | null>;
+  syncAwardedQuotes: (projectId: string) => Promise<{ success: boolean; syncedCount: number }>;
+  createExtraCharge: (
+    projectId: string,
+    data: {
+      category: string;
+      description: string;
+      qty: number;
+      unitPrice: number;
+      vendor: string;
+      vendorId?: string;
+      isBilledToClient?: boolean;
+      ceremonyType?: string;
+    }
+  ) => Promise<boolean>;
+  createVendorBill: (
+    projectId: string,
+    data: {
+      vendorId: string;
+      category: string;
+      agreedBase: number;
+      notes?: string;
+    }
+  ) => Promise<boolean>;
+  reconcileVendorBill: (
+    projectId: string,
+    billId: string,
+    data: {
+      reconciledAmount: number;
+      status: string;
+      notes: string;
+    }
+  ) => Promise<boolean>;
+  recordPayment: (
+    projectId: string,
+    invoiceId: string,
+    data: {
+      amount: number;
+      reference: string;
+    }
+  ) => Promise<boolean>;
+  finaliseProject: (
+    projectId: string,
+    data: {
+      finalisedBy: string;
+      settlementNotes: string;
+    }
+  ) => Promise<boolean>;
 }
 
 export const useBillingStore = create<BillingState>((set, get) => ({
-  extraCharges: [
-    // RW-2026-001 (Ongoing)
-    {
-      id: 'EXT-01',
-      weddingId: 'RW-2026-001',
-      category: 'EXTRA_PLATES',
-      description: '60 Unexpected Guests turned up at the Grand Durbar Banquet',
-      qty: 60,
-      unitPrice: '₹2,100 / plate',
-      total: '₹1,26,000',
-      vendor: 'Marwar Gourmet Kitchens',
-      status: 'ADDED_TO_CLIENT_INVOICE',
-      approvedBy: 'Finance Manager',
-      lastEditedAt: '2026-10-30T18:00:00Z',
-      editHistory: [
+  projects: [],
+  summary: {
+    totalBudget: '₹17.25 Cr',
+    totalInvoiced: '₹17.38 Cr',
+    totalVendorCommitments: '₹13.40 Cr',
+    averageGrossMargin: '23.4%',
+  },
+  currentProject: null,
+  loading: false,
+  isLoading: false,
+  error: null,
+
+  fetchBillingProjects: async () => {
+    set({ loading: true, isLoading: true, error: null });
+    try {
+      const res = await api.get<{
+        success: boolean;
+        summary?: BillingSummary;
+        data: ProjectBillingItem[];
+      }>('/billing/projects');
+      if (res?.success && res.data) {
+        set({
+          projects: res.data,
+          summary: res.summary || get().summary,
+          loading: false,
+          isLoading: false,
+        });
+        return res.data;
+      }
+      set({ loading: false, isLoading: false });
+      return get().projects;
+    } catch (err: any) {
+      console.warn('Failed to fetch billing projects:', err);
+      set({ loading: false, isLoading: false, error: err.message || 'Failed to fetch billing projects' });
+      return get().projects;
+    }
+  },
+
+  fetchProjectDossier: async (projectId: string) => {
+    set({ loading: true, isLoading: true, error: null });
+    try {
+      const res = await api.get<{ success: boolean; data: ProjectFinancials }>(
+        `/billing/projects/${projectId}`
+      );
+      if (res?.success && res.data) {
+        set({ currentProject: res.data, loading: false, isLoading: false });
+        return res.data;
+      }
+      set({ loading: false, isLoading: false });
+      return null;
+    } catch (err: any) {
+      console.warn('Failed to fetch project dossier:', err);
+      set({ loading: false, isLoading: false, error: err.message || 'Failed to fetch project dossier' });
+      return null;
+    }
+  },
+
+  syncAwardedQuotes: async (projectId: string) => {
+    set({ loading: true, isLoading: true });
+    try {
+      const res = await api.post<{ success: boolean; syncedCount: number }>(
+        `/billing/projects/${projectId}/sync-awarded-quotes`,
+        {}
+      );
+      if (res?.success) {
+        await get().fetchProjectDossier(projectId);
+        return { success: true, syncedCount: res.syncedCount || 0 };
+      }
+      return { success: false, syncedCount: 0 };
+    } catch (err: any) {
+      console.error('Error syncing quotes:', err);
+      return { success: false, syncedCount: 0 };
+    } finally {
+      set({ loading: false, isLoading: false });
+    }
+  },
+
+  createExtraCharge: async (projectId: string, data) => {
+    try {
+      const res = await api.post<{ success: boolean }>(`/billing/projects/${projectId}/extras`, data);
+      if (res?.success) {
+        await get().fetchProjectDossier(projectId);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Failed to create extra charge:', err);
+      return false;
+    }
+  },
+
+  createVendorBill: async (projectId: string, data) => {
+    try {
+      const res = await api.post<{ success: boolean }>(`/billing/projects/${projectId}/vendor-bills`, data);
+      if (res?.success) {
+        await get().fetchProjectDossier(projectId);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Failed to create vendor bill:', err);
+      return false;
+    }
+  },
+
+  reconcileVendorBill: async (projectId: string, billId: string, data) => {
+    try {
+      const res = await api.put<{ success: boolean }>(
+        `/billing/projects/${projectId}/vendor-bills/${billId}/reconcile`,
+        data
+      );
+      if (res?.success) {
+        await get().fetchProjectDossier(projectId);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Failed to reconcile bill:', err);
+      return false;
+    }
+  },
+
+  recordPayment: async (projectId: string, invoiceId: string, data) => {
+    try {
+      const res = await api.put<{ success: boolean }>(
+        `/billing/projects/${projectId}/pay-invoice`,
         {
-          date: 'Oct 30, 2026 06:00 PM',
-          action: 'HEADCOUNT_ADJUSTMENT',
-          by: 'Lead Planner Devika',
-          details: 'Adjusted from 50 to 60 extra covers verified with banquet captain signoff',
-        },
-      ],
-    },
-    {
-      id: 'EXT-02',
-      weddingId: 'RW-2026-001',
-      category: 'DJ_OVERTIME',
-      description: 'Sangeet party extended by 2.5 hours past 01:00 AM curfew',
-      qty: 2.5,
-      unitPrice: '₹12,000 / hr',
-      total: '₹30,000',
-      vendor: 'Desert Beat Sounds',
-      status: 'ADDED_TO_CLIENT_INVOICE',
-      approvedBy: 'Lead Planner',
-    },
-    // RW-2026-002 (Ongoing)
-    {
-      id: 'EXT-03',
-      weddingId: 'RW-2026-002',
-      category: 'VINTAGE_CAR',
-      description: 'Vintage Rolls Royce Phantom for Groom Baraat entry procession',
-      qty: 1,
-      unitPrice: '₹55,000 / day',
-      total: '₹55,000',
-      vendor: 'Royal Rajputana Fleet',
-      status: 'ADDED_TO_CLIENT_INVOICE',
-      approvedBy: 'Devika Sharma',
-    },
-    {
-      id: 'EXT-04',
-      weddingId: 'RW-2026-002',
-      category: 'ADDITIONAL_POWER',
-      description: 'Silent Diesel Generator backup (125 kVA) for palace lawn',
-      qty: 2,
-      unitPrice: '₹15,000 / unit',
-      total: '₹30,000',
-      vendor: 'Jaipur Power Grid Rentals',
-      status: 'ADDED_TO_CLIENT_INVOICE',
-      approvedBy: 'Devika Sharma',
-    },
-    // RW-2025-010 (Finalised)
-    {
-      id: 'EXT-10',
-      weddingId: 'RW-2025-010',
-      category: 'SPECIAL_FIREWORKS',
-      description: 'Green Eco-Friendly Pyro Show over palace dome during Varmala',
-      qty: 1,
-      unitPrice: '₹1,90,000',
-      total: '₹1,90,000',
-      vendor: 'Rajputana Pyro Arts',
-      status: 'ADDED_TO_CLIENT_INVOICE',
-      approvedBy: 'Devika Sharma',
-      lastEditedAt: '2026-02-18T14:30:00Z',
-      editHistory: [
-        {
-          date: 'Feb 18, 2026 02:30 PM',
-          action: 'DISCOUNT_REVISION',
-          by: 'Aditya Singhal (Super Admin)',
-          details: 'Negotiated ₹10,000 vendor volume discount applied to final invoice settlement',
-        },
-      ],
-    },
-    {
-      id: 'EXT-11',
-      weddingId: 'RW-2025-010',
-      category: 'ROYAL_PROCESSION',
-      description: '4 Dappled Marwari Horses with silver ceremonial saddlery',
-      qty: 4,
-      unitPrice: '₹37,500 / horse',
-      total: '₹1,50,000',
-      vendor: 'Jodhpur Royal Stables',
-      status: 'ADDED_TO_CLIENT_INVOICE',
-      approvedBy: 'Devika Sharma',
-    },
-    // RW-2025-011 (Finalised)
-    {
-      id: 'EXT-12',
-      weddingId: 'RW-2025-011',
-      category: 'BOAT_SHUTTLE_OVERRUN',
-      description: 'Extra lake speedboats running till 03:00 AM for wedding attendees',
-      qty: 6,
-      unitPrice: '₹35,000 / boat-hr',
-      total: '₹2,10,000',
-      vendor: 'Lake Pichola Royal Charters',
-      status: 'ADDED_TO_CLIENT_INVOICE',
-      approvedBy: 'Karan Verma',
-      lastEditedAt: '2026-02-04T11:00:00Z',
-      editHistory: [
-        {
-          date: 'Feb 04, 2026 11:00 AM',
-          action: 'FUEL_SURCHARGE_WAIVER',
-          by: 'Karan Verma',
-          details: 'Waived midnight fuel surcharge as per VIP season contract addendum clause 4.2',
-        },
-      ],
-    },
-  ],
-
-  vendorBills: [
-    // RW-2026-001
-    {
-      weddingId: 'RW-2026-001',
-      vendor: 'Marwar Gourmet Kitchens',
-      category: 'Catering & Banquets',
-      agreedBase: '₹8,40,000',
-      extras: '+₹1,26,000 (60 Plates)',
-      totalPayable: '₹9,66,000',
-      advancePaid: '₹4,20,000',
-      balanceDue: '₹5,46,000',
-      status: 'RECONCILED_MATCHED',
-    },
-    {
-      weddingId: 'RW-2026-001',
-      vendor: 'Jaipur Floral Wonders',
-      category: 'Mandap & Courtyard Decor',
-      agreedBase: '₹14,00,000',
-      extras: '₹0',
-      totalPayable: '₹14,00,000',
-      advancePaid: '₹7,00,000',
-      balanceDue: '₹7,00,000',
-      status: 'RECONCILED_MATCHED',
-    },
-    {
-      weddingId: 'RW-2026-001',
-      vendor: 'Desert Beat Sounds',
-      category: 'Sound & DJ Tech Rider',
-      agreedBase: '₹3,50,000',
-      extras: '+₹30,000 (Overtime)',
-      totalPayable: '₹3,80,000',
-      advancePaid: '₹1,75,000',
-      balanceDue: '₹2,05,000',
-      status: 'RECONCILED_MATCHED',
-    },
-    // RW-2026-002
-    {
-      weddingId: 'RW-2026-002',
-      vendor: 'Royal Rajputana Fleet',
-      category: 'Luxury Transport & Baraat',
-      agreedBase: '₹2,20,000',
-      extras: '+₹55,000 (Vintage Car)',
-      totalPayable: '₹2,75,000',
-      advancePaid: '₹1,50,000',
-      balanceDue: '₹1,25,000',
-      status: 'RECONCILED_MATCHED',
-    },
-    {
-      weddingId: 'RW-2026-002',
-      vendor: 'Jaipur Power Grid Rentals',
-      category: 'Technical & Infrastructure',
-      agreedBase: '₹1,80,000',
-      extras: '+₹30,000 (Genset)',
-      totalPayable: '₹2,10,000',
-      advancePaid: '₹1,00,000',
-      balanceDue: '₹1,10,000',
-      status: 'RECONCILED_MATCHED',
-    },
-    // RW-2026-003
-    {
-      weddingId: 'RW-2026-003',
-      vendor: 'Bishangarh Hospitality',
-      category: 'Fort Venue & Banquets',
-      agreedBase: '₹22,00,000',
-      extras: '₹0',
-      totalPayable: '₹22,00,000',
-      advancePaid: '₹11,00,000',
-      balanceDue: '₹11,00,000',
-      status: 'RECONCILED_MATCHED',
-    },
-    // RW-2025-010 (Finalised)
-    {
-      weddingId: 'RW-2025-010',
-      vendor: 'Rajputana Pyro Arts',
-      category: 'Special Effects & Pyros',
-      agreedBase: '₹3,00,000',
-      extras: '+₹1,90,000 (Palace Pyro)',
-      totalPayable: '₹4,90,000',
-      advancePaid: '₹4,90,000',
-      balanceDue: '₹0 (Settled)',
-      status: 'SETTLEMENT_CLEARED',
-    },
-    {
-      weddingId: 'RW-2025-010',
-      vendor: 'Jodhpur Royal Stables',
-      category: 'Baraat Royal Regalia',
-      agreedBase: '₹2,50,000',
-      extras: '+₹1,50,000 (Marwari Horses)',
-      totalPayable: '₹4,00,000',
-      advancePaid: '₹4,00,000',
-      balanceDue: '₹0 (Settled)',
-      status: 'SETTLEMENT_CLEARED',
-    },
-    // RW-2025-011 (Finalised)
-    {
-      weddingId: 'RW-2025-011',
-      vendor: 'Lake Pichola Royal Charters',
-      category: 'Water Transport & Ferry Logistics',
-      agreedBase: '₹6,50,000',
-      extras: '+₹2,10,000 (Midnight Ferry)',
-      totalPayable: '₹8,60,000',
-      advancePaid: '₹8,60,000',
-      balanceDue: '₹0 (Settled)',
-      status: 'SETTLEMENT_CLEARED',
-    },
-  ],
-
-  finalisedProjects: {
-    'RW-2025-010': {
-      finalisedDate: 'Feb 20, 2026',
-      finalisedBy: 'Aditya Singhal (Super Admin)',
-    },
-    'RW-2025-011': {
-      finalisedDate: 'Feb 05, 2026',
-      finalisedBy: 'Karan Verma (Lead Planner)',
-    },
+          invoiceId,
+          amount: data.amount,
+          reference: data.reference,
+        }
+      );
+      if (res?.success) {
+        await get().fetchProjectDossier(projectId);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Failed to record payment:', err);
+      return false;
+    }
   },
 
-  addExtraCharge: (extraData) => {
-    const { extraCharges } = get();
-    const newExtra: ExtraCharge = {
-      ...extraData,
-      id: `EXT-0${extraCharges.length + 1}`,
-    };
-    set({ extraCharges: [...extraCharges, newExtra] });
-    return newExtra;
-  },
-
-  finaliseProject: (weddingId, finalisedBy = 'Aditya Singhal (Super Admin)') => {
-    const today = new Date().toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-
-    set((state) => ({
-      finalisedProjects: {
-        ...state.finalisedProjects,
-        [weddingId]: { finalisedDate: today, finalisedBy },
-      },
-      vendorBills: state.vendorBills.map((vb) =>
-        vb.weddingId === weddingId
-          ? { ...vb, balanceDue: '₹0 (Settled)', status: 'SETTLEMENT_CLEARED' }
-          : vb
-      ),
-    }));
-  },
-
-  getProjectExtras: (weddingId) => {
-    return get().extraCharges.filter((ext) => ext.weddingId === weddingId);
-  },
-
-  getProjectVendorBills: (weddingId) => {
-    return get().vendorBills.filter((vb) => vb.weddingId === weddingId);
+  finaliseProject: async (projectId: string, data) => {
+    try {
+      const res = await api.put<{ success: boolean }>(
+        `/billing/projects/${projectId}/finalise`,
+        data
+      );
+      if (res?.success) {
+        await get().fetchProjectDossier(projectId);
+        await get().fetchBillingProjects();
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Failed to finalise project:', err);
+      return false;
+    }
   },
 }));

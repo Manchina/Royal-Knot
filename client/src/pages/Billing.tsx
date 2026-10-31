@@ -36,96 +36,22 @@ import {
   SelectContent,
   SelectItem,
 } from '../components/ui';
-import { api } from '../api/client';
 import { useWeddingStore } from '../store/useWeddingStore';
-
-interface ProjectBillingItem {
-  id: string;
-  code: string;
-  couple: string;
-  brideName?: string;
-  groomName?: string;
-  city: string;
-  venue: string;
-  startDate: string;
-  guestCount: number;
-  packageType: string;
-  status: string;
-  isFinalised: boolean;
-  budget: string;
-  rawBudget: number;
-  coordinator: string;
-  baseContract: string;
-  totalExtras: string;
-  rawTotalExtras: number;
-  extrasCount: number;
-  totalInvoiced: string;
-  rawTotalInvoiced: number;
-  vendorCommitments: string;
-  rawVendorCommitments: number;
-  vendorAdvancePaid: string;
-  rawVendorAdvancePaid: number;
-  vendorBalanceDue: string;
-  rawVendorBalanceDue: number;
-  grossMargin: string;
-  billsCount: number;
-}
+import { useBillingStore } from '../store/useBillingStore';
 
 export const Billing: React.FC = () => {
   const navigate = useNavigate();
   const { setSelectedWeddingId } = useWeddingStore();
+  const { projects, summary, fetchBillingProjects } = useBillingStore();
 
-  const [projects, setProjects] = useState<ProjectBillingItem[]>([]);
-  const [_loading, setLoading] = useState<boolean>(true);
-  const [activeTab, _setActiveTab] = useState<'ongoing' | 'finalised'>('ongoing');
   const [stageFilter, setStageFilter] = useState<string>('ALL');
   const [cityFilter, setCityFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
 
-  const [summary, setSummary] = useState({
-    totalBudget: '₹17.25 Cr',
-    totalInvoiced: '₹17.38 Cr',
-    totalVendorCommitments: '₹13.40 Cr',
-    averageGrossMargin: '23.4%',
-  });
-
-  // Fetch live projects from backend API
-  const fetchBillingProjects = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get<{
-        success: boolean;
-        summary?: {
-          totalBudget: string;
-          totalInvoiced: string;
-          totalVendorCommitments: string;
-          averageGrossMargin: string;
-        };
-        data?: {
-          ongoing: ProjectBillingItem[];
-          finalised: ProjectBillingItem[];
-          activeList: ProjectBillingItem[];
-        };
-      }>(`/billing/projects?tab=${activeTab}&status=${stageFilter}&city=${cityFilter}&search=${encodeURIComponent(searchQuery)}`);
-
-      if (res?.success && res.data) {
-        const combined = [...(res.data.ongoing || []), ...(res.data.finalised || [])];
-        setProjects(combined);
-        if (res.summary) {
-          setSummary(res.summary);
-        }
-      }
-    } catch (err) {
-      console.warn('Failed to load billing projects from API, using fallback store:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     fetchBillingProjects();
-  }, [activeTab, stageFilter, cityFilter, searchQuery]);
+  }, [fetchBillingProjects]);
 
   // Counts for Stage Filter Pills
   const stageCounts = useMemo(() => {

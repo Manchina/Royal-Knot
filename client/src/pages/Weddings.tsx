@@ -14,7 +14,6 @@ import {
   MapPin
 } from 'lucide-react';
 import { useWeddingStore } from '../store/useWeddingStore';
-import { api } from '../api/client';
 import {
   Card,
   CardHeader,
@@ -47,34 +46,9 @@ import {
   TableCell,
 } from '../components/ui';
 
-interface WeddingItem {
-  id: string;
-  code: string;
-  couple: string;
-  brideName?: string;
-  groomName?: string;
-  clientPhone?: string;
-  clientEmail?: string;
-  city: string;
-  venue: string;
-  startDate: string;
-  endDate?: string;
-  guestCount: number;
-  budget: string;
-  agencyFee?: string;
-  packageType: string;
-  theme?: string;
-  status: string;
-  coordinator?: string;
-  coordinatorPhone?: string;
-}
-
 export const Weddings: React.FC = () => {
   const navigate = useNavigate();
-  const { setSelectedWeddingId, fetchWeddingOptions } = useWeddingStore();
-
-  const [weddings, setWeddings] = useState<WeddingItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const { weddings, loading, fetchWeddings, createWedding, setSelectedWeddingId } = useWeddingStore();
 
   // Filters & View Mode
   const [stageFilter, setStageFilter] = useState<string>('ALL');
@@ -98,73 +72,9 @@ export const Weddings: React.FC = () => {
   const [newTheme, setNewTheme] = useState('Palace Royal Heritage');
   const [submittingNew, setSubmittingNew] = useState(false);
 
-  // Fetch live weddings from backend
-  const fetchWeddings = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get<{ success: boolean; data: WeddingItem[] }>('/api/weddings');
-      if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
-        setWeddings(res.data);
-      } else {
-        // Fallback demo data
-        setWeddings([
-          {
-            id: 'c0000001-0000-0000-0000-000000000001',
-            code: 'RW-2026-001',
-            couple: 'Aanya Singhania & Raghav Mehra',
-            city: 'Udaipur',
-            venue: 'The Oberoi Udaivilas',
-            startDate: '2026-12-10',
-            endDate: '2026-12-13',
-            guestCount: 400,
-            budget: '35000000.00',
-            packageType: 'Full-Service Royal Wedding',
-            theme: 'Royal Lakefront Heritage',
-            status: 'LIVE_BIG_DAY',
-            coordinator: 'Devika Sharma',
-          },
-          {
-            id: 'c0000001-0000-0000-0000-000000000002',
-            code: 'RW-2026-002',
-            couple: 'Kriti Maheshwari & Siddharth Jain',
-            city: 'Jaipur',
-            venue: 'Rambagh Palace',
-            startDate: '2026-11-20',
-            endDate: '2026-11-23',
-            guestCount: 420,
-            budget: '27500000.00',
-            packageType: 'Full-Service Royal Wedding',
-            theme: 'Rajputana Elegance',
-            status: 'IN_PLANNING',
-            coordinator: 'Karan Verma',
-          },
-          {
-            id: 'c0000001-0000-0000-0000-000000000003',
-            code: 'RW-2026-003',
-            couple: 'Simran Bajaj & Armaan Gill',
-            city: 'Jaipur',
-            venue: 'Alila Fort Bishangarh',
-            startDate: '2027-01-14',
-            endDate: '2027-01-17',
-            guestCount: 500,
-            budget: '30000000.00',
-            packageType: 'Day-of Execution',
-            theme: 'Desert Fort Chic',
-            status: 'BOOKED',
-            coordinator: 'Devika Sharma',
-          },
-        ]);
-      }
-    } catch (err) {
-      console.warn('Using store fallback for weddings:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     fetchWeddings();
-  }, []);
+  }, [fetchWeddings]);
 
   // Handle Create Wedding
   const handleCreateWedding = async (e: React.FormEvent) => {
@@ -173,7 +83,7 @@ export const Weddings: React.FC = () => {
 
     setSubmittingNew(true);
     try {
-      const res = await api.post<{ success: boolean; message: string; data: any }>('/api/weddings', {
+      const created = await createWedding({
         brideName: newBrideName,
         groomName: newGroomName,
         phone: newPhone,
@@ -188,15 +98,13 @@ export const Weddings: React.FC = () => {
         theme: newTheme,
       });
 
-      if (res?.success) {
+      if (created) {
         setNewModalOpen(false);
         setNewBrideName('');
         setNewGroomName('');
         setNewPhone('');
         setNewEmail('');
         setNewVenue('');
-        fetchWeddings();
-        fetchWeddingOptions();
       }
     } catch (err) {
       console.error('Failed to create wedding:', err);

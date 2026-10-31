@@ -7,19 +7,26 @@ export interface WeddingSummary {
   uuid?: string;
   code: string;
   couple: string;
+  brideName?: string;
+  groomName?: string;
+  clientPhone?: string;
+  clientEmail?: string;
   city: string;
   venue: string;
   startDate: string;
   endDate?: string;
   guestCount: number;
   packageType: string;
-  status: 'LIVE_BIG_DAY' | 'IN_PLANNING' | 'BOOKED' | 'ENQUIRY' | 'FINALISED' | 'FINALISED_SETTLED';
+  status: 'LIVE_BIG_DAY' | 'IN_PLANNING' | 'BOOKED' | 'ENQUIRY' | 'FINALISED' | 'FINALISED_SETTLED' | string;
   isFinalised?: boolean;
   finalisedDate?: string;
   finalisedBy?: string;
   budget: string;
   rawBudget?: number;
+  agencyFee?: string;
+  theme?: string;
   coordinator: string;
+  coordinatorPhone?: string;
 }
 
 export interface WeddingOption {
@@ -90,6 +97,7 @@ interface WeddingState {
   getSelectedWedding: () => WeddingSummary | undefined;
   fetchWeddings: () => Promise<WeddingSummary[]>;
   fetchWeddingOptions: () => Promise<WeddingOption[]>;
+  createWedding: (payload: any) => Promise<WeddingSummary | null>;
 }
 
 export const useWeddingStore = create<WeddingState>((set, get) => ({
@@ -136,7 +144,11 @@ export const useWeddingStore = create<WeddingState>((set, get) => ({
           id: w.id || w.code,
           uuid: w.uuid || (isUUID(w.id) ? w.id : undefined),
           code: w.code,
-          couple: w.couple || 'Royal Couple',
+          couple: w.couple || `${w.brideName || 'Bride'} & ${w.groomName || 'Groom'}`,
+          brideName: w.brideName,
+          groomName: w.groomName,
+          clientPhone: w.clientPhone,
+          clientEmail: w.clientEmail,
           city: w.city || 'Jaipur',
           venue: w.venue || 'Luxury Heritage Palace',
           startDate: w.startDate
@@ -155,18 +167,23 @@ export const useWeddingStore = create<WeddingState>((set, get) => ({
             ? (typeof w.budget === 'string' && w.budget.startsWith('₹') ? w.budget : `₹${(Number(w.budget) / 10000000).toFixed(2)} Cr`)
             : '₹2.50 Cr',
           rawBudget: w.rawBudget || (w.budget ? Number(w.budget) : undefined),
+          agencyFee: w.agencyFee
+            ? (typeof w.agencyFee === 'string' && w.agencyFee.startsWith('₹') ? w.agencyFee : `₹${(Number(w.agencyFee) / 100000).toFixed(0)} Lakh`)
+            : undefined,
+          theme: w.theme,
           coordinator: w.coordinator || 'Lead Planner',
+          coordinatorPhone: w.coordinatorPhone,
         }));
 
         const liveOptions: WeddingOption[] = res.data.map((w) => ({
           id: w.id || w.code,
           code: w.code,
-          couple: w.couple || 'Royal Couple',
+          couple: w.couple || `${w.brideName || 'Bride'} & ${w.groomName || 'Groom'}`,
           city: w.city || 'Jaipur',
           venue: w.venue,
           guestCount: w.guestCount,
           status: w.status,
-          label: `${w.code}: ${w.couple} (${w.city} • ${w.guestCount} Guests)`,
+          label: `${w.code}: ${w.couple || `${w.brideName || 'Bride'} & ${w.groomName || 'Groom'}`} (${w.city} • ${w.guestCount} Guests)`,
         }));
 
         set({
@@ -210,6 +227,27 @@ export const useWeddingStore = create<WeddingState>((set, get) => ({
     } catch (err) {
       console.warn('Failed to fetch options, using store fallback:', err);
       return get().weddingOptions;
+    }
+  },
+
+  createWedding: async (payload: any) => {
+    set({ loading: true, isLoading: true, error: null });
+    try {
+      const res = await api.post<{ success: boolean; data: any }>('/weddings', payload);
+      if (res?.success && res.data) {
+        await get().fetchWeddings();
+        await get().fetchWeddingOptions();
+        if (res.data.id || res.data.code) {
+          set({ selectedWeddingId: res.data.id || res.data.code });
+        }
+        return res.data;
+      }
+      return null;
+    } catch (err: any) {
+      set({ error: err.message || 'Failed to create wedding' });
+      throw err;
+    } finally {
+      set({ loading: false, isLoading: false });
     }
   },
 }));

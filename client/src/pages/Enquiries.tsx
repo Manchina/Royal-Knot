@@ -5,7 +5,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
+import { useEnquiryStore } from '../store/useEnquiryStore';
 import {
   Table,
   TableHeader,
@@ -32,35 +32,15 @@ import {
   SelectItem,
 } from '../components/ui';
 
-interface Enquiry {
-  id: string;
-  dbId?: string;
-  couple: string;
-  primaryContactName?: string;
-  channel: string;
-  phone: string;
-  email?: string;
-  cityPreference: 'Udaipur' | 'Jaipur';
-  datesRough: string;
-  guestCount: number;
-  theme: string;
-  budgetMax: string;
-  packagePreference?: string;
-  agreementStatus: 'Signed on Mobile' | 'Sent - Pending Signature' | 'Drafting Agreement';
-  agreementSignedAt?: string;
-  status: 'Consultation Booked' | 'Agreement Awaited' | 'Initial Discovery' | 'Converted to Wedding';
-  weddingId?: string;
-  notes?: string;
-  createdAt?: string;
-}
 export const Enquiries: React.FC = () => {
   const navigate = useNavigate();
+  const { enquiries, fetchEnquiries, createEnquiry } = useEnquiryStore();
+
   const [stageFilter, setStageFilter] = useState<string>('ALL');
   const [channelFilter, setChannelFilter] = useState<string>('ALL');
   const [cityFilter, setCityFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [_loading, setLoading] = useState<boolean>(false);
 
   // New lead form state
   const [newCouple, setNewCouple] = useState('');
@@ -70,105 +50,9 @@ export const Enquiries: React.FC = () => {
   const [newBudget, setNewBudget] = useState('₹2.50 Cr');
   const [newGuests, setNewGuests] = useState('400');
 
-  const [enquiries, setEnquiries] = useState<Enquiry[]>([
-    {
-      id: 'ENQ-2026-104',
-      couple: 'Kriti Maheshwari & Siddharth Jain',
-      channel: 'WhatsApp Inquiry',
-      phone: '+91 98290 11223',
-      cityPreference: 'Udaipur',
-      datesRough: 'Dec 2026 (Winter Wedding)',
-      guestCount: 420,
-      theme: 'Royal Heritage / Palace Romance',
-      budgetMax: '₹2.50 Cr',
-      agreementStatus: 'Signed on Mobile',
-      agreementSignedAt: 'Oct 29, 2026',
-      status: 'Consultation Booked',
-    },
-    {
-      id: 'ENQ-2026-103',
-      couple: 'Simran Bajaj & Armaan Gill',
-      channel: 'Instagram DM',
-      phone: '+91 98110 44556',
-      cityPreference: 'Jaipur',
-      datesRough: 'Nov 2026',
-      guestCount: 500,
-      theme: 'Regal Fortress Chic',
-      budgetMax: '₹3.00 Cr',
-      agreementStatus: 'Sent - Pending Signature',
-      status: 'Agreement Awaited',
-    },
-    {
-      id: 'ENQ-2026-102',
-      couple: 'Niharika Verma & Kabir Saxena',
-      channel: 'Phone Call Referral',
-      phone: '+91 99887 66554',
-      cityPreference: 'Udaipur',
-      datesRough: 'Jan 2027',
-      guestCount: 380,
-      theme: 'Lakeside Candlelight',
-      budgetMax: '₹1.80 Cr',
-      agreementStatus: 'Drafting Agreement',
-      status: 'Initial Discovery',
-    },
-  ]);
-
-  // Load enquiries from backend API
-  const fetchEnquiries = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get('/enquiries');
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-        const mapped: Enquiry[] = res.data.map((row: any) => {
-          const budgetRaw = row.budgetMax || row.budget_max;
-          let budgetStr = '₹2.50 Cr';
-          if (budgetRaw) {
-            const cr = Number(budgetRaw) / 10000000;
-            budgetStr = `₹${cr.toFixed(2)} Cr`;
-          }
-
-          const rawAgreement = row.agreementStatus || row.agreement_status || 'Drafting Agreement';
-          let agreementSt: any = 'Drafting Agreement';
-          if (String(rawAgreement).includes('Signed')) agreementSt = 'Signed on Mobile';
-          else if (String(rawAgreement).includes('Sent')) agreementSt = 'Sent - Pending Signature';
-
-          const signedAt = row.agreementSignedAt || row.agreement_signed_at;
-          const cityPref = (row.cityPreference || row.city_preference) === 'Jaipur' ? 'Jaipur' : 'Udaipur';
-
-          return {
-            id: row.code || `ENQ-${String(row.id || '').slice(0, 8)}`,
-            dbId: row.id,
-            couple: row.coupleName || row.couple_name || 'Couple Consultation',
-            primaryContactName: row.primaryContactName || row.primary_contact_name,
-            channel: row.channel || 'Website Consultation',
-            phone: row.phone || '',
-            email: row.email || '',
-            cityPreference: cityPref,
-            datesRough: row.datesRough || row.dates_rough || 'Winter 2026',
-            guestCount: Number(row.guestCount || row.guest_count) || 400,
-            theme: row.theme || 'Royal Heritage',
-            budgetMax: budgetStr,
-            packagePreference: row.packagePreference || row.package_preference || 'FULL_SERVICE',
-            agreementStatus: agreementSt,
-            agreementSignedAt: signedAt ? new Date(signedAt).toLocaleDateString() : undefined,
-            status: row.status || 'Initial Discovery',
-            weddingId: row.weddingId || row.wedding_id,
-            notes: row.notes || '',
-            createdAt: row.createdAt || row.created_at,
-          };
-        });
-        setEnquiries(mapped);
-      }
-    } catch (e) {
-      console.warn('Using seeded / local enquiries fallback:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     fetchEnquiries();
-  }, []);
+  }, [fetchEnquiries]);
 
   const handleCreateEnquiry = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,7 +60,7 @@ export const Enquiries: React.FC = () => {
 
     try {
       const budgetNum = parseFloat(newBudget.replace(/[^0-9.]/g, '')) * 10000000 || 25000000;
-      const res = await api.post('/enquiries', {
+      await createEnquiry({
         coupleName: newCouple,
         phone: newPhone || '+91 98000 00000',
         channel: newChannel,
@@ -185,26 +69,8 @@ export const Enquiries: React.FC = () => {
         budgetMax: budgetNum,
         datesRough: 'Winter 2026',
       });
-
-      if (res.success) {
-        await fetchEnquiries();
-      }
     } catch (err) {
-      console.warn('Local lead creation fallback:', err);
-      const newEnq: Enquiry = {
-        id: `ENQ-2026-${100 + enquiries.length + 2}`,
-        couple: newCouple,
-        channel: newChannel,
-        phone: newPhone || '+91 98000 00000',
-        cityPreference: newCity,
-        datesRough: 'Winter 2026',
-        guestCount: parseInt(newGuests, 10) || 400,
-        theme: 'Palace Regal',
-        budgetMax: newBudget,
-        agreementStatus: 'Drafting Agreement',
-        status: 'Initial Discovery',
-      };
-      setEnquiries([newEnq, ...enquiries]);
+      console.warn('Lead creation error:', err);
     }
 
     setModalOpen(false);
