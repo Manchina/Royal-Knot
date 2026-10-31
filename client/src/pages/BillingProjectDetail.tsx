@@ -143,25 +143,27 @@ export const BillingProjectDetail: React.FC = () => {
       {/* 2. Executive Financial Ribbon */}
       <BillingMetricsRibbon project={project} />
 
-      {/* 3. Main Operational Tabs */}
+      {/* 3. Main Operational Tabs (Standard Odoo ERP Tab Bar) */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-slate-100 p-1 rounded-lg border border-slate-200/80 w-full justify-start overflow-x-auto">
-          <TabsTrigger value="vendorBills" className="gap-2 text-xs font-semibold cursor-pointer py-2">
-            Vendor Bills & PO Ledger ({project?.vendorBills?.length || 0})
-          </TabsTrigger>
+        <div className="bg-white border border-slate-200 rounded p-1.5 shadow-2xs">
+          <TabsList className="h-9 bg-slate-100 border border-slate-200 w-full justify-start overflow-x-auto p-1">
+            <TabsTrigger value="vendorBills" className="text-xs px-3 font-semibold">
+              Vendor Bills & PO Ledger ({project?.vendorBills?.length || 0})
+            </TabsTrigger>
 
-          <TabsTrigger value="extraCharges" className="gap-2 text-xs font-semibold cursor-pointer py-2">
-            Audited Extra Charges ({project?.extraCharges?.length || 0})
-          </TabsTrigger>
+            <TabsTrigger value="extraCharges" className="text-xs px-3 font-semibold">
+              Audited Extra Charges ({project?.extraCharges?.length || 0})
+            </TabsTrigger>
 
-          <TabsTrigger value="invoices" className="gap-2 text-xs font-semibold cursor-pointer py-2">
-            Client Milestone Invoices ({project?.invoices?.length || 0})
-          </TabsTrigger>
+            <TabsTrigger value="invoices" className="text-xs px-3 font-semibold">
+              Client Milestone Invoices ({project?.invoices?.length || 0})
+            </TabsTrigger>
 
-          <TabsTrigger value="changelog" className="gap-2 text-xs font-semibold cursor-pointer py-2">
-            Audit Changelog ({project?.changelog?.length || 0})
-          </TabsTrigger>
-        </TabsList>
+            <TabsTrigger value="changelog" className="text-xs px-3 font-semibold">
+              Audit Changelog ({project?.changelog?.length || 0})
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Tab 1: Vendor Bills (Purchases & 3-Way Matching) */}
         <TabsContent value="vendorBills" className="mt-4">

@@ -27,7 +27,7 @@ export const ExtraChargesTab: React.FC<ExtraChargesTabProps> = ({ extraCharges, 
           className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-2xs cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5 mr-1" />
-          + Add Extra Charge
+          Add Extra Charge
         </Button>
       </CardHeader>
 

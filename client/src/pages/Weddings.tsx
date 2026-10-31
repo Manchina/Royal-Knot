@@ -1,19 +1,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { 
-  Plus, 
-  Search, 
-  Calendar, 
-  Users, 
+import {
+  Plus,
+  Search,
+  Calendar,
+  Users,
   Building2,
   ArrowRight,
   LayoutList,
   LayoutGrid,
   SlidersHorizontal,
   Loader2,
-  MapPin
+  MapPin,
+  AlertCircle
 } from 'lucide-react';
 import { useWeddingStore } from '../store/useWeddingStore';
+import { weddingIntakeSchema, formatZodErrors } from '../lib/validations';
 import {
   Card,
   CardHeader,
@@ -91,25 +93,55 @@ export const Weddings: React.FC = () => {
   const [newPackage, setNewPackage] = useState('Full-Service Royal Wedding');
   const [newTheme, setNewTheme] = useState('Palace Royal Heritage');
   const [submittingNew, setSubmittingNew] = useState(false);
+  const [weddingErrors, setWeddingErrors] = useState<Record<string, string>>({});
+
+  const clearWeddingError = (field: string) => {
+    setWeddingErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   useEffect(() => {
     fetchWeddings();
   }, [fetchWeddings]);
 
+  const validateWeddingForm = (): boolean => {
+    const result = weddingIntakeSchema.safeParse({
+      brideName: newBrideName,
+      groomName: newGroomName,
+      phone: newPhone,
+      email: newEmail,
+      city: newCity,
+      startDate: newStartDate,
+      budget: Number(newBudget),
+    });
+
+    if (!result.success) {
+      setWeddingErrors(formatZodErrors(result.error));
+      return false;
+    }
+
+    setWeddingErrors({});
+    return true;
+  };
+
   // Handle Create Wedding
   const handleCreateWedding = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newBrideName || !newGroomName || !newPhone || !newStartDate) return;
+    if (!validateWeddingForm()) return;
 
     setSubmittingNew(true);
     try {
       const created = await createWedding({
-        brideName: newBrideName,
-        groomName: newGroomName,
-        phone: newPhone,
-        email: newEmail,
+        brideName: newBrideName.trim(),
+        groomName: newGroomName.trim(),
+        phone: newPhone.trim(),
+        email: newEmail.trim() || undefined,
         city: newCity,
-        venue: newVenue || (newCity === 'Udaipur' ? 'The Oberoi Udaivilas' : 'Rambagh Palace'),
+        venue: newVenue.trim() || (newCity === 'Udaipur' ? 'The Oberoi Udaivilas' : 'Rambagh Palace'),
         startDate: newStartDate,
         endDate: newEndDate || newStartDate,
         guestCount: parseInt(newGuests, 10) || 400,
@@ -125,6 +157,7 @@ export const Weddings: React.FC = () => {
         setNewPhone('');
         setNewEmail('');
         setNewVenue('');
+        setWeddingErrors({});
       }
     } catch (err) {
       console.error('Failed to create wedding:', err);
@@ -323,9 +356,8 @@ export const Weddings: React.FC = () => {
             <button
               type="button"
               onClick={() => setViewMode('table')}
-              className={`p-1.5 rounded transition-colors cursor-pointer ${
-                viewMode === 'table' ? 'bg-white shadow-2xs text-[#714B67]' : 'text-slate-500 hover:text-slate-800'
-              }`}
+              className={`p-1.5 rounded transition-colors cursor-pointer ${viewMode === 'table' ? 'bg-white shadow-2xs text-[#714B67]' : 'text-slate-500 hover:text-slate-800'
+                }`}
               title="Table View (Odoo List)"
             >
               <LayoutList className="w-4 h-4" />
@@ -333,9 +365,8 @@ export const Weddings: React.FC = () => {
             <button
               type="button"
               onClick={() => setViewMode('cards')}
-              className={`p-1.5 rounded transition-colors cursor-pointer ${
-                viewMode === 'cards' ? 'bg-white shadow-2xs text-[#714B67]' : 'text-slate-500 hover:text-slate-800'
-              }`}
+              className={`p-1.5 rounded transition-colors cursor-pointer ${viewMode === 'cards' ? 'bg-white shadow-2xs text-[#714B67]' : 'text-slate-500 hover:text-slate-800'
+                }`}
               title="Kanban Cards View"
             >
               <LayoutGrid className="w-4 h-4" />
@@ -360,9 +391,7 @@ export const Weddings: React.FC = () => {
                 <TableHead className="text-xs font-bold">Guests</TableHead>
                 <TableHead className="text-xs font-bold">Budget</TableHead>
                 <TableHead className="text-xs font-bold">Coordinator</TableHead>
-                <TableHead className="text-xs font-bold">Status</TableHead>
-                <TableHead className="text-right text-xs font-bold pr-4">Actions</TableHead>
-              </TableRow>
+                <TableHead className="text-xs font-bold">Status</TableHead>              </TableRow>
             </TableHeader>
             <TableBody>
               {filteredWeddings.length === 0 ? (
@@ -422,32 +451,6 @@ export const Weddings: React.FC = () => {
                     <TableCell>
                       {getStageBadge(w.status)}
                     </TableCell>
-
-                    {/* Actions */}
-                    <TableCell className="text-right pr-4" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate(`/weddings/${w.code || w.id}`)}
-                          className="h-7 text-xs text-[#714B67] hover:text-[#5b3c53] font-semibold"
-                        >
-                          Dossier
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedWeddingId(w.id);
-                            navigate('/procurement');
-                          }}
-                          className="h-7 text-xs text-slate-700 font-medium"
-                          title="Open Sourcing"
-                        >
-                          <SlidersHorizontal className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -480,7 +483,7 @@ export const Weddings: React.FC = () => {
                         </Badge>
                         {getStageBadge(w.status)}
                       </div>
-                      <CardTitle 
+                      <CardTitle
                         onClick={() => navigate(`/weddings/${w.code || w.id}`)}
                         className="text-sm font-bold text-slate-900 pt-0.5 cursor-pointer hover:text-[#714B67]"
                       >
@@ -580,56 +583,102 @@ export const Weddings: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleCreateWedding} className="space-y-3 pt-2">
+          <form onSubmit={handleCreateWedding} noValidate className="space-y-3 pt-2">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold text-slate-700">Bride's Name *</Label>
+                <Label className="text-xs font-semibold text-slate-700">
+                  Bride's Name <span className="text-rose-500 font-bold">*</span>
+                </Label>
                 <Input
                   value={newBrideName}
-                  onChange={(e) => setNewBrideName(e.target.value)}
+                  onChange={(e) => {
+                    setNewBrideName(e.target.value);
+                    if (weddingErrors.brideName) setWeddingErrors((prev) => ({ ...prev, brideName: undefined as unknown as string }));
+                  }}
                   placeholder="e.g. Radhika"
-                  className="mt-1 h-8 text-xs"
+                  className={`mt-1 h-8 text-xs ${weddingErrors.brideName ? 'border-rose-400 bg-rose-50/20' : ''}`}
                   required
                 />
+                {weddingErrors.brideName && (
+                  <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    {weddingErrors.brideName}
+                  </p>
+                )}
               </div>
               <div>
-                <Label className="text-xs font-semibold text-slate-700">Groom's Name *</Label>
+                <Label className="text-xs font-semibold text-slate-700">
+                  Groom's Name <span className="text-rose-500 font-bold">*</span>
+                </Label>
                 <Input
                   value={newGroomName}
-                  onChange={(e) => setNewGroomName(e.target.value)}
+                  onChange={(e) => {
+                    setNewGroomName(e.target.value);
+                    clearWeddingError('groomName');
+                  }}
                   placeholder="e.g. Anant"
-                  className="mt-1 h-8 text-xs"
+                  className={`mt-1 h-8 text-xs ${weddingErrors.groomName ? 'border-rose-400 bg-rose-50/20' : ''}`}
                   required
                 />
+                {weddingErrors.groomName && (
+                  <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    {weddingErrors.groomName}
+                  </p>
+                )}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold text-slate-700">Contact Phone *</Label>
+                <Label className="text-xs font-semibold text-slate-700">
+                  Contact Phone <span className="text-rose-500 font-bold">*</span>
+                </Label>
                 <Input
                   value={newPhone}
-                  onChange={(e) => setNewPhone(e.target.value)}
+                  onChange={(e) => {
+                    setNewPhone(e.target.value);
+                    clearWeddingError('phone');
+                  }}
                   placeholder="+91 98290 12345"
-                  className="mt-1 h-8 text-xs"
+                  className={`mt-1 h-8 text-xs ${weddingErrors.phone ? 'border-rose-400 bg-rose-50/20' : ''}`}
                   required
                 />
+                {weddingErrors.phone && (
+                  <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    {weddingErrors.phone}
+                  </p>
+                )}
               </div>
               <div>
-                <Label className="text-xs font-semibold text-slate-700">Contact Email</Label>
+                <Label className="text-xs font-semibold text-slate-700">
+                  Contact Email
+                </Label>
                 <Input
                   type="email"
                   value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
+                  onChange={(e) => {
+                    setNewEmail(e.target.value);
+                    clearWeddingError('email');
+                  }}
                   placeholder="client@royalknot.com"
-                  className="mt-1 h-8 text-xs"
+                  className={`mt-1 h-8 text-xs ${weddingErrors.email ? 'border-rose-400 bg-rose-50/20' : ''}`}
                 />
+                {weddingErrors.email && (
+                  <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    {weddingErrors.email}
+                  </p>
+                )}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold text-slate-700">Destination City *</Label>
+                <Label className="text-xs font-semibold text-slate-700">
+                  Destination City <span className="text-rose-500 font-bold">*</span>
+                </Label>
                 <select
                   value={newCity}
                   onChange={(e) => setNewCity(e.target.value as 'Udaipur' | 'Jaipur' | 'Jodhpur')}
@@ -653,14 +702,25 @@ export const Weddings: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold text-slate-700">Start Date *</Label>
+                <Label className="text-xs font-semibold text-slate-700">
+                  Start Date <span className="text-rose-500 font-bold">*</span>
+                </Label>
                 <Input
                   type="date"
                   value={newStartDate}
-                  onChange={(e) => setNewStartDate(e.target.value)}
-                  className="mt-1 h-8 text-xs"
+                  onChange={(e) => {
+                    setNewStartDate(e.target.value);
+                    clearWeddingError('startDate');
+                  }}
+                  className={`mt-1 h-8 text-xs ${weddingErrors.startDate ? 'border-rose-400 bg-rose-50/20' : ''}`}
                   required
                 />
+                {weddingErrors.startDate && (
+                  <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    {weddingErrors.startDate}
+                  </p>
+                )}
               </div>
               <div>
                 <Label className="text-xs font-semibold text-slate-700">End Date</Label>
@@ -684,14 +744,25 @@ export const Weddings: React.FC = () => {
                 />
               </div>
               <div>
-                <Label className="text-xs font-semibold text-slate-700">Total Budget (₹)</Label>
+                <Label className="text-xs font-semibold text-slate-700">
+                  Total Budget (₹) <span className="text-rose-500 font-bold">*</span>
+                </Label>
                 <Input
                   type="number"
                   value={newBudget}
-                  onChange={(e) => setNewBudget(e.target.value)}
+                  onChange={(e) => {
+                    setNewBudget(e.target.value);
+                    clearWeddingError('budget');
+                  }}
                   placeholder="25000000"
-                  className="mt-1 h-8 text-xs font-mono"
+                  className={`mt-1 h-8 text-xs font-mono ${weddingErrors.budget ? 'border-rose-400 bg-rose-50/20' : ''}`}
                 />
+                {weddingErrors.budget && (
+                  <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    {weddingErrors.budget}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -721,7 +792,10 @@ export const Weddings: React.FC = () => {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setNewModalOpen(false)}
+                onClick={() => {
+                  setNewModalOpen(false);
+                  setWeddingErrors({});
+                }}
                 className="text-xs h-8"
               >
                 Cancel

@@ -35,6 +35,9 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
+  Tabs,
+  TabsList,
+  TabsTrigger,
 } from '../components/ui';
 import { useWeddingStore } from '../store/useWeddingStore';
 import { useBillingStore } from '../store/useBillingStore';
@@ -45,7 +48,6 @@ export const Billing: React.FC = () => {
   const { setSelectedWeddingId } = useWeddingStore();
   const { projects, summary, fetchBillingProjects } = useBillingStore();
 
-  // Module filters initialized from URL query params
   const [stageFilter, setStageFilter] = useState<string>(
     () => searchParams.get('status') || searchParams.get('stage') || 'ALL'
   );
@@ -66,13 +68,14 @@ export const Billing: React.FC = () => {
     if (urlCity) setCityFilter(urlCity);
     if (urlSearch) setSearchQuery(urlSearch);
   }, [searchParams]);
+
   useEffect(() => {
     fetchBillingProjects();
   }, [fetchBillingProjects]);
 
   const safeProjects = useMemo(() => (Array.isArray(projects) ? projects : []), [projects]);
 
-  // Counts for Stage Filter Pills
+  // Stage counts for standard pipeline tabs
   const stageCounts = useMemo(() => {
     return {
       ALL: safeProjects.length,
@@ -250,36 +253,30 @@ export const Billing: React.FC = () => {
         </Card>
       </div>
 
-      {/* 3. Stage Pills Filter Toolbar (Matching Weddings.tsx & Enquiries.tsx) */}
-      <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200/80 text-xs w-fit">
-        {[
-          { id: 'ALL', label: 'All Projects', count: stageCounts.ALL },
-          { id: 'LIVE_BIG_DAY', label: 'Live Big Day', count: stageCounts.LIVE_BIG_DAY },
-          { id: 'IN_PLANNING', label: 'In Planning', count: stageCounts.IN_PLANNING },
-          { id: 'BOOKED', label: 'Booked', count: stageCounts.BOOKED },
-          { id: 'FINALISED', label: 'Finalised', count: stageCounts.FINALISED },
-          { id: 'FINALISED_SETTLED', label: 'Settled & Closed', count: stageCounts.FINALISED_SETTLED },
-        ].map((tab) => {
-          const isActive = stageFilter === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setStageFilter(tab.id)}
-              className={`px-3 py-1.5 rounded font-medium transition-all flex items-center gap-1.5 cursor-pointer ${isActive
-                ? 'bg-white text-slate-900 shadow-2xs font-bold border border-slate-200'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                }`}
-            >
-              <span>{tab.label}</span>
-              <span
-                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${isActive ? 'bg-[#714B67] text-white' : 'bg-slate-200 text-slate-700'
-                  }`}
-              >
-                {tab.count}
-              </span>
-            </button>
-          );
-        })}
+      {/* 3. Pipeline Stages Tabs with Live Counts (Matching Weddings.tsx & Enquiries.tsx) */}
+      <div className="bg-white border border-slate-200 rounded p-1.5 shadow-2xs">
+        <Tabs value={stageFilter} onValueChange={setStageFilter} className="w-full">
+          <TabsList className="h-9 bg-slate-100 border border-slate-200 w-full justify-start overflow-x-auto p-1">
+            <TabsTrigger value="ALL" className="text-xs px-3 font-semibold">
+              All Projects ({stageCounts.ALL})
+            </TabsTrigger>
+            <TabsTrigger value="LIVE_BIG_DAY" className="text-xs px-3 font-semibold">
+              Live Big Day ({stageCounts.LIVE_BIG_DAY})
+            </TabsTrigger>
+            <TabsTrigger value="IN_PLANNING" className="text-xs px-3 font-semibold">
+              In Planning ({stageCounts.IN_PLANNING})
+            </TabsTrigger>
+            <TabsTrigger value="BOOKED" className="text-xs px-3 font-semibold">
+              Booked ({stageCounts.BOOKED})
+            </TabsTrigger>
+            <TabsTrigger value="FINALISED" className="text-xs px-3 font-semibold">
+              Finalised ({stageCounts.FINALISED})
+            </TabsTrigger>
+            <TabsTrigger value="FINALISED_SETTLED" className="text-xs px-3 font-semibold">
+              Settled & Closed ({stageCounts.FINALISED_SETTLED})
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* 4. Search and Filter Toolbar */}

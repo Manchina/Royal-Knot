@@ -12,6 +12,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { useAuthStore, type UserRole, ROLE_EMAILS } from '../store/useAuthStore';
+import { loginFormSchema, formatZodErrors } from '../lib/validations';
 import {
   Card,
   CardHeader,
@@ -77,17 +78,36 @@ export const Login: React.FC = () => {
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [email, setEmail] = useState('admin@royalknot.com');
   const [password, setPassword] = useState('password123');
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
   const handleSelectRole = (r: UserRole) => {
     setSelectedRole(r);
     clearError();
+    setFieldErrors({});
     setEmail(ROLE_EMAILS[r] || '');
     setPassword('password123');
+  };
+
+  const validateForm = (): boolean => {
+    if (isDemoMode) return true;
+
+    const result = loginFormSchema.safeParse({ email, password });
+    if (!result.success) {
+      setFieldErrors(formatZodErrors(result.error));
+      return false;
+    }
+
+    setFieldErrors({});
+    return true;
   };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
+
+    if (!validateForm()) {
+      return;
+    }
 
     let success = false;
     if (isDemoMode) {
@@ -134,64 +154,65 @@ export const Login: React.FC = () => {
             <CardDescription className="text-xs text-slate-500">
               Enter your work credentials or toggle quick demo access below
             </CardDescription>
-
-            {/* Quick Demo Access Chip for Super Admin */}
-            <div className="mt-2.5 p-2 rounded-md bg-purple-50/80 border border-purple-200/80 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <ShieldCheck className="w-4 h-4 text-[#714B67] shrink-0" />
-                <div className="min-w-0 leading-tight">
-                  <span className="font-bold text-slate-900">Super Admin: </span>
-                  <span className="font-mono text-[11px] text-slate-600">admin@royalknot.com</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedRole('SUPER_ADMIN');
-                  setEmail('admin@royalknot.com');
-                  setPassword('password123');
-                  clearError();
-                }}
-                className="text-[10px] font-bold text-[#714B67] hover:text-[#56344E] cursor-pointer px-2 py-0.5 rounded bg-white border border-purple-200 shadow-2xs shrink-0"
-              >
-                Autofill
-              </button>
-            </div>
           </CardHeader>
 
           <CardContent className="p-4 space-y-3">
-            <form onSubmit={handleLoginSubmit} className="space-y-3">
+            <form onSubmit={handleLoginSubmit} noValidate className="space-y-3">
               {/* Standard Login Inputs */}
               <div className="space-y-2.5">
                 <div className="space-y-1">
                   <Label htmlFor="email" className="text-xs font-semibold text-slate-700">
-                    Work Email
+                    Work Email <span className="text-rose-500 font-bold">*</span>
                   </Label>
                   <Input
                     id="email"
                     type="email"
                     placeholder="planner@royalknot.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                    }}
                     required={!isDemoMode}
                     disabled={isDemoMode}
-                    className="border-slate-300 text-xs h-9 disabled:opacity-50 disabled:bg-slate-50"
+                    className={`text-xs h-9 disabled:opacity-50 disabled:bg-slate-50 transition-colors ${fieldErrors.email
+                      ? 'border-rose-400 bg-rose-50/20 focus-visible:ring-rose-400'
+                      : 'border-slate-300'
+                      }`}
                   />
+                  {fieldErrors.email && (
+                    <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      {fieldErrors.email}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="password" className="text-xs font-semibold text-slate-700">
-                    Password
+                    Password <span className="text-rose-500 font-bold">*</span>
                   </Label>
                   <Input
                     id="password"
                     type="password"
                     placeholder="••••••••"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                    }}
                     required={!isDemoMode}
                     disabled={isDemoMode}
-                    className="border-slate-300 text-xs h-9 disabled:opacity-50 disabled:bg-slate-50"
+                    className={`text-xs h-9 disabled:opacity-50 disabled:bg-slate-50 transition-colors ${fieldErrors.password
+                      ? 'border-rose-400 bg-rose-50/20 focus-visible:ring-rose-400'
+                      : 'border-slate-300'
+                      }`}
                   />
+                  {fieldErrors.password && (
+                    <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      {fieldErrors.password}
+                    </p>
+                  )}
                 </div>
               </div>
 

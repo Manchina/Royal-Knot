@@ -3,7 +3,8 @@ import {
   Plus, 
   CheckCircle2, 
   Send, 
-  Loader2 
+  Loader2,
+  AlertCircle 
 } from 'lucide-react';
 import {
   Button,
@@ -23,6 +24,7 @@ import { VendorDirectoryView, type VendorItem } from '../components/procurement/
 import { useWeddingStore } from '../store/useWeddingStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useProcurementStore } from '../store/useProcurementStore';
+import { vendorIntakeSchema, formatZodErrors } from '../lib/validations';
 
 export const Procurement: React.FC = () => {
   const { user } = useAuthStore();
@@ -64,6 +66,16 @@ export const Procurement: React.FC = () => {
   const [newVendorPrice, setNewVendorPrice] = useState('');
   const [newVendorSpecialties, setNewVendorSpecialties] = useState('');
   const [submittingVendor, setSubmittingVendor] = useState(false);
+  const [vendorErrors, setVendorErrors] = useState<Record<string, string>>({});
+
+  const clearVendorError = (field: string) => {
+    setVendorErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   // Assign Options Form State
   const [assignWeddingId, setAssignWeddingId] = useState<string>('');
@@ -101,22 +113,40 @@ export const Procurement: React.FC = () => {
     return weddingsOverview.find((w) => w.id === selectedWeddingId || w.code === selectedWeddingId) || weddingsOverview[0];
   }, [weddingsOverview, selectedWeddingId]);
 
+  const validateVendorForm = (): boolean => {
+    const result = vendorIntakeSchema.safeParse({
+      businessName: newVendorName,
+      category: newVendorCategory,
+      city: newVendorCity,
+      phone: newVendorPhone,
+      email: newVendorEmail,
+    });
+
+    if (!result.success) {
+      setVendorErrors(formatZodErrors(result.error));
+      return false;
+    }
+
+    setVendorErrors({});
+    return true;
+  };
+
   // Handle Create Vendor
   const handleCreateVendor = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newVendorName || !newVendorPhone) return;
+    if (!validateVendorForm()) return;
 
     setSubmittingVendor(true);
     try {
       const created = await createVendor({
-        businessName: newVendorName,
+        businessName: newVendorName.trim(),
         category: newVendorCategory,
-        contactPerson: newVendorContact,
-        phone: newVendorPhone,
-        email: newVendorEmail,
+        contactPerson: newVendorContact.trim(),
+        phone: newVendorPhone.trim(),
+        email: newVendorEmail.trim() || undefined,
         city: newVendorCity,
-        pricingEstimate: newVendorPrice,
-        specialties: newVendorSpecialties,
+        pricingEstimate: newVendorPrice.trim(),
+        specialties: newVendorSpecialties.trim(),
       });
 
       if (created) {
@@ -128,6 +158,7 @@ export const Procurement: React.FC = () => {
         setNewVendorEmail('');
         setNewVendorPrice('');
         setNewVendorSpecialties('');
+        setVendorErrors({});
       }
     } catch (err) {
       console.error('Failed to create vendor:', err);
@@ -426,22 +457,35 @@ export const Procurement: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleCreateVendor} className="space-y-3 pt-2">
+          <form onSubmit={handleCreateVendor} noValidate className="space-y-3 pt-2">
             <div>
-              <Label className="text-xs font-semibold text-slate-700">Business Name *</Label>
+              <Label className="text-xs font-semibold text-slate-700">
+                Business Name <span className="text-rose-500 font-bold ml-0.5">*</span>
+              </Label>
               <Input
                 type="text"
                 required
                 value={newVendorName}
-                onChange={(e) => setNewVendorName(e.target.value)}
+                onChange={(e) => {
+                  setNewVendorName(e.target.value);
+                  clearVendorError('businessName');
+                }}
                 placeholder="e.g. Mewar Royal Banquets"
-                className="mt-1 h-8 text-xs"
+                className={`mt-1 h-8 text-xs ${vendorErrors.businessName ? 'border-rose-400 bg-rose-50/20' : ''}`}
               />
+              {vendorErrors.businessName && (
+                <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3 shrink-0" />
+                  {vendorErrors.businessName}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label className="text-xs font-semibold text-slate-700">Category *</Label>
+                <Label className="text-xs font-semibold text-slate-700">
+                  Category <span className="text-rose-500 font-bold ml-0.5">*</span>
+                </Label>
                 <select
                   value={newVendorCategory}
                   onChange={(e) => setNewVendorCategory(e.target.value as 'CATERER' | 'DJ' | 'DECORATOR')}
@@ -454,7 +498,9 @@ export const Procurement: React.FC = () => {
               </div>
 
               <div>
-                <Label className="text-xs font-semibold text-slate-700">City *</Label>
+                <Label className="text-xs font-semibold text-slate-700">
+                  City <span className="text-rose-500 font-bold ml-0.5">*</span>
+                </Label>
                 <select
                   value={newVendorCity}
                   onChange={(e) => setNewVendorCity(e.target.value)}
@@ -481,15 +527,26 @@ export const Procurement: React.FC = () => {
               </div>
 
               <div>
-                <Label className="text-xs font-semibold text-slate-700">Phone Number *</Label>
+                <Label className="text-xs font-semibold text-slate-700">
+                  Phone Number <span className="text-rose-500 font-bold ml-0.5">*</span>
+                </Label>
                 <Input
                   type="text"
                   required
                   value={newVendorPhone}
-                  onChange={(e) => setNewVendorPhone(e.target.value)}
+                  onChange={(e) => {
+                    setNewVendorPhone(e.target.value);
+                    clearVendorError('phone');
+                  }}
                   placeholder="+91 98290 00000"
-                  className="mt-1 h-8 text-xs"
+                  className={`mt-1 h-8 text-xs ${vendorErrors.phone ? 'border-rose-400 bg-rose-50/20' : ''}`}
                 />
+                {vendorErrors.phone && (
+                  <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    {vendorErrors.phone}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -498,10 +555,19 @@ export const Procurement: React.FC = () => {
               <Input
                 type="email"
                 value={newVendorEmail}
-                onChange={(e) => setNewVendorEmail(e.target.value)}
+                onChange={(e) => {
+                  setNewVendorEmail(e.target.value);
+                  clearVendorError('email');
+                }}
                 placeholder="contact@vendor.com"
-                className="mt-1 h-8 text-xs"
+                className={`mt-1 h-8 text-xs ${vendorErrors.email ? 'border-rose-400 bg-rose-50/20' : ''}`}
               />
+              {vendorErrors.email && (
+                <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3 shrink-0" />
+                  {vendorErrors.email}
+                </p>
+              )}
             </div>
 
             <div>

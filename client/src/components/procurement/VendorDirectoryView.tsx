@@ -1,15 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Search, 
-  Star, 
-  Phone, 
-  Mail 
+import {
+  Search,
+  Star,
+  Phone,
+  Mail
 } from 'lucide-react';
 import {
   Card,
   CardContent,
-  Button,
   Badge,
   Table,
   TableHeader,
@@ -52,7 +51,6 @@ interface VendorDirectoryViewProps {
 export const VendorDirectoryView: React.FC<VendorDirectoryViewProps> = ({
   vendorsList,
   vendorCounts,
-  onAssignToWedding,
 }) => {
   const navigate = useNavigate();
 
@@ -66,7 +64,7 @@ export const VendorDirectoryView: React.FC<VendorDirectoryViewProps> = ({
     return vendorsList.filter((v) => {
       const matchesCategory = vendorCategoryFilter === 'ALL' || v.category === vendorCategoryFilter;
       const matchesCity = vendorCityFilter === 'ALL' || (v.city && v.city.toLowerCase() === vendorCityFilter.toLowerCase());
-      const matchesSearch = !vendorSearch.trim() || 
+      const matchesSearch = !vendorSearch.trim() ||
         v.businessName.toLowerCase().includes(vendorSearch.toLowerCase()) ||
         (v.city && v.city.toLowerCase().includes(vendorSearch.toLowerCase())) ||
         (v.contactPerson && v.contactPerson.toLowerCase().includes(vendorSearch.toLowerCase())) ||
@@ -142,9 +140,7 @@ export const VendorDirectoryView: React.FC<VendorDirectoryViewProps> = ({
                 <TableHead className="font-bold text-xs text-slate-700">Category</TableHead>
                 <TableHead className="font-bold text-xs text-slate-700">City</TableHead>
                 <TableHead className="font-bold text-xs text-slate-700">Rating</TableHead>
-                <TableHead className="font-bold text-xs text-slate-700">Contact</TableHead>
-                <TableHead className="font-bold text-xs text-slate-700 text-right">Actions</TableHead>
-              </TableRow>
+                <TableHead className="font-bold text-xs text-slate-700">Contact</TableHead>              </TableRow>
             </TableHeader>
             <TableBody className="divide-y divide-slate-100">
               {filteredVendors.length === 0 ? (
@@ -191,32 +187,6 @@ export const VendorDirectoryView: React.FC<VendorDirectoryViewProps> = ({
                           <span>{v.email}</span>
                         </div>
                       )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/procurement/vendors/${v.id}`);
-                          }}
-                          className="h-7 text-xs font-semibold"
-                        >
-                          Dossier
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onAssignToWedding(v);
-                          }}
-                          className="h-7 text-xs font-semibold"
-                        >
-                          Assign to Wedding
-                        </Button>
-                      </div>
                     </TableCell>
                   </TableRow>
                 ))

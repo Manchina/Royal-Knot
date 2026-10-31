@@ -3,9 +3,11 @@ import {
   Plus,
   Phone,
   Search,
+  AlertCircle,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useEnquiryStore } from '../store/useEnquiryStore';
+import { leadIntakeSchema, formatZodErrors } from '../lib/validations';
 import {
   Table,
   TableHeader,
@@ -48,24 +50,54 @@ export const Enquiries: React.FC = () => {
   // New lead form state
   const [newCouple, setNewCouple] = useState('');
   const [newPhone, setNewPhone] = useState('');
+  const [newEmail, setNewEmail] = useState('');
   const [newChannel, setNewChannel] = useState<string>('Website Consultation');
   const [newCity, setNewCity] = useState<'Udaipur' | 'Jaipur'>('Udaipur');
   const [newBudget, setNewBudget] = useState('₹2.50 Cr');
   const [newGuests, setNewGuests] = useState('400');
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  const clearFieldError = (field: string) => {
+    setFormErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
 
   useEffect(() => {
     fetchEnquiries();
   }, [fetchEnquiries]);
 
+  const validateLeadForm = (): boolean => {
+    const result = leadIntakeSchema.safeParse({
+      coupleName: newCouple,
+      phone: newPhone,
+      email: newEmail,
+      channel: newChannel,
+      cityPreference: newCity,
+    });
+
+    if (!result.success) {
+      setFormErrors(formatZodErrors(result.error));
+      return false;
+    }
+
+    setFormErrors({});
+    return true;
+  };
+
   const handleCreateEnquiry = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCouple) return;
+    if (!validateLeadForm()) return;
 
     try {
       const budgetNum = parseFloat(newBudget.replace(/[^0-9.]/g, '')) * 10000000 || 25000000;
       await createEnquiry({
-        coupleName: newCouple,
-        phone: newPhone || '+91 98000 00000',
+        coupleName: newCouple.trim(),
+        phone: newPhone.trim(),
+        email: newEmail.trim() || undefined,
         channel: newChannel,
         cityPreference: newCity,
         guestCount: parseInt(newGuests, 10) || 400,
@@ -79,6 +111,8 @@ export const Enquiries: React.FC = () => {
     setModalOpen(false);
     setNewCouple('');
     setNewPhone('');
+    setNewEmail('');
+    setFormErrors({});
   };
 
 
@@ -339,53 +373,102 @@ export const Enquiries: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleCreateEnquiry} className="space-y-3 py-2">
+          <form onSubmit={handleCreateEnquiry} noValidate className="space-y-3 py-2">
             <div className="space-y-1">
-              <Label htmlFor="couple_name">Couple Identifier / Names</Label>
+              <Label htmlFor="couple_name">
+                Couple Identifier / Names <span className="text-rose-500 font-bold">*</span>
+              </Label>
               <Input
                 id="couple_name"
                 placeholder="e.g. Radhika Merchant & Anant"
                 value={newCouple}
-                onChange={(e) => setNewCouple(e.target.value)}
+                onChange={(e) => {
+                  setNewCouple(e.target.value);
+                  clearFieldError('coupleName');
+                }}
                 required
-                className="border-slate-300"
+                className={`text-xs ${formErrors.coupleName ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'}`}
               />
+              {formErrors.coupleName && (
+                <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3 shrink-0" />
+                  {formErrors.coupleName}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-2.5">
               <div className="space-y-1">
-                <Label htmlFor="phone">Phone / WhatsApp</Label>
+                <Label htmlFor="phone">
+                  Phone / WhatsApp <span className="text-rose-500 font-bold">*</span>
+                </Label>
                 <Input
                   id="phone"
                   placeholder="+91 98290 00000"
                   value={newPhone}
-                  onChange={(e) => setNewPhone(e.target.value)}
+                  onChange={(e) => {
+                    setNewPhone(e.target.value);
+                    clearFieldError('phone');
+                  }}
                   required
-                  className="border-slate-300"
+                  className={`text-xs ${formErrors.phone ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'}`}
                 />
+                {formErrors.phone && (
+                  <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    {formErrors.phone}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="channel">Channel</Label>
-                <Select value={newChannel} onValueChange={(val: string) => setNewChannel(val)}>
-                  <SelectTrigger className="border-slate-300">
-                    <SelectValue placeholder="Select channel" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Website Consultation">Website Lead</SelectItem>
-                    <SelectItem value="WhatsApp Inquiry">WhatsApp Inquiry</SelectItem>
-                    <SelectItem value="Instagram DM">Instagram DM</SelectItem>
-                    <SelectItem value="Phone Call Referral">Phone Call Referral</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="lead_email">
+                  Client Email
+                </Label>
+                <Input
+                  id="lead_email"
+                  type="email"
+                  placeholder="client@royalknot.com"
+                  value={newEmail}
+                  onChange={(e) => {
+                    setNewEmail(e.target.value);
+                    clearFieldError('email');
+                  }}
+                  className={`text-xs ${formErrors.email ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'}`}
+                />
+                {formErrors.email && (
+                  <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    {formErrors.email}
+                  </p>
+                )}
               </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="channel">
+                Inquiry Channel <span className="text-rose-500 font-bold">*</span>
+              </Label>
+              <Select value={newChannel} onValueChange={(val: string) => setNewChannel(val)}>
+                <SelectTrigger className="border-slate-300 text-xs">
+                  <SelectValue placeholder="Select channel" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Website Consultation">Website Lead</SelectItem>
+                  <SelectItem value="WhatsApp Inquiry">WhatsApp Inquiry</SelectItem>
+                  <SelectItem value="Instagram DM">Instagram DM</SelectItem>
+                  <SelectItem value="Phone Call Referral">Phone Call Referral</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid grid-cols-3 gap-2.5">
               <div className="space-y-1">
-                <Label htmlFor="city">City Preference</Label>
+                <Label htmlFor="city">
+                  City Preference <span className="text-rose-500 font-bold">*</span>
+                </Label>
                 <Select value={newCity} onValueChange={(val: string) => setNewCity(val as 'Udaipur' | 'Jaipur')}>
-                  <SelectTrigger className="border-slate-300">
+                  <SelectTrigger className="border-slate-300 text-xs">
                     <SelectValue placeholder="City" />
                   </SelectTrigger>
                   <SelectContent>
@@ -398,7 +481,7 @@ export const Enquiries: React.FC = () => {
               <div className="space-y-1">
                 <Label htmlFor="guests">Guest Count</Label>
                 <Select value={newGuests} onValueChange={(val: string) => setNewGuests(val)}>
-                  <SelectTrigger className="border-slate-300">
+                  <SelectTrigger className="border-slate-300 text-xs">
                     <SelectValue placeholder="Guests" />
                   </SelectTrigger>
                   <SelectContent>
@@ -413,7 +496,7 @@ export const Enquiries: React.FC = () => {
               <div className="space-y-1">
                 <Label htmlFor="budget">Max Budget</Label>
                 <Select value={newBudget} onValueChange={(val: string) => setNewBudget(val)}>
-                  <SelectTrigger className="border-slate-300">
+                  <SelectTrigger className="border-slate-300 text-xs">
                     <SelectValue placeholder="Budget" />
                   </SelectTrigger>
                   <SelectContent>
@@ -431,11 +514,14 @@ export const Enquiries: React.FC = () => {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setModalOpen(false)}
+                onClick={() => {
+                  setModalOpen(false);
+                  setFormErrors({});
+                }}
               >
                 Cancel
               </Button>
-              <Button type="submit" size="sm" variant="default">
+              <Button type="submit" size="sm" variant="default" className="bg-[#714B67] hover:bg-[#5b3c53] text-white">
                 Register Lead
               </Button>
             </div>

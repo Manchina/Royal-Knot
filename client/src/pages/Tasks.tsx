@@ -13,9 +13,6 @@ import {
   Filter,
   X,
   Bookmark,
-  Clock,
-  Truck,
-  CalendarClock,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -422,7 +419,6 @@ export const Tasks: React.FC = () => {
             className="gap-1.5 h-8 text-xs font-semibold bg-[#714B67]/10 text-[#714B67] hover:bg-[#714B67]/20 border border-[#714B67]/30"
             title="Add specialized wedding day task with exact execution time"
           >
-            <Clock className="w-3.5 h-3.5 text-[#714B67]" />
             <span>Day-Of Task</span>
           </Button>
         </div>
@@ -553,11 +549,10 @@ export const Tasks: React.FC = () => {
           <button
             type="button"
             onClick={() => setMilestonesOnly(!milestonesOnly)}
-            className={`h-7 px-2.5 rounded text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer ${
-              milestonesOnly
-                ? 'bg-[#714B67] text-white border-[#714B67]'
-                : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
-            }`}
+            className={`h-7 px-2.5 rounded text-xs font-medium border flex items-center gap-1.5 transition cursor-pointer ${milestonesOnly
+              ? 'bg-[#714B67] text-white border-[#714B67]'
+              : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+              }`}
           >
             <Bookmark className={`w-3 h-3 ${milestonesOnly ? 'fill-current' : ''}`} />
             <span>Milestones Only</span>
@@ -639,11 +634,10 @@ export const Tasks: React.FC = () => {
                           type="button"
                           onClick={() => handleCheckboxClick(t)}
                           disabled={updateStageMutation.isPending}
-                          className={`w-5 h-5 rounded border flex items-center justify-center transition cursor-pointer mx-auto shadow-2xs ${
-                            isDone
-                              ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
-                              : 'bg-white border-slate-300 hover:border-emerald-600 text-transparent hover:text-slate-300'
-                          }`}
+                          className={`w-5 h-5 rounded border flex items-center justify-center transition cursor-pointer mx-auto shadow-2xs ${isDone
+                            ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
+                            : 'bg-white border-slate-300 hover:border-emerald-600 text-transparent hover:text-slate-300'
+                            }`}
                           title={isDone ? 'Click to reopen task' : 'Click to mark as finished'}
                         >
                           <Check className={`w-3.5 h-3.5 stroke-[2.5] ${isDone ? 'text-white' : ''}`} />
@@ -653,9 +647,8 @@ export const Tasks: React.FC = () => {
                       {/* Column 2: Task Name & Code */}
                       <TableCell className="py-2.5">
                         <div
-                          className={`font-semibold text-xs ${
-                            isDone ? 'line-through text-slate-400' : 'text-slate-900'
-                          }`}
+                          className={`font-semibold text-xs ${isDone ? 'line-through text-slate-400' : 'text-slate-900'
+                            }`}
                         >
                           {t.title}
                         </div>
@@ -703,13 +696,12 @@ export const Tasks: React.FC = () => {
                                 updateStageMutation.mutate({ id: t.id, stage: newStage });
                               }
                             }}
-                            className={`h-6 text-[11px] font-semibold rounded px-2 border cursor-pointer focus:outline-none transition ${
-                              isDone
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                                : isInProgress
+                            className={`h-6 text-[11px] font-semibold rounded px-2 border cursor-pointer focus:outline-none transition ${isDone
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                              : isInProgress
                                 ? 'bg-amber-50 text-amber-800 border-amber-300'
                                 : 'bg-slate-100 text-slate-700 border-slate-300'
-                            }`}
+                              }`}
                           >
                             <option value="TO_PLAN">To Plan</option>
                             <option value="IN_PROGRESS">In Progress</option>
@@ -722,7 +714,6 @@ export const Tasks: React.FC = () => {
                       <TableCell className="py-2.5 font-mono text-xs text-slate-600">
                         {t.category === 'DAY_OF' || (t.daysBefore && t.daysBefore.startsWith('@')) ? (
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#714B67] bg-[#714B67]/10 px-2 py-0.5 rounded border border-[#714B67]/20">
-                            <Clock className="w-3 h-3" />
                             <span>{t.daysBefore?.replace('(Wedding Day)', '').trim() || 'Day-Of'}</span>
                           </span>
                         ) : (
@@ -851,13 +842,15 @@ export const Tasks: React.FC = () => {
           )}
 
           <form onSubmit={handleAddTask} className="space-y-3 py-2">
-            <div className="space-y-1">
-              <Label htmlFor="task_wedding">Related Wedding Project</Label>
+            <div>
+              <Label htmlFor="task_wedding" className="text-xs font-semibold text-slate-700">
+                Related Wedding Project
+              </Label>
               <select
                 id="task_wedding"
                 value={newTaskWeddingId}
                 onChange={(e) => setNewTaskWeddingId(e.target.value)}
-                className="w-full h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
+                className="mt-1 w-full h-8 text-xs bg-white border border-slate-200 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
               >
                 <option value="">-- Select a Wedding Project --</option>
                 {weddings.map((w) => (
@@ -868,26 +861,30 @@ export const Tasks: React.FC = () => {
               </select>
             </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="task_title">Task Description</Label>
+            <div>
+              <Label htmlFor="task_title" className="text-xs font-semibold text-slate-700">
+                Task Description <span className="text-rose-500 font-bold">*</span>
+              </Label>
               <Input
                 id="task_title"
                 placeholder="e.g. Vintage Car Baraat Escort Permits"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 required
-                className="border-slate-300"
+                className="mt-1 h-8 text-xs border-slate-200"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="space-y-1">
-                <Label htmlFor="cat">Category</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="cat" className="text-xs font-semibold text-slate-700">
+                  Category
+                </Label>
                 <Select
                   value={newCategory}
                   onValueChange={(val) => setNewCategory(val)}
                 >
-                  <SelectTrigger id="cat" className="h-8 text-xs border-slate-300">
+                  <SelectTrigger id="cat" className="mt-1 h-8 text-xs border-slate-200">
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -902,26 +899,30 @@ export const Tasks: React.FC = () => {
                 </Select>
               </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="timeline">Timeline (Days Before)</Label>
+              <div>
+                <Label htmlFor="timeline" className="text-xs font-semibold text-slate-700">
+                  Timeline (Days Before)
+                </Label>
                 <Input
                   id="timeline"
                   placeholder="e.g. 15 Days"
                   value={newDays}
                   onChange={(e) => setNewDays(e.target.value)}
-                  className="border-slate-300"
+                  className="mt-1 h-8 text-xs border-slate-200"
                 />
               </div>
             </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="owner">Assignee Owner</Label>
+            <div>
+              <Label htmlFor="owner" className="text-xs font-semibold text-slate-700">
+                Assignee Owner
+              </Label>
               <Input
                 id="owner"
                 placeholder="Devika Sharma"
                 value={newOwner}
                 onChange={(e) => setNewOwner(e.target.value)}
-                className="border-slate-300"
+                className="mt-1 h-8 text-xs border-slate-200"
               />
             </div>
 
@@ -952,7 +953,6 @@ export const Tasks: React.FC = () => {
         <DialogContent className="max-w-md bg-white border border-slate-200 shadow-xl rounded">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-[#714B67]" />
               <span>Create Day-Of Wedding Task</span>
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
@@ -1014,11 +1014,10 @@ export const Tasks: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setDayOfType('MINUTE_TO_MINUTE')}
-                  className={`p-2.5 rounded border text-left flex items-start gap-2.5 transition cursor-pointer ${
-                    dayOfType === 'MINUTE_TO_MINUTE'
-                      ? 'bg-[#714B67]/10 border-[#714B67] text-[#714B67] ring-1 ring-[#714B67]'
-                      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-                  }`}
+                  className={`p-2.5 rounded border text-left flex items-start gap-2.5 transition cursor-pointer ${dayOfType === 'MINUTE_TO_MINUTE'
+                    ? 'bg-[#714B67]/10 border-[#714B67] text-[#714B67] ring-1 ring-[#714B67]'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
                 >
                   <input
                     type="radio"
@@ -1029,7 +1028,6 @@ export const Tasks: React.FC = () => {
                   />
                   <div>
                     <div className="text-xs font-bold flex items-center gap-1.5">
-                      <CalendarClock className="w-3.5 h-3.5 text-[#714B67]" />
                       <span>Minute to Minute</span>
                     </div>
                     <div className="text-[10px] text-slate-500 mt-0.5 leading-tight">
@@ -1046,11 +1044,10 @@ export const Tasks: React.FC = () => {
                       setDayOfVendorId(registeredVendors[0].id);
                     }
                   }}
-                  className={`p-2.5 rounded border text-left flex items-start gap-2.5 transition cursor-pointer ${
-                    dayOfType === 'VENDOR_TELEMETRY'
-                      ? 'bg-[#714B67]/10 border-[#714B67] text-[#714B67] ring-1 ring-[#714B67]'
-                      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-                  }`}
+                  className={`p-2.5 rounded border text-left flex items-start gap-2.5 transition cursor-pointer ${dayOfType === 'VENDOR_TELEMETRY'
+                    ? 'bg-[#714B67]/10 border-[#714B67] text-[#714B67] ring-1 ring-[#714B67]'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
                 >
                   <input
                     type="radio"
@@ -1066,7 +1063,6 @@ export const Tasks: React.FC = () => {
                   />
                   <div>
                     <div className="text-xs font-bold flex items-center gap-1.5">
-                      <Truck className="w-3.5 h-3.5 text-[#714B67]" />
                       <span>Vendor Arrival Telemetry</span>
                     </div>
                     <div className="text-[10px] text-slate-500 mt-0.5 leading-tight">
@@ -1077,14 +1073,16 @@ export const Tasks: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="dayof_wedding">Related Wedding Project</Label>
+            <div>
+              <Label htmlFor="dayof_wedding" className="text-xs font-semibold text-slate-700">
+                Related Wedding Project <span className="text-rose-500 font-bold">*</span>
+              </Label>
               <select
                 id="dayof_wedding"
                 value={dayOfTaskWeddingId}
                 onChange={(e) => setDayOfTaskWeddingId(e.target.value)}
                 required
-                className="w-full h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
+                className="mt-1 w-full h-8 text-xs bg-white border border-slate-200 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
               >
                 <option value="">-- Select a Wedding Project --</option>
                 {weddings.map((w) => (
@@ -1098,23 +1096,24 @@ export const Tasks: React.FC = () => {
             {/* Stream 1: Minute to Minute Fields */}
             {dayOfType === 'MINUTE_TO_MINUTE' ? (
               <>
-                <div className="space-y-1">
-                  <Label htmlFor="dayof_title">Day-Of Task / Activity Cue</Label>
+                <div>
+                  <Label htmlFor="dayof_title" className="text-xs font-semibold text-slate-700">
+                    Day-Of Task / Activity Cue <span className="text-rose-500 font-bold">*</span>
+                  </Label>
                   <Input
                     id="dayof_title"
                     placeholder="e.g. Groom vintage car Baraat arrival & drummers assembly"
                     value={dayOfTitle}
                     onChange={(e) => setDayOfTitle(e.target.value)}
                     required
-                    className="border-slate-300"
+                    className="mt-1 h-8 text-xs border-slate-200"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="space-y-1">
-                    <Label htmlFor="dayof_time" className="flex items-center gap-1 text-[#714B67] font-semibold">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>Execution Time (HH:MM)</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="dayof_time" className="text-xs font-semibold text-slate-700">
+                      Execution Time (HH:MM) <span className="text-rose-500 font-bold">*</span>
                     </Label>
                     <Input
                       id="dayof_time"
@@ -1122,18 +1121,20 @@ export const Tasks: React.FC = () => {
                       value={dayOfTime}
                       onChange={(e) => setDayOfTime(e.target.value)}
                       required
-                      className="border-[#714B67]/40 focus:border-[#714B67]"
+                      className="mt-1 h-8 text-xs border-slate-200"
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="dayof_venue">Venue / Location</Label>
+                  <div>
+                    <Label htmlFor="dayof_venue" className="text-xs font-semibold text-slate-700">
+                      Venue / Location
+                    </Label>
                     <Input
                       id="dayof_venue"
                       placeholder="e.g. Main Palace Driveway"
                       value={dayOfVenue}
                       onChange={(e) => setDayOfVenue(e.target.value)}
-                      className="border-slate-300"
+                      className="mt-1 h-8 text-xs border-slate-200"
                     />
                   </div>
                 </div>
@@ -1141,13 +1142,15 @@ export const Tasks: React.FC = () => {
             ) : (
               /* Stream 2: Vendor Arrival Telemetry Fields */
               <>
-                <div className="space-y-1">
-                  <Label htmlFor="dayof_vendor">Assigned Vendor Partner</Label>
+                <div>
+                  <Label htmlFor="dayof_vendor" className="text-xs font-semibold text-slate-700">
+                    Assigned Vendor Partner <span className="text-rose-500 font-bold">*</span>
+                  </Label>
                   <select
                     id="dayof_vendor"
                     value={dayOfVendorId || (registeredVendors[0]?.id || '')}
                     onChange={(e) => setDayOfVendorId(e.target.value)}
-                    className="w-full h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
+                    className="mt-1 w-full h-8 text-xs bg-white border border-slate-200 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
                   >
                     {registeredVendors.map((v) => (
                       <option key={v.id} value={v.id}>
@@ -1157,11 +1160,10 @@ export const Tasks: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="space-y-1">
-                    <Label htmlFor="dayof_time" className="flex items-center gap-1 text-[#714B67] font-semibold">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>Scheduled Arrival (HH:MM)</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="dayof_time" className="text-xs font-semibold text-slate-700">
+                      Scheduled Arrival (HH:MM) <span className="text-rose-500 font-bold">*</span>
                     </Label>
                     <Input
                       id="dayof_time"
@@ -1169,49 +1171,55 @@ export const Tasks: React.FC = () => {
                       value={dayOfTime}
                       onChange={(e) => setDayOfTime(e.target.value)}
                       required
-                      className="border-[#714B67]/40 focus:border-[#714B67]"
+                      className="mt-1 h-8 text-xs border-slate-200"
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="dayof_gate">Service Gate / Checkpoint</Label>
+                  <div>
+                    <Label htmlFor="dayof_gate" className="text-xs font-semibold text-slate-700">
+                      Service Gate / Checkpoint
+                    </Label>
                     <Input
                       id="dayof_gate"
                       placeholder="e.g. Palace North Service Gate"
                       value={dayOfGate}
                       onChange={(e) => setDayOfGate(e.target.value)}
-                      className="border-slate-300"
+                      className="mt-1 h-8 text-xs border-slate-200"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="dayof_remarks">Telemetry Remarks / Notes</Label>
+                <div>
+                  <Label htmlFor="dayof_remarks" className="text-xs font-semibold text-slate-700">
+                    Telemetry Remarks / Notes
+                  </Label>
                   <Input
                     id="dayof_remarks"
                     placeholder="e.g. Mandap floral crates delivery & setup crew"
                     value={dayOfRemarks}
                     onChange={(e) => setDayOfRemarks(e.target.value)}
-                    className="border-slate-300"
+                    className="mt-1 h-8 text-xs border-slate-200"
                   />
                 </div>
               </>
             )}
 
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="space-y-1">
-                <Label htmlFor="dayof_owner">Responsible Field Lead</Label>
+            <div className="grid grid-cols-2 gap-3 items-end">
+              <div>
+                <Label htmlFor="dayof_owner" className="text-xs font-semibold text-slate-700">
+                  Responsible Field Lead
+                </Label>
                 <Input
                   id="dayof_owner"
                   placeholder="Karan Verma"
                   value={dayOfOwner}
                   onChange={(e) => setDayOfOwner(e.target.value)}
-                  className="border-slate-300"
+                  className="mt-1 h-8 text-xs border-slate-200"
                 />
               </div>
 
-              <div className="space-y-1 flex flex-col justify-end">
-                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 pb-2 cursor-pointer">
+              <div className="h-8 flex items-center px-3 rounded border border-slate-200 bg-slate-50/70 hover:bg-slate-50 transition cursor-pointer">
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-700 w-full cursor-pointer">
                   <input
                     type="checkbox"
                     checked={dayOfIsMilestone}
@@ -1245,8 +1253,8 @@ export const Tasks: React.FC = () => {
                 {createDayOfTaskMutation.isPending
                   ? 'Scheduling...'
                   : dayOfType === 'MINUTE_TO_MINUTE'
-                  ? 'Add Minute-to-Minute Cue'
-                  : 'Schedule Vendor Telemetry'}
+                    ? 'Add Minute-to-Minute Cue'
+                    : 'Schedule Vendor Telemetry'}
               </Button>
             </DialogFooter>
           </form>

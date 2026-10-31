@@ -38,7 +38,7 @@ export const VendorBillsTab: React.FC<VendorBillsTabProps> = ({
               className="text-xs font-semibold border-slate-300 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5 mr-1" />
-              + Add Bill Manually
+              Add Bill Manually
             </Button>
           </div>
         </CardHeader>
