@@ -94,6 +94,7 @@ export const DayOf: React.FC = () => {
   // Modals State
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [incidentListModalOpen, setIncidentListModalOpen] = useState(false);
 
   // Form states for Incident
   const [incidentWeddingId, setIncidentWeddingId] = useState<string>('');
@@ -259,6 +260,7 @@ export const DayOf: React.FC = () => {
   };
 
   const activeWedding = weddings.find((w) => w.id === selectedWeddingId || w.code === selectedWeddingId);
+  const pendingIncidentsCount = incidents.filter((i) => i.status === 'INVESTIGATING').length;
 
   return (
     <div className="space-y-4">
@@ -283,6 +285,30 @@ export const DayOf: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Incident List Button on left side of Project */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIncidentListModalOpen(true)}
+            className={`gap-1.5 h-8 text-xs font-semibold border transition ${
+              pendingIncidentsCount > 0
+                ? 'border-rose-300 bg-rose-50/80 text-rose-800 hover:bg-rose-100 hover:text-rose-900 shadow-2xs'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs'
+            }`}
+            title="View Active Operational Incidents"
+          >
+            <AlertTriangle className={`w-3.5 h-3.5 ${pendingIncidentsCount > 0 ? 'text-rose-600 animate-pulse' : 'text-slate-500'}`} />
+            <span>Incidents</span>
+            <Badge
+              variant={pendingIncidentsCount > 0 ? 'destructive' : 'secondary'}
+              className={`h-4 px-1.5 text-[10px] font-mono leading-none ml-0.5 ${
+                pendingIncidentsCount > 0 ? 'bg-rose-600 text-white' : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              {pendingIncidentsCount}
+            </Badge>
+          </Button>
+
           <span className="text-xs text-slate-500 font-medium hidden sm:inline">Project:</span>
           <select
             value={selectedWeddingId || ''}
@@ -301,83 +327,13 @@ export const DayOf: React.FC = () => {
             variant="destructive"
             size="sm"
             onClick={() => { setIncidentWeddingId(selectedWeddingId || ''); setReportModalOpen(true); }}
-            className="gap-1.5 h-8 text-xs"
+            className="gap-1.5 h-8 text-xs font-semibold"
           >
             <AlertTriangle className="w-3.5 h-3.5" />
             <span>Log Incident</span>
           </Button>
         </div>
       </div>
-
-      {/* Incidents Command Bar */}
-      <Card className="border border-rose-200 bg-rose-50/40 shadow-2xs rounded">
-        <CardHeader className="p-3 pb-2 border-b border-rose-200/80 bg-rose-50">
-          <div className="flex items-center justify-between">
-            <div className="font-bold text-xs uppercase tracking-wider text-rose-900 flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-              <span>Active Operational Incidents</span>
-            </div>
-            <Badge variant="destructive" className="text-[10px] font-mono">
-              {incidents.filter((i) => i.status === 'INVESTIGATING').length} Pending
-            </Badge>
-          </div>
-        </CardHeader>
-
-        <CardContent className="p-3 space-y-2">
-          {incidentsLoading ? (
-            <div className="text-xs text-slate-400 py-2">Loading active incidents...</div>
-          ) : !selectedWeddingId ? (
-            <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 p-2.5 rounded flex items-center justify-between">
-              <span>Select a wedding project above to view and log live incidents.</span>
-              <AlertTriangle className="w-4 h-4 text-amber-600" />
-            </div>
-          ) : incidents.length === 0 ? (
-            <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 p-2.5 rounded flex items-center justify-between">
-              <span>All clear. Zero unresolved incidents logged for this project.</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            </div>
-          ) : (
-            incidents.map((inc) => (
-              <div
-                key={inc.id}
-                className="p-3 rounded bg-white border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs"
-              >
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant={inc.severity === 'HIGH' ? 'destructive' : inc.severity === 'MEDIUM' ? 'warning' : 'secondary'}
-                    className="text-[10px] font-mono uppercase"
-                  >
-                    {inc.severity}
-                  </Badge>
-                  <Badge variant="outline" className="text-[10px] font-mono text-[#714B67] bg-[#714B67]/5 border-[#714B67]/20">{inc.weddingCode || 'RW-2026-001'}</Badge>
-                  <span className="font-bold text-slate-900">{inc.title}</span>
-                </div>
-
-                <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-slate-500 text-[11px]">
-                    Assigned: <strong className="text-slate-800">{inc.assignedTo}</strong> ({inc.time})
-                  </span>
-                  {inc.status === 'INVESTIGATING' ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={resolveIncidentMutation.isPending}
-                      onClick={() => resolveIncidentMutation.mutate(inc.id)}
-                      className="h-6 text-xs text-emerald-800 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 cursor-pointer"
-                    >
-                      Mark Resolved
-                    </Button>
-                  ) : (
-                    <Badge variant="success" className="text-[10px]">
-                      Resolved
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
 
       {/* Primary Tabs: Minute-by-Minute Run Sheet & Vendor Arrival Telemetry */}
       <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full space-y-3">
@@ -839,6 +795,120 @@ export const DayOf: React.FC = () => {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+      {/* Modal: View Active Operational Incidents */}
+      <Dialog open={incidentListModalOpen} onOpenChange={setIncidentListModalOpen}>
+        <DialogContent className="max-w-2xl bg-white border border-slate-200 shadow-xl rounded">
+          <DialogHeader>
+            <div className="flex items-center justify-between pr-6">
+              <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600" />
+                <span>Operational Incidents Log</span>
+              </DialogTitle>
+              <Badge
+                variant={pendingIncidentsCount > 0 ? 'destructive' : 'secondary'}
+                className="text-[10px] font-mono uppercase"
+              >
+                {pendingIncidentsCount} Pending
+              </Badge>
+            </div>
+            <DialogDescription className="text-xs text-slate-500">
+              {activeWedding
+                ? `Active emergency escalations and field incident logs for ${activeWedding.code} (${activeWedding.couple}).`
+                : 'Active emergency escalations and field incident logs for selected wedding.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-2 space-y-2.5 max-h-[60vh] overflow-y-auto">
+            {incidentsLoading ? (
+              <div className="text-xs text-slate-400 py-6 text-center">Loading incidents...</div>
+            ) : !selectedWeddingId ? (
+              <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded flex items-center justify-between">
+                <span>Please select a wedding project from the project selector to view active incidents.</span>
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              </div>
+            ) : incidents.length === 0 ? (
+              <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 p-4 rounded text-center space-y-1">
+                <div className="font-semibold flex items-center justify-center gap-1.5 text-emerald-800">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>All Clear</span>
+                </div>
+                <div className="text-[11px] text-emerald-600">
+                  Zero unresolved incidents logged for this project.
+                </div>
+              </div>
+            ) : (
+              incidents.map((inc) => (
+                <div
+                  key={inc.id}
+                  className="p-3 rounded bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={inc.severity === 'HIGH' ? 'destructive' : inc.severity === 'MEDIUM' ? 'warning' : 'secondary'}
+                        className="text-[10px] font-mono uppercase"
+                      >
+                        {inc.severity}
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px] font-mono text-[#714B67] bg-[#714B67]/5 border-[#714B67]/20">
+                        {inc.weddingCode || 'RW-2026-001'}
+                      </Badge>
+                      <span className="font-bold text-slate-900">{inc.title}</span>
+                    </div>
+                    <div className="text-slate-500 text-[11px] pl-0.5">
+                      Assigned: <strong className="text-slate-800">{inc.assignedTo}</strong> • Logged: {inc.time}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    {inc.status === 'INVESTIGATING' ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={resolveIncidentMutation.isPending}
+                        onClick={() => resolveIncidentMutation.mutate(inc.id)}
+                        className="h-7 text-xs text-emerald-800 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5 mr-1" />
+                        <span>Mark Resolved</span>
+                      </Button>
+                    ) : (
+                      <Badge variant="outline" className="text-emerald-700 bg-emerald-50 border-emerald-200 text-[11px] gap-1 py-0.5">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <span>Resolved</span>
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <DialogFooter className="pt-2 flex sm:justify-between items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIncidentWeddingId(selectedWeddingId || '');
+                setReportModalOpen(true);
+              }}
+              className="gap-1.5 text-xs text-rose-700 border-rose-300 hover:bg-rose-50"
+            >
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>Log New Incident</span>
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              onClick={() => setIncidentListModalOpen(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

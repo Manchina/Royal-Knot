@@ -1,35 +1,59 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { pool } from '../db';
+import { db } from '../db';
+import {
+  weddings,
+  clients,
+  users,
+  vendors,
+  vendorQuotes,
+  rfqRequests,
+  clientInvoices,
+  weddingExtraCharges,
+  vendorBills,
+  billingChangeLogs,
+  masterOptions,
+} from '../db/schema';
+import { eq, desc, asc, ilike, or, and, sql, inArray } from 'drizzle-orm';
+import { isUUID } from '../utils';
 
 export interface ExtraChargeItem {
   id: string;
+  dbId?: string;
   category: string;
   description: string;
   qty: number;
   unitPrice: string;
   total: string;
+  rawTotal: number;
   vendor: string;
+  vendorId?: string;
+  isBilledToClient: boolean;
   status: 'ADDED_TO_CLIENT_INVOICE' | 'PENDING_APPROVAL';
   approvedBy: string;
-  lastEditedAt?: string;
-  editHistory?: Array<{
-    date: string;
-    action: string;
-    by: string;
-    details: string;
-  }>;
+  createdAt?: string;
 }
 
 export interface VendorDisbursementItem {
   id: string;
+  vendorId: string;
   vendor: string;
   category: string;
+  contactPerson?: string;
+  phone?: string;
   agreedBase: string;
+  rawAgreedBase: number;
   extras: string;
+  rawExtras: number;
   totalPayable: string;
+  rawTotalPayable: number;
   advancePaid: string;
+  rawAdvancePaid: number;
   balanceDue: string;
-  status: 'RECONCILED_MATCHED' | 'SETTLEMENT_CLEARED' | 'DISPUTED';
+  rawBalanceDue: number;
+  status: 'PENDING' | 'RECONCILED_MATCHED' | 'SETTLEMENT_CLEARED' | 'DISPUTED';
+  awardedQuoteId?: string;
+  settledAt?: string;
+  createdAt?: string;
 }
 
 export interface ClientInvoiceItem {
@@ -39,205 +63,243 @@ export interface ClientInvoiceItem {
   stageLabel: string;
   percentage: number;
   amountDue: string;
+  rawAmountDue: number;
   dueDate: string;
   status: 'PAID' | 'UNPAID';
   paidAmount: string;
+  rawPaidAmount: number;
   paidAt?: string;
   paymentReference?: string;
+}
+
+export interface BillingChangelogItem {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId?: string;
+  fromStatus?: string;
+  toStatus?: string;
+  amount?: string;
+  performedBy: string;
+  notes?: string;
+  createdAt: string;
 }
 
 export interface ProjectBillingData {
   id: string;
   code: string;
   couple: string;
+  brideName?: string;
+  groomName?: string;
+  clientEmail?: string;
+  clientPhone?: string;
   city: string;
   venue: string;
   startDate: string;
+  endDate?: string;
   guestCount: number;
+  actualHeadcount?: number;
   packageType: string;
-  status: 'LIVE_BIG_DAY' | 'IN_PLANNING' | 'BOOKED' | 'FINALISED' | 'FINALISED_SETTLED';
+  status: string;
   isFinalised: boolean;
   finalisedDate?: string;
   finalisedBy?: string;
   budget: string;
+  rawBudget: number;
   coordinator: string;
   baseContract: string;
+  rawBaseContract: number;
   totalExtras: string;
+  rawTotalExtras: number;
+  extrasCount: number;
   totalInvoiced: string;
+  rawTotalInvoiced: number;
+  vendorCommitments: string;
+  rawVendorCommitments: number;
   vendorAdvancePaid: string;
+  rawVendorAdvancePaid: number;
   vendorBalanceDue: string;
+  rawVendorBalanceDue: number;
   grossMargin: string;
+  billsCount: number;
   extraCharges: ExtraChargeItem[];
   vendorBills: VendorDisbursementItem[];
   invoices: ClientInvoiceItem[];
+  availableQuotes?: any[];
+  changelog?: BillingChangelogItem[];
 }
 
-// In-memory cache for master options with 60-second TTL
-interface MasterOptionRow {
-  id: string;
-  category: string;
-  optionKey: string;
-  label: string;
-  description: string | null;
-  sortOrder: number;
-  isActive: boolean;
-}
-
-let cachedMasterStatuses: MasterOptionRow[] | null = null;
-let masterStatusesCacheTime = 0;
-const MASTER_STATUSES_CACHE_TTL_MS = 60_000;
-
-async function getCachedMasterStatuses(): Promise<MasterOptionRow[]> {
-  const now = Date.now();
-  if (cachedMasterStatuses && now - masterStatusesCacheTime < MASTER_STATUSES_CACHE_TTL_MS) {
-    return cachedMasterStatuses;
-  }
-
-  try {
-    const res = await pool.query(
-      `SELECT id, category, option_key as "optionKey", label, description, sort_order as "sortOrder", is_active as "isActive"
-       FROM master_options
-       WHERE category = 'WEDDING_STATUS' AND is_active = true
-       ORDER BY sort_order ASC`
-    );
-    cachedMasterStatuses = res.rows;
-    masterStatusesCacheTime = now;
-    return res.rows;
-  } catch (err: any) {
-    if (cachedMasterStatuses) return cachedMasterStatuses;
-    throw new Error(`Failed to load master statuses from PostgreSQL: ${err.message}`);
-  }
-}
-
-// Format numbers into Indian Rupees currency string
 function formatInr(val: number): string {
   return `₹${Math.round(val).toLocaleString('en-IN')}`;
 }
 
 export async function billingRoutes(fastify: FastifyInstance) {
-  // GET /api/billing/master-statuses - Fetch dynamic WEDDING_STATUS master data from PostgreSQL
+  // 1. GET /api/billing/master-statuses - Fetch dynamic WEDDING_STATUS master data
   fastify.get('/master-statuses', async (_request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const data = await getCachedMasterStatuses();
+      const data = await db
+        .select({
+          id: masterOptions.id,
+          category: masterOptions.category,
+          optionKey: masterOptions.optionKey,
+          label: masterOptions.label,
+          description: masterOptions.description,
+          sortOrder: masterOptions.sortOrder,
+          isActive: masterOptions.isActive,
+        })
+        .from(masterOptions)
+        .where(and(eq(masterOptions.category, 'WEDDING_STATUS'), eq(masterOptions.isActive, true)))
+        .orderBy(asc(masterOptions.sortOrder));
+
       reply.header('Cache-Control', 'public, max-age=60');
-      return {
-        success: true,
-        data,
-      };
+      return { success: true, data };
     } catch (err: any) {
       reply.status(500);
-      return {
-        success: false,
-        error: err.message,
-      };
+      return { success: false, error: err.message };
     }
   });
 
-  // GET /api/billing/projects - List projects from PostgreSQL with status subtabs
+  // 2. GET /api/billing/projects - List projects with commercial sums & PeopleFirst tabs
   fastify.get(
     '/projects',
     async (
       request: FastifyRequest<{
-        Querystring: { tab?: string; status?: string; search?: string };
+        Querystring: { tab?: string; status?: string; search?: string; city?: string };
       }>,
       reply: FastifyReply
     ) => {
-      const { tab = 'ongoing', status = 'ALL', search = '' } = request.query;
+      const { tab = 'ongoing', status = 'ALL', search = '', city = 'ALL' } = request.query;
       const normalizedSearch = search.trim().toLowerCase();
 
       try {
-        // Query weddings joined with clients from PostgreSQL
-        const weddingsRes = await pool.query(`
-          SELECT 
-            w.id,
-            w.code,
-            c.bride_name || ' & ' || c.groom_name as couple,
-            w.destination_city as city,
-            w.primary_venue as venue,
-            TO_CHAR(w.start_date, 'Mon DD') || ' - ' || TO_CHAR(w.end_date, 'DD, YYYY') as "startDate",
-            w.estimated_guest_count as "guestCount",
-            w.actual_banquet_headcount as "actualHeadcount",
-            w.package_type as "packageType",
-            w.status,
-            w.total_budget as "totalBudget",
-            w.agency_fee as "agencyFee"
-          FROM weddings w
-          JOIN clients c ON w.client_id = c.id
-          ORDER BY w.start_date ASC
-        `);
+        // Query weddings with clients and coordinators using Drizzle ORM
+        const weddingRows = await db
+          .select({
+            id: weddings.id,
+            code: weddings.code,
+            brideName: clients.brideName,
+            groomName: clients.groomName,
+            clientEmail: clients.email,
+            clientPhone: clients.phone,
+            city: weddings.destinationCity,
+            venue: weddings.primaryVenue,
+            startDate: weddings.startDate,
+            endDate: weddings.endDate,
+            guestCount: weddings.estimatedGuestCount,
+            actualHeadcount: weddings.actualBanquetHeadcount,
+            packageType: weddings.packageType,
+            status: weddings.status,
+            totalBudget: weddings.totalBudget,
+            agencyFee: weddings.agencyFee,
+            coordinator: users.fullName,
+          })
+          .from(weddings)
+          .leftJoin(clients, eq(weddings.clientId, clients.id))
+          .leftJoin(users, eq(weddings.leadPlannerId, users.id))
+          .orderBy(desc(weddings.startDate));
 
-        // Query extra charges totals grouped by wedding
-        const extrasRes = await pool.query(`
-          SELECT 
-            wedding_id,
-            COALESCE(SUM(total_amount), 0) as total_extras,
-            COUNT(*) as extras_count
-          FROM wedding_extra_charges
-          GROUP BY wedding_id
-        `);
-        const extrasMap = new Map(extrasRes.rows.map((r: any) => [r.wedding_id, parseFloat(r.total_extras) || 0]));
-        const extrasCountMap = new Map(extrasRes.rows.map((r: any) => [r.wedding_id, parseInt(r.extras_count, 10) || 0]));
+        // Aggregate extra charges per wedding
+        const extraRows = await db
+          .select({
+            weddingId: weddingExtraCharges.weddingId,
+            totalAmount: sql<string>`COALESCE(SUM(${weddingExtraCharges.totalAmount}), 0)`,
+            count: sql<number>`COUNT(${weddingExtraCharges.id})`,
+          })
+          .from(weddingExtraCharges)
+          .groupBy(weddingExtraCharges.weddingId);
 
-        // Query vendor bills totals grouped by wedding
-        const billsRes = await pool.query(`
-          SELECT 
-            wedding_id,
-            COALESCE(SUM(total_payable), 0) as total_payable,
-            COALESCE(SUM(advance_paid), 0) as total_advance,
-            COALESCE(SUM(balance_due), 0) as total_balance
-          FROM vendor_bills
-          GROUP BY wedding_id
-        `);
-        const billsMap = new Map(billsRes.rows.map((r: any) => [r.wedding_id, {
-          payable: parseFloat(r.total_payable) || 0,
-          advance: parseFloat(r.total_advance) || 0,
-          balance: parseFloat(r.total_balance) || 0,
-        }]));
+        const extrasMap = new Map(extraRows.map((r) => [r.weddingId, parseFloat(r.totalAmount) || 0]));
+        const extrasCountMap = new Map(extraRows.map((r) => [r.weddingId, Number(r.count) || 0]));
 
-        // Format into project records
-        const allProjects: ProjectBillingData[] = weddingsRes.rows.map((w: any) => {
+        // Aggregate vendor bills per wedding
+        const billRows = await db
+          .select({
+            weddingId: vendorBills.weddingId,
+            totalPayable: sql<string>`COALESCE(SUM(${vendorBills.totalPayable}), 0)`,
+            advancePaid: sql<string>`COALESCE(SUM(${vendorBills.advancePaid}), 0)`,
+            balanceDue: sql<string>`COALESCE(SUM(${vendorBills.balanceDue}), 0)`,
+            count: sql<number>`COUNT(${vendorBills.id})`,
+          })
+          .from(vendorBills)
+          .groupBy(vendorBills.weddingId);
+
+        const billsMap = new Map(
+          billRows.map((r) => [
+            r.weddingId,
+            {
+              payable: parseFloat(r.totalPayable) || 0,
+              advance: parseFloat(r.advancePaid) || 0,
+              balance: parseFloat(r.balanceDue) || 0,
+              count: Number(r.count) || 0,
+            },
+          ])
+        );
+
+        // Format all projects
+        const allProjects: ProjectBillingData[] = weddingRows.map((w) => {
           const baseContractNum = parseFloat(w.totalBudget) || 0;
           const extrasNum = extrasMap.get(w.id) || 0;
           const extrasCount = extrasCountMap.get(w.id) || 0;
           const totalInvoicedNum = baseContractNum + extrasNum;
 
-          const billData = billsMap.get(w.id) || {
-            payable: 0,
-            advance: 0,
-            balance: 0,
-          };
-
+          const billData = billsMap.get(w.id) || { payable: 0, advance: 0, balance: 0, count: 0 };
           const isFinal = w.status === 'FINALISED' || w.status === 'FINALISED_SETTLED';
-          const grossMarginNum = totalInvoicedNum > 0 ? ((totalInvoicedNum - billData.payable) / totalInvoicedNum) * 100 : 23.5;
+          const grossMarginNum =
+            totalInvoicedNum > 0 ? ((totalInvoicedNum - billData.payable) / totalInvoicedNum) * 100 : 22.5;
+
+          const coupleStr =
+            w.brideName && w.groomName ? `${w.brideName} & ${w.groomName}` : 'Royal Couple';
+
+          const formattedStart = w.startDate
+            ? new Date(w.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : 'Winter 2026';
 
           return {
             id: w.id,
             code: w.code,
-            couple: w.couple,
-            city: w.city,
-            venue: w.venue,
-            startDate: w.startDate,
-            guestCount: w.actualHeadcount || w.guestCount,
-            packageType: w.packageType,
-            status: w.status as any,
+            couple: coupleStr,
+            brideName: w.brideName || '',
+            groomName: w.groomName || '',
+            clientEmail: w.clientEmail || '',
+            clientPhone: w.clientPhone || '',
+            city: w.city || 'Jaipur',
+            venue: w.venue || 'Palace Venue',
+            startDate: formattedStart,
+            endDate: w.endDate ? String(w.endDate) : undefined,
+            guestCount: w.actualHeadcount || w.guestCount || 400,
+            actualHeadcount: w.actualHeadcount || undefined,
+            packageType: w.packageType || 'Full-Service Royal Wedding',
+            status: w.status,
             isFinalised: isFinal,
             finalisedDate: isFinal ? 'Feb 2026' : undefined,
             finalisedBy: isFinal ? 'Aditya Singhal (Super Admin)' : undefined,
             budget: `₹${(baseContractNum / 10000000).toFixed(2)} Cr`,
-            coordinator: w.city === 'Jaipur' ? 'Devika Sharma' : 'Karan Verma',
+            rawBudget: baseContractNum,
+            coordinator: w.coordinator || (w.city === 'Jaipur' ? 'Devika Sharma' : 'Karan Verma'),
             baseContract: formatInr(baseContractNum),
+            rawBaseContract: baseContractNum,
             totalExtras: extrasNum > 0 ? `+${extrasCount} (${formatInr(extrasNum)})` : 'None',
+            rawTotalExtras: extrasNum,
+            extrasCount,
             totalInvoiced: formatInr(totalInvoicedNum),
+            rawTotalInvoiced: totalInvoicedNum,
+            vendorCommitments: formatInr(billData.payable),
+            rawVendorCommitments: billData.payable,
             vendorAdvancePaid: formatInr(billData.advance),
+            rawVendorAdvancePaid: billData.advance,
             vendorBalanceDue: isFinal && w.status === 'FINALISED_SETTLED' ? '₹0 (Settled)' : formatInr(billData.balance),
+            rawVendorBalanceDue: billData.balance,
             grossMargin: `${grossMarginNum.toFixed(1)}%`,
+            billsCount: billData.count,
             extraCharges: [],
             vendorBills: [],
             invoices: [],
           };
         });
 
-        // High-performance single-pass partition, filter, and aggregation
+        // Calculate counts
+        const ongoingAll: ProjectBillingData[] = [];
+        const finalisedAll: ProjectBillingData[] = [];
         const counts: Record<string, number> = {
           ALL_ONGOING: 0,
           ALL_FINALISED: 0,
@@ -248,13 +310,11 @@ export async function billingRoutes(fastify: FastifyInstance) {
           FINALISED_SETTLED: 0,
         };
 
-        const ongoingAll: ProjectBillingData[] = [];
-        const finalisedAll: ProjectBillingData[] = [];
+        for (const p of allProjects) {
+          // City filter
+          if (city !== 'ALL' && p.city.toLowerCase() !== city.toLowerCase()) continue;
 
-        for (let i = 0; i < allProjects.length; i++) {
-          const p = allProjects[i];
-
-          // Search check
+          // Search filter
           if (normalizedSearch) {
             const match =
               p.code.toLowerCase().includes(normalizedSearch) ||
@@ -275,53 +335,49 @@ export async function billingRoutes(fastify: FastifyInstance) {
           }
         }
 
-        // Fetch master status labels dynamically from cache/Postgres
-        const masterStatuses = await getCachedMasterStatuses();
-        const masterLabelMap = new Map(masterStatuses.map((m) => [m.optionKey, m.label]));
-
-        // Status subtabs definition matching PeopleFirst standard
         const ongoingStatusTabs = [
-          { id: 'ALL', label: 'All', count: counts.ALL_ONGOING },
-          { id: 'LIVE_BIG_DAY', label: masterLabelMap.get('LIVE_BIG_DAY') || 'Live Big Day', count: counts.LIVE_BIG_DAY || 0 },
-          { id: 'IN_PLANNING', label: masterLabelMap.get('IN_PLANNING') || 'In Planning', count: counts.IN_PLANNING || 0 },
-          { id: 'BOOKED', label: masterLabelMap.get('BOOKED') || 'Booked', count: counts.BOOKED || 0 },
+          { id: 'ALL', label: 'All Projects', count: counts.ALL_ONGOING },
+          { id: 'LIVE_BIG_DAY', label: 'Live Big Day', count: counts.LIVE_BIG_DAY || 0 },
+          { id: 'IN_PLANNING', label: 'In Planning', count: counts.IN_PLANNING || 0 },
+          { id: 'BOOKED', label: 'Booked', count: counts.BOOKED || 0 },
         ];
 
         const finalisedStatusTabs = [
-          { id: 'ALL', label: 'All', count: counts.ALL_FINALISED },
-          { id: 'FINALISED', label: masterLabelMap.get('FINALISED') || 'Finalised', count: counts.FINALISED || 0 },
-          { id: 'FINALISED_SETTLED', label: masterLabelMap.get('FINALISED_SETTLED') || 'Finalised & Settled', count: counts.FINALISED_SETTLED || 0 },
+          { id: 'ALL', label: 'All Projects', count: counts.ALL_FINALISED },
+          { id: 'FINALISED', label: 'Finalised', count: counts.FINALISED || 0 },
+          { id: 'FINALISED_SETTLED', label: 'Finalised & Settled', count: counts.FINALISED_SETTLED || 0 },
         ];
 
-        // Filter active list based on selected status subtab
-        let activeList: ProjectBillingData[];
-        if (tab === 'ongoing') {
-          activeList = status === 'ALL' ? ongoingAll : ongoingAll.filter((p) => p.status === status);
-        } else {
-          activeList = status === 'ALL' ? finalisedAll : finalisedAll.filter((p) => p.status === status);
+        let activeList = tab === 'ongoing' ? ongoingAll : finalisedAll;
+        if (status !== 'ALL') {
+          activeList = activeList.filter((p) => p.status === status);
         }
 
         const tabs = [
-          {
-            id: 'ongoing',
-            label: 'Ongoing Projects',
-            count: allProjects.filter((p) => !p.isFinalised).length,
-          },
-          {
-            id: 'finalised',
-            label: 'Finalised Projects',
-            count: allProjects.filter((p) => p.isFinalised).length,
-          },
+          { id: 'ongoing', label: 'Ongoing Projects', count: allProjects.filter((p) => !p.isFinalised).length },
+          { id: 'finalised', label: 'Finalised Projects', count: allProjects.filter((p) => p.isFinalised).length },
         ];
 
-        reply.header('Cache-Control', 'private, max-age=2');
+        // Overall Aggregate Metrics for Header
+        const totalBudgetSum = allProjects.reduce((sum, p) => sum + p.rawBudget, 0);
+        const totalInvoicedSum = allProjects.reduce((sum, p) => sum + p.rawTotalInvoiced, 0);
+        const totalVendorCommitmentsSum = allProjects.reduce((sum, p) => sum + p.rawVendorCommitments, 0);
+        const avgGrossMargin =
+          totalInvoicedSum > 0 ? ((totalInvoicedSum - totalVendorCommitmentsSum) / totalInvoicedSum) * 100 : 23.4;
 
+        reply.header('Cache-Control', 'private, max-age=2');
         return {
           success: true,
           tabs,
           activeTab: tab,
           activeStatus: status,
           statusTabs: tab === 'ongoing' ? ongoingStatusTabs : finalisedStatusTabs,
+          summary: {
+            totalBudget: `₹${(totalBudgetSum / 10000000).toFixed(2)} Cr`,
+            totalInvoiced: formatInr(totalInvoicedSum),
+            totalVendorCommitments: formatInr(totalVendorCommitmentsSum),
+            averageGrossMargin: `${avgGrossMargin.toFixed(1)}%`,
+          },
           data: {
             ongoing: ongoingAll,
             finalised: finalisedAll,
@@ -330,145 +386,175 @@ export async function billingRoutes(fastify: FastifyInstance) {
         };
       } catch (err: any) {
         reply.status(500);
-        return {
-          success: false,
-          error: err.message,
-        };
+        return { success: false, error: err.message };
       }
     }
   );
 
-  // GET /api/billing/projects/:id - Get detailed billing data (Invoices, Extra Charges, Vendor Bills) from PostgreSQL
+  // 3. GET /api/billing/projects/:id - Full Financial Dossier (Bills, Extras, Invoices, Changelog, Awarded Quotes)
   fastify.get('/projects/:id', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const { id } = request.params;
 
     try {
-      // 1. Fetch wedding by id or code
-      const weddingRes = await pool.query(
-        `SELECT 
-          w.id,
-          w.code,
-          c.bride_name || ' & ' || c.groom_name as couple,
-          w.destination_city as city,
-          w.primary_venue as venue,
-          TO_CHAR(w.start_date, 'Mon DD') || ' - ' || TO_CHAR(w.end_date, 'DD, YYYY') as "startDate",
-          w.estimated_guest_count as "guestCount",
-          w.actual_banquet_headcount as "actualHeadcount",
-          w.package_type as "packageType",
-          w.status,
-          w.total_budget as "totalBudget",
-          w.agency_fee as "agencyFee"
-        FROM weddings w
-        JOIN clients c ON w.client_id = c.id
-        WHERE w.id::text = $1 OR w.code = $1`,
-        [id]
-      );
+      // 1. Fetch wedding by UUID or Code
+      const condition = isUUID(id) ? eq(weddings.id, id) : eq(weddings.code, id);
+      const [w] = await db
+        .select({
+          id: weddings.id,
+          code: weddings.code,
+          brideName: clients.brideName,
+          groomName: clients.groomName,
+          clientEmail: clients.email,
+          clientPhone: clients.phone,
+          city: weddings.destinationCity,
+          venue: weddings.primaryVenue,
+          startDate: weddings.startDate,
+          endDate: weddings.endDate,
+          guestCount: weddings.estimatedGuestCount,
+          actualHeadcount: weddings.actualBanquetHeadcount,
+          packageType: weddings.packageType,
+          status: weddings.status,
+          totalBudget: weddings.totalBudget,
+          agencyFee: weddings.agencyFee,
+          coordinator: users.fullName,
+          coordinatorRole: users.role,
+        })
+        .from(weddings)
+        .leftJoin(clients, eq(weddings.clientId, clients.id))
+        .leftJoin(users, eq(weddings.leadPlannerId, users.id))
+        .where(condition)
+        .limit(1);
 
-      if (weddingRes.rows.length === 0) {
+      if (!w) {
         reply.status(404);
-        return { success: false, message: `Project ${id} not found` };
+        return { success: false, message: `Project '${id}' not found` };
       }
 
-      const w = weddingRes.rows[0];
       const weddingUuid = w.id;
 
-      // 2. Fetch Extra Charges from PostgreSQL
-      const extrasRes = await pool.query(
-        `SELECT 
-          ec.id,
-          ec.category,
-          ec.description,
-          ec.quantity,
-          ec.unit_rate,
-          ec.total_amount,
-          COALESCE(v.business_name, 'Preferred Vendor') as vendor,
-          ec.is_billed_to_client
-        FROM wedding_extra_charges ec
-        LEFT JOIN vendors v ON ec.vendor_id = v.id
-        WHERE ec.wedding_id = $1
-        ORDER BY ec.id ASC`,
-        [weddingUuid]
-      );
+      // 2. Fetch Extra Charges
+      const extrasRows = await db
+        .select({
+          id: weddingExtraCharges.id,
+          category: weddingExtraCharges.category,
+          description: weddingExtraCharges.description,
+          quantity: weddingExtraCharges.quantity,
+          unitRate: weddingExtraCharges.unitRate,
+          totalAmount: weddingExtraCharges.totalAmount,
+          vendorId: weddingExtraCharges.vendorId,
+          vendorName: vendors.businessName,
+          isBilledToClient: weddingExtraCharges.isBilledToClient,
+          approvedByName: users.fullName,
+          createdAt: weddingExtraCharges.createdAt,
+        })
+        .from(weddingExtraCharges)
+        .leftJoin(vendors, eq(weddingExtraCharges.vendorId, vendors.id))
+        .leftJoin(users, eq(weddingExtraCharges.approvedBy, users.id))
+        .where(eq(weddingExtraCharges.weddingId, weddingUuid))
+        .orderBy(asc(weddingExtraCharges.createdAt));
 
-      const extraCharges: ExtraChargeItem[] = extrasRes.rows.map((r: any, idx: number) => ({
-        id: `EXT-0${idx + 1}`,
-        category: r.category,
-        description: r.description,
-        qty: parseFloat(r.quantity) || 1,
-        unitPrice: formatInr(parseFloat(r.unit_rate) || 0),
-        total: formatInr(parseFloat(r.total_amount) || 0),
-        vendor: r.vendor,
-        status: 'ADDED_TO_CLIENT_INVOICE',
-        approvedBy: 'Devika Sharma',
-      }));
+      const extraCharges: ExtraChargeItem[] = extrasRows.map((r, idx) => {
+        const totalNum = parseFloat(r.totalAmount) || 0;
+        return {
+          id: `EXT-0${idx + 1}`,
+          dbId: r.id,
+          category: r.category,
+          description: r.description,
+          qty: parseFloat(r.quantity) || 1,
+          unitPrice: formatInr(parseFloat(r.unitRate) || 0),
+          total: formatInr(totalNum),
+          rawTotal: totalNum,
+          vendor: r.vendorName || 'Preferred Vendor',
+          vendorId: r.vendorId || undefined,
+          isBilledToClient: !!r.isBilledToClient,
+          status: 'ADDED_TO_CLIENT_INVOICE',
+          approvedBy: r.approvedByName || 'Devika Sharma',
+          createdAt: r.createdAt ? new Date(r.createdAt).toLocaleString('en-IN') : undefined,
+        };
+      });
 
-      // 3. Fetch Vendor Bills (Two-Way Matching) from PostgreSQL
-      const billsRes = await pool.query(
-        `SELECT 
-          vb.id,
-          v.business_name as vendor,
-          v.category,
-          vb.agreed_base_amount,
-          vb.extra_charges_amount,
-          vb.total_payable,
-          vb.advance_paid,
-          vb.balance_due,
-          vb.status
-        FROM vendor_bills vb
-        JOIN vendors v ON vb.vendor_id = v.id
-        WHERE vb.wedding_id = $1
-        ORDER BY vb.total_payable DESC`,
-        [weddingUuid]
-      );
+      // 3. Fetch Vendor Bills (Purchases / Disbursements Ledger)
+      const billsRows = await db
+        .select({
+          id: vendorBills.id,
+          vendorId: vendorBills.vendorId,
+          vendorName: vendors.businessName,
+          category: vendors.category,
+          contactPerson: vendors.contactPerson,
+          phone: vendors.phone,
+          agreedBaseAmount: vendorBills.agreedBaseAmount,
+          extraChargesAmount: vendorBills.extraChargesAmount,
+          totalPayable: vendorBills.totalPayable,
+          advancePaid: vendorBills.advancePaid,
+          balanceDue: vendorBills.balanceDue,
+          status: vendorBills.status,
+          awardedQuoteId: vendorBills.awardedQuoteId,
+          settledAt: vendorBills.settledAt,
+          createdAt: vendorBills.createdAt,
+        })
+        .from(vendorBills)
+        .innerJoin(vendors, eq(vendorBills.vendorId, vendors.id))
+        .where(eq(vendorBills.weddingId, weddingUuid))
+        .orderBy(desc(vendorBills.totalPayable));
 
-      const vendorBills: VendorDisbursementItem[] = billsRes.rows.map((r: any) => ({
-        id: r.id,
-        vendor: r.vendor,
-        category: r.category,
-        agreedBase: formatInr(parseFloat(r.agreed_base_amount) || 0),
-        extras: parseFloat(r.extra_charges_amount) > 0 ? `+${formatInr(parseFloat(r.extra_charges_amount))}` : '₹0',
-        totalPayable: formatInr(parseFloat(r.total_payable) || 0),
-        advancePaid: formatInr(parseFloat(r.advance_paid) || 0),
-        balanceDue: formatInr(parseFloat(r.balance_due) || 0),
-        status: r.status as any,
-      }));
+      const vendorBillsList: VendorDisbursementItem[] = billsRows.map((r) => {
+        const baseNum = parseFloat(r.agreedBaseAmount) || 0;
+        const extrasNum = parseFloat(r.extraChargesAmount) || 0;
+        const payableNum = parseFloat(r.totalPayable) || (baseNum + extrasNum);
+        const advNum = parseFloat(r.advancePaid) || 0;
+        const balNum = parseFloat(r.balanceDue) || Math.max(0, payableNum - advNum);
 
-      // 4. Fetch Client Milestone Invoices from PostgreSQL
-      const invoicesRes = await pool.query(
-        `SELECT 
-          id,
-          invoice_number,
-          stage_key,
-          amount_due,
-          TO_CHAR(due_date, 'Mon DD, YYYY') as "dueDate",
-          status,
-          paid_amount,
-          paid_at,
-          payment_reference
-        FROM client_invoices
-        WHERE wedding_id = $1
-        ORDER BY 
-          CASE stage_key 
-            WHEN 'BOOKING_DEPOSIT' THEN 1 
-            WHEN 'PRE_WEDDING_ADVANCE' THEN 2 
-            WHEN 'FINAL_SETTLEMENT' THEN 3 
-            ELSE 4 
-          END, 
-          due_date ASC, 
-          id ASC`,
-        [weddingUuid]
-      );
+        return {
+          id: r.id,
+          vendorId: r.vendorId,
+          vendor: r.vendorName,
+          category: r.category,
+          contactPerson: r.contactPerson || undefined,
+          phone: r.phone || undefined,
+          agreedBase: formatInr(baseNum),
+          rawAgreedBase: baseNum,
+          extras: extrasNum > 0 ? `+${formatInr(extrasNum)}` : '₹0',
+          rawExtras: extrasNum,
+          totalPayable: formatInr(payableNum),
+          rawTotalPayable: payableNum,
+          advancePaid: formatInr(advNum),
+          rawAdvancePaid: advNum,
+          balanceDue: formatInr(balNum),
+          rawBalanceDue: balNum,
+          status: r.status as any,
+          awardedQuoteId: r.awardedQuoteId || undefined,
+          settledAt: r.settledAt ? new Date(r.settledAt).toLocaleDateString('en-IN') : undefined,
+          createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : undefined,
+        };
+      });
 
-      const invoices: ClientInvoiceItem[] = invoicesRes.rows.map((r: any) => {
+      // 4. Fetch Client Milestone Invoices
+      const invoicesRows = await db
+        .select({
+          id: clientInvoices.id,
+          invoiceNumber: clientInvoices.invoiceNumber,
+          stageKey: clientInvoices.stageKey,
+          amountDue: clientInvoices.amountDue,
+          dueDate: clientInvoices.dueDate,
+          status: clientInvoices.status,
+          paidAmount: clientInvoices.paidAmount,
+          paidAt: clientInvoices.paidAt,
+          paymentReference: clientInvoices.paymentReference,
+        })
+        .from(clientInvoices)
+        .where(eq(clientInvoices.weddingId, weddingUuid))
+        .orderBy(asc(clientInvoices.dueDate));
+
+      const invoices: ClientInvoiceItem[] = invoicesRows.map((r) => {
         let stageLabel = 'Milestone Payment';
         let pct = 30;
-        if (r.stage_key === 'BOOKING_DEPOSIT') {
+        if (r.stageKey === 'BOOKING_DEPOSIT') {
           stageLabel = 'Booking Deposit (20%)';
           pct = 20;
-        } else if (r.stage_key === 'PRE_WEDDING_ADVANCE') {
+        } else if (r.stageKey === 'PRE_WEDDING_ADVANCE') {
           stageLabel = '30-Day Pre-Wedding Advance (50%)';
           pct = 50;
-        } else if (r.stage_key === 'FINAL_SETTLEMENT') {
+        } else if (r.stageKey === 'FINAL_SETTLEMENT') {
           stageLabel = 'Post-Event Final Settlement (30% + Extras)';
           pct = 30;
         } else if (r.stage_key === 'DAY_OF_EXTRA' || (typeof r.stage_key === 'string' && r.stage_key.startsWith('EXTRA'))) {
@@ -479,55 +565,136 @@ export async function billingRoutes(fastify: FastifyInstance) {
           pct = 0;
         }
 
+        const dueNum = parseFloat(r.amountDue) || 0;
+        const paidNum = parseFloat(r.paidAmount || '0') || 0;
+
         return {
           id: r.id,
-          invoiceNumber: r.invoice_number,
-          stageKey: r.stage_key,
+          invoiceNumber: r.invoiceNumber,
+          stageKey: r.stageKey,
           stageLabel,
           percentage: pct,
-          amountDue: formatInr(parseFloat(r.amount_due) || 0),
-          dueDate: r.dueDate,
-          status: r.status,
-          paidAmount: formatInr(parseFloat(r.paid_amount) || 0),
-          paidAt: r.paid_at,
-          paymentReference: r.payment_reference,
+          amountDue: formatInr(dueNum),
+          rawAmountDue: dueNum,
+          dueDate: r.dueDate ? new Date(r.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Due on Event',
+          status: r.status as any,
+          paidAmount: formatInr(paidNum),
+          rawPaidAmount: paidNum,
+          paidAt: r.paidAt ? new Date(r.paidAt).toLocaleString('en-IN') : undefined,
+          paymentReference: r.paymentReference || undefined,
         };
       });
 
+      // 5. Fetch Winning RFQ Quotes for this Wedding available to be billed
+      const awardedQuotesRows = await db
+        .select({
+          quoteId: vendorQuotes.id,
+          rfqId: rfqRequests.id,
+          serviceCategory: rfqRequests.serviceCategory,
+          description: rfqRequests.description,
+          vendorId: vendors.id,
+          vendorName: vendors.businessName,
+          baseCost: vendorQuotes.baseCost,
+          pricePerPlate: vendorQuotes.pricePerPlate,
+          quoteStatus: vendorQuotes.status,
+        })
+        .from(rfqRequests)
+        .innerJoin(vendorQuotes, eq(vendorQuotes.rfqId, rfqRequests.id))
+        .innerJoin(vendors, eq(vendorQuotes.vendorId, vendors.id))
+        .where(
+          and(
+            eq(rfqRequests.weddingId, weddingUuid),
+            or(eq(vendorQuotes.status, 'AWARDED'), eq(vendorQuotes.status, 'ACCEPTED'), eq(vendorQuotes.status, 'SHORTLISTED'))
+          )
+        );
+
+      // Check which quotes already have bills
+      const existingBilledQuoteIds = new Set(billsRows.map((b) => b.awardedQuoteId).filter(Boolean));
+      const availableQuotes = awardedQuotesRows.map((q) => ({
+        ...q,
+        isBilled: existingBilledQuoteIds.has(q.quoteId),
+        formattedCost: formatInr(parseFloat(q.baseCost) || 0),
+      }));
+
+      // 6. Fetch Billing Change Logs (Audit Trail)
+      const changelogRows = await db
+        .select()
+        .from(billingChangeLogs)
+        .where(eq(billingChangeLogs.weddingId, weddingUuid))
+        .orderBy(desc(billingChangeLogs.createdAt));
+
+      const changelog: BillingChangelogItem[] = changelogRows.map((c) => ({
+        id: c.id,
+        action: c.action,
+        entityType: c.entityType,
+        entityId: c.entityId || undefined,
+        fromStatus: c.fromStatus || undefined,
+        toStatus: c.toStatus || undefined,
+        amount: c.amount ? formatInr(parseFloat(c.amount)) : undefined,
+        performedBy: c.performedBy || 'System',
+        notes: c.notes || undefined,
+        createdAt: c.createdAt ? new Date(c.createdAt).toLocaleString('en-IN') : new Date().toLocaleString('en-IN'),
+      }));
+
+      // Aggregations
       const baseContractNum = parseFloat(w.totalBudget) || 0;
-      const totalExtrasNum = extrasRes.rows.reduce((sum: number, r: any) => sum + (parseFloat(r.total_amount) || 0), 0);
+      const totalExtrasNum = extraCharges.reduce((sum, e) => sum + e.rawTotal, 0);
       const totalInvoicedNum = baseContractNum + totalExtrasNum;
-      const totalVendorPayable = billsRes.rows.reduce((sum: number, r: any) => sum + (parseFloat(r.total_payable) || 0), 0);
-      const totalVendorAdvance = billsRes.rows.reduce((sum: number, r: any) => sum + (parseFloat(r.advance_paid) || 0), 0);
-      const totalVendorBalance = billsRes.rows.reduce((sum: number, r: any) => sum + (parseFloat(r.balance_due) || 0), 0);
+      const totalVendorPayable = vendorBillsList.reduce((sum, b) => sum + b.rawTotalPayable, 0);
+      const totalVendorAdvance = vendorBillsList.reduce((sum, b) => sum + b.rawAdvancePaid, 0);
+      const totalVendorBalance = vendorBillsList.reduce((sum, b) => sum + b.rawBalanceDue, 0);
 
       const isFinal = w.status === 'FINALISED' || w.status === 'FINALISED_SETTLED';
-      const grossMarginNum = totalInvoicedNum > 0 ? ((totalInvoicedNum - totalVendorPayable) / totalInvoicedNum) * 100 : 22.4;
+      const grossMarginNum =
+        totalInvoicedNum > 0 ? ((totalInvoicedNum - totalVendorPayable) / totalInvoicedNum) * 100 : 22.4;
+
+      const coupleStr =
+        w.brideName && w.groomName ? `${w.brideName} & ${w.groomName}` : 'Royal Couple';
 
       const project: ProjectBillingData = {
         id: w.id,
         code: w.code,
-        couple: w.couple,
-        city: w.city,
-        venue: w.venue,
-        startDate: w.startDate,
-        guestCount: w.actualHeadcount || w.guestCount,
-        packageType: w.packageType,
+        couple: coupleStr,
+        brideName: w.brideName || '',
+        groomName: w.groomName || '',
+        clientEmail: w.clientEmail || '',
+        clientPhone: w.clientPhone || '',
+        city: w.city || 'Jaipur',
+        venue: w.venue || 'Palace Venue',
+        startDate: w.startDate
+          ? new Date(w.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+          : 'Winter 2026',
+        endDate: w.endDate ? String(w.endDate) : undefined,
+        guestCount: w.actualHeadcount || w.guestCount || 400,
+        actualHeadcount: w.actualHeadcount || undefined,
+        packageType: w.packageType || 'Full-Service Royal Wedding',
         status: w.status,
         isFinalised: isFinal,
-        finalisedDate: isFinal ? 'Feb 20, 2026' : undefined,
+        finalisedDate: isFinal ? 'Feb 2026' : undefined,
         finalisedBy: isFinal ? 'Aditya Singhal (Super Admin)' : undefined,
         budget: `₹${(baseContractNum / 10000000).toFixed(2)} Cr`,
-        coordinator: w.city === 'Jaipur' ? 'Devika Sharma' : 'Karan Verma',
+        rawBudget: baseContractNum,
+        coordinator: w.coordinator || 'Devika Sharma',
         baseContract: formatInr(baseContractNum),
+        rawBaseContract: baseContractNum,
         totalExtras: formatInr(totalExtrasNum),
+        rawTotalExtras: totalExtrasNum,
+        extrasCount: extraCharges.length,
         totalInvoiced: formatInr(totalInvoicedNum),
+        rawTotalInvoiced: totalInvoicedNum,
+        vendorCommitments: formatInr(totalVendorPayable),
+        rawVendorCommitments: totalVendorPayable,
         vendorAdvancePaid: formatInr(totalVendorAdvance),
+        rawVendorAdvancePaid: totalVendorAdvance,
         vendorBalanceDue: isFinal && w.status === 'FINALISED_SETTLED' ? '₹0 (Settled)' : formatInr(totalVendorBalance),
+        rawVendorBalanceDue: totalVendorBalance,
         grossMargin: `${grossMarginNum.toFixed(1)}%`,
+        billsCount: vendorBillsList.length,
         extraCharges,
-        vendorBills,
+        vendorBills: vendorBillsList,
         invoices,
+        availableQuotes,
+        changelog,
       };
 
       return {
@@ -540,7 +707,270 @@ export async function billingRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // POST /api/billing/projects/:id/extras - Insert real extra charge into PostgreSQL
+  // 4. POST /api/billing/projects/:id/vendor-bills - Add manual Vendor Bill
+  fastify.post(
+    '/projects/:id/vendor-bills',
+    async (
+      request: FastifyRequest<{
+        Params: { id: string };
+        Body: {
+          vendorId: string;
+          category?: string;
+          agreedBaseAmount: number | string;
+          advancePaid?: number | string;
+          awardedQuoteId?: string;
+          notes?: string;
+          performedBy?: string;
+        };
+      }>,
+      reply: FastifyReply
+    ) => {
+      const { id } = request.params;
+      const {
+        vendorId,
+        agreedBaseAmount,
+        advancePaid = 0,
+        awardedQuoteId,
+        notes = 'Vendor bill created in financial ledger',
+        performedBy = 'Finance Manager',
+      } = request.body || {};
+
+      try {
+        const condition = isUUID(id) ? eq(weddings.id, id) : eq(weddings.code, id);
+        const [w] = await db.select({ id: weddings.id, code: weddings.code }).from(weddings).where(condition).limit(1);
+        if (!w) {
+          reply.status(404);
+          return { success: false, message: `Project ${id} not found` };
+        }
+
+        const baseNum = Number(agreedBaseAmount) || 0;
+        const advNum = Number(advancePaid) || 0;
+        const balanceNum = Math.max(0, baseNum - advNum);
+        const status = advNum >= baseNum ? 'SETTLEMENT_CLEARED' : advNum > 0 ? 'RECONCILED_MATCHED' : 'PENDING';
+
+        const [createdBill] = await db
+          .insert(vendorBills)
+          .values({
+            weddingId: w.id,
+            vendorId,
+            awardedQuoteId: awardedQuoteId || null,
+            agreedBaseAmount: String(baseNum),
+            extraChargesAmount: '0.00',
+            totalPayable: String(baseNum),
+            advancePaid: String(advNum),
+            balanceDue: String(balanceNum),
+            status,
+          })
+          .returning();
+
+        // Write to audit changelog
+        await db.insert(billingChangeLogs).values({
+          weddingId: w.id,
+          action: 'BILL_CREATED',
+          entityType: 'VENDOR_BILL',
+          entityId: createdBill.id,
+          toStatus: status,
+          amount: String(baseNum),
+          performedBy,
+          notes: notes || `Created vendor bill for ${formatInr(baseNum)}`,
+        });
+
+        return {
+          success: true,
+          message: 'Vendor bill added to ledger successfully',
+          data: createdBill,
+        };
+      } catch (err: any) {
+        reply.status(500);
+        return { success: false, error: err.message };
+      }
+    }
+  );
+
+  // 5. POST /api/billing/projects/:id/sync-awarded-quotes - Automatically bill winning RFQ quotes
+  fastify.post(
+    '/projects/:id/sync-awarded-quotes',
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const { id } = request.params;
+
+      try {
+        const condition = isUUID(id) ? eq(weddings.id, id) : eq(weddings.code, id);
+        const [w] = await db.select({ id: weddings.id, code: weddings.code }).from(weddings).where(condition).limit(1);
+        if (!w) {
+          reply.status(404);
+          return { success: false, message: `Project ${id} not found` };
+        }
+
+        // Find awarded quotes
+        const awardedQuotes = await db
+          .select({
+            quoteId: vendorQuotes.id,
+            vendorId: vendors.id,
+            vendorName: vendors.businessName,
+            baseCost: vendorQuotes.baseCost,
+            category: rfqRequests.serviceCategory,
+          })
+          .from(rfqRequests)
+          .innerJoin(vendorQuotes, eq(vendorQuotes.rfqId, rfqRequests.id))
+          .innerJoin(vendors, eq(vendorQuotes.vendorId, vendors.id))
+          .where(
+            and(
+              eq(rfqRequests.weddingId, w.id),
+              or(eq(vendorQuotes.status, 'AWARDED'), eq(vendorQuotes.status, 'ACCEPTED'))
+            )
+          );
+
+        if (awardedQuotes.length === 0) {
+          return {
+            success: true,
+            syncedCount: 0,
+            message: 'No unbilled awarded quotes found in RFQs for this wedding project.',
+          };
+        }
+
+        // Check already billed quotes
+        const existingBills = await db
+          .select({ awardedQuoteId: vendorBills.awardedQuoteId })
+          .from(vendorBills)
+          .where(eq(vendorBills.weddingId, w.id));
+        const billedSet = new Set(existingBills.map((b) => b.awardedQuoteId).filter(Boolean));
+
+        let createdCount = 0;
+        for (const q of awardedQuotes) {
+          if (!billedSet.has(q.quoteId)) {
+            const baseCostNum = parseFloat(q.baseCost) || 0;
+            const [bill] = await db
+              .insert(vendorBills)
+              .values({
+                weddingId: w.id,
+                vendorId: q.vendorId,
+                awardedQuoteId: q.quoteId,
+                agreedBaseAmount: String(baseCostNum),
+                extraChargesAmount: '0.00',
+                totalPayable: String(baseCostNum),
+                advancePaid: '0.00',
+                balanceDue: String(baseCostNum),
+                status: 'PENDING',
+              })
+              .returning();
+
+            await db.insert(billingChangeLogs).values({
+              weddingId: w.id,
+              action: 'QUOTE_AUTO_BILLED',
+              entityType: 'VENDOR_BILL',
+              entityId: bill.id,
+              toStatus: 'PENDING',
+              amount: String(baseCostNum),
+              performedBy: 'Procurement Engine Sync',
+              notes: `Auto-billed winning ${q.category} quote for ${q.vendorName} (${formatInr(baseCostNum)})`,
+            });
+
+            createdCount++;
+          }
+        }
+
+        return {
+          success: true,
+          syncedCount: createdCount,
+          message: `Successfully synchronized ${createdCount} winning vendor quote(s) into billing ledger.`,
+        };
+      } catch (err: any) {
+        reply.status(500);
+        return { success: false, error: err.message };
+      }
+    }
+  );
+
+  // 6. PUT /api/billing/projects/:id/vendor-bills/:billId/reconcile - Reconcile & Record Payment
+  fastify.put(
+    '/projects/:id/vendor-bills/:billId/reconcile',
+    async (
+      request: FastifyRequest<{
+        Params: { id: string; billId: string };
+        Body: {
+          paymentAmount?: number | string;
+          paymentReference?: string;
+          status?: 'PENDING' | 'RECONCILED_MATCHED' | 'SETTLEMENT_CLEARED' | 'DISPUTED';
+          notes?: string;
+          performedBy?: string;
+        };
+      }>,
+      reply: FastifyReply
+    ) => {
+      const { id, billId } = request.params;
+      const {
+        paymentAmount,
+        paymentReference = 'NEFT/RTGS Settlement',
+        status,
+        notes = 'Payment reconciled and updated',
+        performedBy = 'Devika Sharma (Finance Manager)',
+      } = request.body || {};
+
+      try {
+        const condition = isUUID(id) ? eq(weddings.id, id) : eq(weddings.code, id);
+        const [w] = await db.select({ id: weddings.id, code: weddings.code }).from(weddings).where(condition).limit(1);
+        if (!w) {
+          reply.status(404);
+          return { success: false, message: `Project ${id} not found` };
+        }
+
+        const [existingBill] = await db.select().from(vendorBills).where(eq(vendorBills.id, billId)).limit(1);
+        if (!existingBill) {
+          reply.status(404);
+          return { success: false, message: `Bill ${billId} not found` };
+        }
+
+        const currentAdvance = parseFloat(existingBill.advancePaid) || 0;
+        const totalPayable = parseFloat(existingBill.totalPayable) || 0;
+        const additionalPay = Number(paymentAmount) || 0;
+
+        const newAdvance = currentAdvance + additionalPay;
+        const newBalance = Math.max(0, totalPayable - newAdvance);
+
+        let targetStatus = status || existingBill.status;
+        if (newBalance === 0) {
+          targetStatus = 'SETTLEMENT_CLEARED';
+        } else if (newAdvance > 0) {
+          targetStatus = 'RECONCILED_MATCHED';
+        }
+
+        const [updatedBill] = await db
+          .update(vendorBills)
+          .set({
+            advancePaid: String(newAdvance),
+            balanceDue: String(newBalance),
+            status: targetStatus,
+            settledAt: newBalance === 0 ? new Date() : existingBill.settledAt,
+          })
+          .where(eq(vendorBills.id, billId))
+          .returning();
+
+        // Write to audit changelog
+        await db.insert(billingChangeLogs).values({
+          weddingId: w.id,
+          action: targetStatus === 'SETTLEMENT_CLEARED' ? 'SETTLEMENT_CLEARED' : 'BILL_RECONCILED',
+          entityType: 'VENDOR_BILL',
+          entityId: billId,
+          fromStatus: existingBill.status,
+          toStatus: targetStatus,
+          amount: String(additionalPay > 0 ? additionalPay : newAdvance),
+          performedBy,
+          notes: `${notes} [Ref: ${paymentReference}]`,
+        });
+
+        return {
+          success: true,
+          message: 'Vendor disbursement successfully reconciled',
+          data: updatedBill,
+        };
+      } catch (err: any) {
+        reply.status(500);
+        return { success: false, error: err.message };
+      }
+    }
+  );
+
+  // 7. POST /api/billing/projects/:id/extras - Insert extra charge and reflect in vendor bill & client settlement
   fastify.post(
     '/projects/:id/extras',
     async (
@@ -549,133 +979,103 @@ export async function billingRoutes(fastify: FastifyInstance) {
         Body: {
           category: string;
           description: string;
-          qty: number;
-          unitPrice: string;
-          vendor: string;
+          qty: number | string;
+          unitPrice: number | string;
+          vendor?: string;
+          vendorId?: string;
+          performedBy?: string;
         };
       }>,
       reply: FastifyReply
     ) => {
       const { id } = request.params;
-      const { category, description, qty, unitPrice, vendor } = request.body || {};
+      const {
+        category = 'EXTRA_PLATES',
+        description,
+        qty = 60,
+        unitPrice = 2100,
+        vendor = 'Marwar Heritage Kitchens',
+        vendorId,
+        performedBy = 'Devika Sharma',
+      } = request.body || {};
 
       try {
-        // Resolve wedding ID
-        const wRes = await pool.query(`SELECT id, code, actual_banquet_headcount FROM weddings WHERE id::text = $1 OR code = $1`, [id]);
-        if (wRes.rows.length === 0) {
+        const condition = isUUID(id) ? eq(weddings.id, id) : eq(weddings.code, id);
+        const [w] = await db.select({ id: weddings.id, code: weddings.code }).from(weddings).where(condition).limit(1);
+        if (!w) {
           reply.status(404);
           return { success: false, message: `Project ${id} not found` };
         }
 
-        const weddingUuid = wRes.rows[0].id;
-        const numQty = Number(qty) || 1;
-        const numPrice = Number(String(unitPrice).replace(/[^\d.]/g, '')) || 1000;
-        const calcTotal = numQty * numPrice;
+        const quantityNum = Number(qty) || 1;
+        const unitRateNum = Number(unitPrice) || 0;
+        const totalAmountNum = quantityNum * unitRateNum;
 
-        // Resolve vendor ID if matches or pick preferred
-        let vendorId: string | null = null;
-        if (vendor) {
-          const vRes = await pool.query(`SELECT id FROM vendors WHERE business_name ILIKE $1 LIMIT 1`, [`%${vendor}%`]);
-          if (vRes.rows.length > 0) vendorId = vRes.rows[0].id;
+        // Resolve vendor
+        let resolvedVendorId = vendorId;
+        if (!resolvedVendorId && vendor) {
+          const [foundVendor] = await db
+            .select({ id: vendors.id })
+            .from(vendors)
+            .where(ilike(vendors.businessName, `%${vendor.trim()}%`))
+            .limit(1);
+          if (foundVendor) resolvedVendorId = foundVendor.id;
         }
 
-        // Insert into wedding_extra_charges
-        const insertRes = await pool.query(
-          `INSERT INTO wedding_extra_charges (wedding_id, category, description, quantity, unit_rate, total_amount, vendor_id, is_billed_to_client)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
-           RETURNING id, category, description, quantity, unit_rate, total_amount`,
-          [weddingUuid, category || 'OVERRUN_ADDITION', description, numQty, numPrice, calcTotal, vendorId]
-        );
+        // Insert into weddingExtraCharges
+        const [createdExtra] = await db
+          .insert(weddingExtraCharges)
+          .values({
+            weddingId: w.id,
+            category,
+            description: description || `${quantityNum} Extra Banquet Plates @ ${formatInr(unitRateNum)}`,
+            quantity: String(quantityNum),
+            unitRate: String(unitRateNum),
+            totalAmount: String(totalAmountNum),
+            vendorId: resolvedVendorId || null,
+            isBilledToClient: true,
+          })
+          .returning();
 
-        // If extra plates, update actual banquet headcount in weddings
-        if (category === 'EXTRA_PLATES') {
-          await pool.query(
-            `UPDATE weddings SET actual_banquet_headcount = COALESCE(actual_banquet_headcount, 400) + $1 WHERE id = $2`,
-            [numQty, weddingUuid]
-          );
-        }
+        // If vendor bill exists, append extra charges to vendor bill total payable
+        if (resolvedVendorId) {
+          const [matchingBill] = await db
+            .select()
+            .from(vendorBills)
+            .where(and(eq(vendorBills.weddingId, w.id), eq(vendorBills.vendorId, resolvedVendorId)))
+            .limit(1);
 
-        // If vendor exists, also update/insert into vendor_bills
-        if (vendorId) {
-          const vbCheck = await pool.query(
-            `SELECT id FROM vendor_bills WHERE wedding_id = $1 AND vendor_id = $2`,
-            [weddingUuid, vendorId]
-          );
-          if (vbCheck.rows.length > 0) {
-            await pool.query(
-              `UPDATE vendor_bills 
-               SET extra_charges_amount = extra_charges_amount + $1,
-                   total_payable = total_payable + $1,
-                   balance_due = balance_due + $1
-               WHERE wedding_id = $2 AND vendor_id = $3`,
-              [calcTotal, weddingUuid, vendorId]
-            );
-          } else {
-            await pool.query(
-              `INSERT INTO vendor_bills (wedding_id, vendor_id, agreed_base_amount, extra_charges_amount, total_payable, advance_paid, balance_due, status)
-               VALUES ($1, $2, 0, $3, $3, 0, $3, 'RECONCILED_MATCHED')`,
-              [weddingUuid, vendorId, calcTotal]
-            );
+          if (matchingBill) {
+            const currentExtras = parseFloat(matchingBill.extraChargesAmount) || 0;
+            const currentTotal = parseFloat(matchingBill.totalPayable) || 0;
+            const currentBal = parseFloat(matchingBill.balanceDue) || 0;
+
+            await db
+              .update(vendorBills)
+              .set({
+                extraChargesAmount: String(currentExtras + totalAmountNum),
+                totalPayable: String(currentTotal + totalAmountNum),
+                balanceDue: String(currentBal + totalAmountNum),
+              })
+              .where(eq(vendorBills.id, matchingBill.id));
           }
         }
 
-        // Count existing client invoices to generate sequential invoice number: e.g. INV-2026-001-EX1
-        const countRes = await pool.query(
-          `SELECT count(*) FROM client_invoices WHERE wedding_id = $1`,
-          [weddingUuid]
-        );
-        const invoiceCount = parseInt(countRes.rows[0].count, 10) || 0;
-        const cleanCode = (wRes.rows[0].code || 'RW-2026-001').replace(/^RW-/, '');
-
-        let invNumber = `INV-${cleanCode}-EX${invoiceCount >= 3 ? invoiceCount - 2 : invoiceCount + 1}`;
-        const existingInv = await pool.query(`SELECT id FROM client_invoices WHERE invoice_number = $1`, [invNumber]);
-        if (existingInv.rows.length > 0) {
-          invNumber = `INV-${cleanCode}-EX-${Date.now().toString().slice(-4)}`;
-        }
-
-        // Create new invoice record in client_invoices (Staged Client Billing)
-        const invRes = await pool.query(
-          `INSERT INTO client_invoices (
-            wedding_id, 
-            invoice_number, 
-            stage_key, 
-            amount_due, 
-            due_date, 
-            status, 
-            paid_amount, 
-            paid_at, 
-            payment_reference
-          )
-          VALUES ($1, $2, 'DAY_OF_EXTRA', $3, CURRENT_DATE, 'UNPAID', 0, NULL, $4)
-          RETURNING id, invoice_number, stage_key, amount_due, due_date, status`,
-          [weddingUuid, invNumber, calcTotal, description || category || 'Day-of Extra Addition']
-        );
-
-        // Link client_invoice_id to wedding_extra_charges
-        if (invRes.rows.length > 0) {
-          await pool.query(
-            `UPDATE wedding_extra_charges SET client_invoice_id = $1 WHERE id = $2`,
-            [invRes.rows[0].id, insertRes.rows[0].id]
-          );
-        }
-
-        const newExtra: ExtraChargeItem = {
-          id: insertRes.rows[0].id,
-          category: insertRes.rows[0].category,
-          description: insertRes.rows[0].description,
-          qty: numQty,
-          unitPrice: formatInr(numPrice),
-          total: formatInr(calcTotal),
-          vendor: vendor || 'Marwar Heritage Kitchens',
-          status: 'ADDED_TO_CLIENT_INVOICE',
-          approvedBy: 'Devika Sharma',
-          lastEditedAt: new Date().toISOString(),
-        };
+        // Write to audit changelog
+        await db.insert(billingChangeLogs).values({
+          weddingId: w.id,
+          action: 'EXTRA_CHARGE_ADDED',
+          entityType: 'EXTRA_CHARGE',
+          entityId: createdExtra.id,
+          amount: String(totalAmountNum),
+          performedBy,
+          notes: `Added extra charge: ${description} (${formatInr(totalAmountNum)})`,
+        });
 
         return {
           success: true,
-          message: 'Extra charge successfully saved to PostgreSQL database & attached to client invoice',
-          extra: newExtra,
+          message: 'Extra charge audited and added to client billing and vendor ledger',
+          data: createdExtra,
         };
       } catch (err: any) {
         reply.status(500);
@@ -684,113 +1084,177 @@ export async function billingRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // PUT /api/billing/projects/:id/finalise - Finalise and audit in PostgreSQL
-  fastify.put('/projects/:id/finalise', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  // 8. PUT /api/billing/projects/:id/pay-invoice - Mark client milestone invoice as PAID
+  fastify.put(
+    '/projects/:id/pay-invoice',
+    async (
+      request: FastifyRequest<{
+        Params: { id: string };
+        Body: {
+          invoiceId: string;
+          paidAmount?: number | string;
+          paymentReference?: string;
+          performedBy?: string;
+        };
+      }>,
+      reply: FastifyReply
+    ) => {
+      const { id } = request.params;
+      const {
+        invoiceId,
+        paidAmount,
+        paymentReference = 'HDFC-RTGS-AUTO',
+        performedBy = 'Aditya Singhal (Finance Director)',
+      } = request.body || {};
+
+      try {
+        const condition = isUUID(id) ? eq(weddings.id, id) : eq(weddings.code, id);
+        const [w] = await db.select({ id: weddings.id, code: weddings.code }).from(weddings).where(condition).limit(1);
+        if (!w) {
+          reply.status(404);
+          return { success: false, message: `Project ${id} not found` };
+        }
+
+        const [existingInvoice] = await db
+          .select()
+          .from(clientInvoices)
+          .where(and(eq(clientInvoices.id, invoiceId), eq(clientInvoices.weddingId, w.id)))
+          .limit(1);
+
+        if (!existingInvoice) {
+          reply.status(404);
+          return { success: false, message: `Invoice ${invoiceId} not found` };
+        }
+
+        const finalPaid = paidAmount ? String(paidAmount) : existingInvoice.amountDue;
+
+        const [updatedInvoice] = await db
+          .update(clientInvoices)
+          .set({
+            status: 'PAID',
+            paidAmount: finalPaid,
+            paidAt: new Date(),
+            paymentReference,
+          })
+          .where(eq(clientInvoices.id, invoiceId))
+          .returning();
+
+        // Write to audit changelog
+        await db.insert(billingChangeLogs).values({
+          weddingId: w.id,
+          action: 'INVOICE_PAID',
+          entityType: 'CLIENT_INVOICE',
+          entityId: invoiceId,
+          fromStatus: existingInvoice.status,
+          toStatus: 'PAID',
+          amount: finalPaid,
+          performedBy,
+          notes: `Settled milestone invoice ${existingInvoice.invoiceNumber} (${formatInr(parseFloat(finalPaid))}) via ${paymentReference}`,
+        });
+
+        return {
+          success: true,
+          message: 'Client milestone invoice payment successfully recorded',
+          data: updatedInvoice,
+        };
+      } catch (err: any) {
+        reply.status(500);
+        return { success: false, error: err.message };
+      }
+    }
+  );
+
+  // 9. PUT /api/billing/projects/:id/finalise - Finalise project and lock ledger
+  fastify.put(
+    '/projects/:id/finalise',
+    async (
+      request: FastifyRequest<{
+        Params: { id: string };
+        Body: {
+          notes?: string;
+          performedBy?: string;
+        };
+      }>,
+      reply: FastifyReply
+    ) => {
+      const { id } = request.params;
+      const { notes = 'All vendor accounts and client milestone invoices settled', performedBy = 'Aditya Singhal (Super Admin)' } =
+        request.body || {};
+
+      try {
+        const condition = isUUID(id) ? eq(weddings.id, id) : eq(weddings.code, id);
+        const [w] = await db
+          .select({ id: weddings.id, code: weddings.code, status: weddings.status })
+          .from(weddings)
+          .where(condition)
+          .limit(1);
+
+        if (!w) {
+          reply.status(404);
+          return { success: false, message: `Project ${id} not found` };
+        }
+
+        const [updatedWedding] = await db
+          .update(weddings)
+          .set({
+            status: 'FINALISED_SETTLED',
+            updatedAt: new Date(),
+          })
+          .where(eq(weddings.id, w.id))
+          .returning();
+
+        // Write to audit changelog
+        await db.insert(billingChangeLogs).values({
+          weddingId: w.id,
+          action: 'PROJECT_FINALISED',
+          entityType: 'SETTLEMENT',
+          fromStatus: w.status,
+          toStatus: 'FINALISED_SETTLED',
+          performedBy,
+          notes: `Project ${w.code} signed off as FINALISED & SETTLED. ${notes}`,
+        });
+
+        return {
+          success: true,
+          message: `Project ${w.code} has been finalised and locked in the financial registry.`,
+          data: updatedWedding,
+        };
+      } catch (err: any) {
+        reply.status(500);
+        return { success: false, error: err.message };
+      }
+    }
+  );
+
+  // 10. GET /api/billing/projects/:id/changelog - Get live changelog audit trail
+  fastify.get('/projects/:id/changelog', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const { id } = request.params;
 
     try {
-      const wRes = await pool.query(
-        `UPDATE weddings 
-         SET status = 'FINALISED_SETTLED', updated_at = NOW()
-         WHERE id::text = $1 OR code = $1
-         RETURNING id, code, status`,
-        [id]
-      );
-
-      if (wRes.rows.length === 0) {
+      const condition = isUUID(id) ? eq(weddings.id, id) : eq(weddings.code, id);
+      const [w] = await db.select({ id: weddings.id }).from(weddings).where(condition).limit(1);
+      if (!w) {
         reply.status(404);
         return { success: false, message: `Project ${id} not found` };
       }
 
-      const weddingUuid = wRes.rows[0].id;
-
-      // Mark all vendor bills for this wedding as settled
-      await pool.query(
-        `UPDATE vendor_bills 
-         SET status = 'SETTLEMENT_CLEARED', balance_due = 0, settled_at = NOW()
-         WHERE wedding_id = $1`,
-        [weddingUuid]
-      );
-
-      // Mark all milestone invoices as paid
-      await pool.query(
-        `UPDATE client_invoices 
-         SET status = 'PAID', paid_amount = amount_due, paid_at = NOW()
-         WHERE wedding_id = $1`,
-        [weddingUuid]
-      );
+      const logs = await db
+        .select()
+        .from(billingChangeLogs)
+        .where(eq(billingChangeLogs.weddingId, w.id))
+        .orderBy(desc(billingChangeLogs.createdAt));
 
       return {
         success: true,
-        message: `Project ${wRes.rows[0].code} has been successfully finalised, audited and settled in PostgreSQL!`,
+        data: logs.map((l) => ({
+          ...l,
+          amountFormatted: l.amount ? formatInr(parseFloat(l.amount)) : undefined,
+          dateFormatted: l.createdAt ? new Date(l.createdAt).toLocaleString('en-IN') : undefined,
+        })),
       };
     } catch (err: any) {
       reply.status(500);
       return { success: false, error: err.message };
     }
   });
-
-  // PUT /api/billing/vendor-bills/:billId/reconcile - Two-Way Matching Reconciliation in PostgreSQL
-  fastify.put(
-    '/vendor-bills/:billId/reconcile',
-    async (request: FastifyRequest<{ Params: { billId: string } }>, reply: FastifyReply) => {
-      const { billId } = request.params;
-
-      try {
-        const res = await pool.query(
-          `UPDATE vendor_bills
-           SET status = 'RECONCILED_MATCHED'
-           WHERE id::text = $1
-           RETURNING id, agreed_base_amount, extra_charges_amount, total_payable, balance_due, status`,
-          [billId]
-        );
-
-        if (res.rows.length === 0) {
-          reply.status(404);
-          return { success: false, message: `Vendor bill ${billId} not found` };
-        }
-
-        return {
-          success: true,
-          message: 'Vendor bill two-way matched and verified with agreed RFQ base + extras',
-          bill: res.rows[0],
-        };
-      } catch (err: any) {
-        reply.status(500);
-        return { success: false, error: err.message };
-      }
-    }
-  );
-
-  // PUT /api/billing/invoices/:invoiceId/pay - Mark milestone invoice as paid in PostgreSQL
-  fastify.put(
-    '/invoices/:invoiceId/pay',
-    async (request: FastifyRequest<{ Params: { invoiceId: string } }>, reply: FastifyReply) => {
-      const { invoiceId } = request.params;
-
-      try {
-        const res = await pool.query(
-          `UPDATE client_invoices
-           SET status = 'PAID', paid_amount = amount_due, paid_at = NOW()
-           WHERE id::text = $1 OR invoice_number = $1
-           RETURNING id, invoice_number, stage_key, amount_due, status, paid_at`,
-          [invoiceId]
-        );
-
-        if (res.rows.length === 0) {
-          reply.status(404);
-          return { success: false, message: `Invoice ${invoiceId} not found` };
-        }
-
-        return {
-          success: true,
-          message: `Invoice ${res.rows[0].invoice_number} successfully marked as PAID in PostgreSQL`,
-          invoice: res.rows[0],
-        };
-      } catch (err: any) {
-        reply.status(500);
-        return { success: false, error: err.message };
-      }
-    }
-  );
 }

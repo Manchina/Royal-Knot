@@ -327,38 +327,25 @@ export const Dashboard: React.FC = () => {
           <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
             <button
               onClick={() => handleGlobalViewToggle('table')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${
-                globalViewMode === 'table'
-                  ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/80 font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${globalViewMode === 'table'
+                ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/80 font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+                }`}
             >
               <TableIcon className="w-3.5 h-3.5 text-[#714B67]" />
               <span>Table View</span>
             </button>
             <button
               onClick={() => handleGlobalViewToggle('chart')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${
-                globalViewMode === 'chart'
-                  ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/80 font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${globalViewMode === 'chart'
+                ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/80 font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+                }`}
             >
               <BarChart3 className="w-3.5 h-3.5 text-[#714B67]" />
               <span>Chart View</span>
             </button>
           </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchSeasonSummary}
-            disabled={loading}
-            className="text-xs gap-1.5 h-8 border-slate-300"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
 
           <Button
             variant="outline"
@@ -400,11 +387,10 @@ export const Dashboard: React.FC = () => {
 
                   <div className="flex items-center gap-1.5 text-xs pt-1 border-t border-slate-100">
                     <span
-                      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold border ${
-                        m.positive
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                          : 'bg-slate-100 text-slate-700 border-slate-300'
-                      }`}
+                      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold border ${m.positive
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                        : 'bg-slate-100 text-slate-700 border-slate-300'
+                        }`}
                     >
                       {m.positive ? (
                         <ArrowUpRight className="w-3 h-3 mr-0.5" />
@@ -474,18 +460,16 @@ export const Dashboard: React.FC = () => {
                 <button
                   onClick={() => setProfitViewMode('table')}
                   title="Table View"
-                  className={`p-1 rounded text-xs transition ${
-                    profitViewMode === 'table' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600'
-                  }`}
+                  className={`p-1 rounded text-xs transition ${profitViewMode === 'table' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600'
+                    }`}
                 >
                   <TableIcon className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={() => setProfitViewMode('chart')}
                   title="Chart View"
-                  className={`p-1 rounded text-xs transition ${
-                    profitViewMode === 'chart' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600'
-                  }`}
+                  className={`p-1 rounded text-xs transition ${profitViewMode === 'chart' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600'
+                    }`}
                 >
                   <BarChart3 className="w-3.5 h-3.5" />
                 </button>
@@ -552,8 +536,8 @@ export const Dashboard: React.FC = () => {
                             w.status === 'High Margin'
                               ? 'success'
                               : w.status === 'On Target'
-                              ? 'info'
-                              : 'warning'
+                                ? 'info'
+                                : 'warning'
                           }
                           className="text-[11px] font-semibold"
                         >
@@ -662,18 +646,16 @@ export const Dashboard: React.FC = () => {
                 <button
                   onClick={() => setCashFlowViewMode('table')}
                   title="Table View"
-                  className={`p-1 rounded text-xs transition ${
-                    cashFlowViewMode === 'table' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600'
-                  }`}
+                  className={`p-1 rounded text-xs transition ${cashFlowViewMode === 'table' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600'
+                    }`}
                 >
                   <TableIcon className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={() => setCashFlowViewMode('chart')}
                   title="Chart View"
-                  className={`p-1 rounded text-xs transition ${
-                    cashFlowViewMode === 'chart' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600'
-                  }`}
+                  className={`p-1 rounded text-xs transition ${cashFlowViewMode === 'chart' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600'
+                    }`}
                 >
                   <BarChart3 className="w-3.5 h-3.5" />
                 </button>
@@ -811,22 +793,20 @@ export const Dashboard: React.FC = () => {
               <div className="flex items-center bg-slate-200/70 p-0.5 rounded border border-slate-300">
                 <button
                   onClick={() => setVendorViewMode('table')}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition ${
-                    vendorViewMode === 'table'
-                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition ${vendorViewMode === 'table'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   <TableIcon className="w-3.5 h-3.5 text-[#714B67]" />
                   <span>Table View</span>
                 </button>
                 <button
                   onClick={() => setVendorViewMode('chart')}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition ${
-                    vendorViewMode === 'chart'
-                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition ${vendorViewMode === 'chart'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   <BarChart3 className="w-3.5 h-3.5 text-[#714B67]" />
                   <span>Chart View</span>
@@ -919,8 +899,8 @@ export const Dashboard: React.FC = () => {
                               v.reliability === 'High Reliability'
                                 ? 'success'
                                 : v.reliability === 'Satisfactory'
-                                ? 'info'
-                                : 'warning'
+                                  ? 'info'
+                                  : 'warning'
                             }
                             className="text-[11px] font-semibold"
                           >
