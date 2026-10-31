@@ -41,10 +41,13 @@ import {
 } from '../components/ui';
 import { useWeddingStore } from '../store/useWeddingStore';
 import { useBillingStore } from '../store/useBillingStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 export const Billing: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { user } = useAuthStore();
+  const isClient = user?.role === 'CLIENT';
   const { setSelectedWeddingId } = useWeddingStore();
   const { projects, summary, fetchBillingProjects } = useBillingStore();
 
@@ -170,88 +173,142 @@ export const Billing: React.FC = () => {
         <div className="space-y-0.5">
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Financial Registry & Commercial Operations
+              {isClient ? 'Client Financial Dossier' : 'Financial Registry & Commercial Operations'}
             </span>
             <span className="text-slate-300">•</span>
             <span className="text-[11px] font-mono font-bold text-[#714B67]">
-              Billing & Extras
+              {isClient ? 'My Wedding Invoices' : 'Billing & Extras'}
             </span>
           </div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            Billing & Vendor Settlements
+            {isClient ? 'My Wedding Invoices & Settlement' : 'Billing & Vendor Settlements'}
           </h1>
           <p className="text-xs text-slate-500 pt-0.5">
-            Contract revenue, winning RFQ vendor disbursements, audited extra charge overruns, and milestone accounts reconciliation.
+            {isClient
+              ? 'Track your project budget, milestone invoice schedules, banquet additions, and payment status.'
+              : 'Contract revenue, winning RFQ vendor disbursements, audited extra charge overruns, and milestone accounts reconciliation.'}
           </p>
         </div>
       </div>
 
       {/* 2. Executive KPI Cards Ribbon */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-slate-200 bg-white shadow-2xs">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Managed Budget</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1 font-mono tracking-tight">{summary.totalBudget}</p>
-              <div className="flex items-center gap-1.5 mt-1 text-[11px] text-slate-500">
-                <Building2 className="w-3 h-3 text-slate-400" />
-                <span>Across {projects.length} luxury weddings</span>
+      {isClient ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card className="border-slate-200 bg-white shadow-2xs">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Wedding Contract Budget</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1 font-mono tracking-tight">{summary.totalBudget}</p>
+                <div className="flex items-center gap-1.5 mt-1 text-[11px] text-slate-500">
+                  <Building2 className="w-3 h-3 text-slate-400" />
+                  <span>Fixed Celebration Agreement</span>
+                </div>
               </div>
-            </div>
-            <div className="w-10 h-10 rounded-lg bg-purple-50 text-[#714B67] flex items-center justify-center font-bold">
-              <DollarSign className="w-5 h-5" />
-            </div>
-          </CardContent>
-        </Card>
+              <div className="w-10 h-10 rounded-lg bg-purple-50 text-[#714B67] flex items-center justify-center font-bold">
+                <DollarSign className="w-5 h-5" />
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card className="border-slate-200 bg-white shadow-2xs">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Invoiced to Clients</p>
-              <p className="text-2xl font-bold text-emerald-700 mt-1 font-mono tracking-tight">{summary.totalInvoiced}</p>
-              <div className="flex items-center gap-1.5 mt-1 text-[11px] text-emerald-600 font-medium">
-                <Check className="w-3 h-3" />
-                <span>Milestones + Audited Extras</span>
+          <Card className="border-slate-200 bg-white shadow-2xs">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Invoiced Amount</p>
+                <p className="text-2xl font-bold text-emerald-700 mt-1 font-mono tracking-tight">{summary.totalInvoiced}</p>
+                <div className="flex items-center gap-1.5 mt-1 text-[11px] text-emerald-600 font-medium">
+                  <Check className="w-3 h-3" />
+                  <span>Contract Milestones + Extras</span>
+                </div>
               </div>
-            </div>
-            <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-              <Receipt className="w-5 h-5" />
-            </div>
-          </CardContent>
-        </Card>
+              <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                <Receipt className="w-5 h-5" />
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card className="border-slate-200 bg-white shadow-2xs">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Vendor Commitments</p>
-              <p className="text-2xl font-bold text-slate-900 mt-1 font-mono tracking-tight">{summary.totalVendorCommitments}</p>
-              <div className="flex items-center gap-1.5 mt-1 text-[11px] text-slate-500 font-medium">
-                <CreditCard className="w-3 h-3 text-slate-400" />
-                <span>Agreed POs & Sourced Bills</span>
+          <Card className="border-slate-200 bg-white shadow-2xs">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Payment Schedule</p>
+                <p className="text-lg font-bold text-blue-700 mt-1 font-mono tracking-tight">3 Milestones</p>
+                <div className="flex items-center gap-1.5 mt-1 text-[11px] text-slate-500 font-medium">
+                  <CreditCard className="w-3 h-3 text-slate-400" />
+                  <span>Deposit (20%) • Advance (50%) • Settlement</span>
+                </div>
               </div>
-            </div>
-            <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-              <CreditCard className="w-5 h-5" />
-            </div>
-          </CardContent>
-        </Card>
+              <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                <CreditCard className="w-5 h-5" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="border-slate-200 bg-white shadow-2xs">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Managed Budget</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1 font-mono tracking-tight">{summary.totalBudget}</p>
+                <div className="flex items-center gap-1.5 mt-1 text-[11px] text-slate-500">
+                  <Building2 className="w-3 h-3 text-slate-400" />
+                  <span>Across {projects.length} luxury weddings</span>
+                </div>
+              </div>
+              <div className="w-10 h-10 rounded-lg bg-purple-50 text-[#714B67] flex items-center justify-center font-bold">
+                <DollarSign className="w-5 h-5" />
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card className="border-slate-200 bg-white shadow-2xs">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Realized Gross Margin</p>
-              <p className="text-2xl font-bold text-purple-700 mt-1 font-mono tracking-tight">{summary.averageGrossMargin}</p>
-              <div className="flex items-center gap-1.5 mt-1 text-[11px] text-purple-600 font-medium">
-                <TrendingUp className="w-3 h-3" />
-                <span>Agency Spread & Markup</span>
+          <Card className="border-slate-200 bg-white shadow-2xs">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Invoiced to Clients</p>
+                <p className="text-2xl font-bold text-emerald-700 mt-1 font-mono tracking-tight">{summary.totalInvoiced}</p>
+                <div className="flex items-center gap-1.5 mt-1 text-[11px] text-emerald-600 font-medium">
+                  <Check className="w-3 h-3" />
+                  <span>Milestones + Audited Extras</span>
+                </div>
               </div>
-            </div>
-            <div className="w-10 h-10 rounded-lg bg-purple-50 text-[#714B67] flex items-center justify-center font-bold">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                <Receipt className="w-5 h-5" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200 bg-white shadow-2xs">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Vendor Commitments</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1 font-mono tracking-tight">{summary.totalVendorCommitments}</p>
+                <div className="flex items-center gap-1.5 mt-1 text-[11px] text-slate-500 font-medium">
+                  <CreditCard className="w-3 h-3 text-slate-400" />
+                  <span>Agreed POs & Sourced Bills</span>
+                </div>
+              </div>
+              <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                <CreditCard className="w-5 h-5" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200 bg-white shadow-2xs">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Realized Gross Margin</p>
+                <p className="text-2xl font-bold text-purple-700 mt-1 font-mono tracking-tight">{summary.averageGrossMargin}</p>
+                <div className="flex items-center gap-1.5 mt-1 text-[11px] text-purple-600 font-medium">
+                  <TrendingUp className="w-3 h-3" />
+                  <span>Agency Spread & Markup</span>
+                </div>
+              </div>
+              <div className="w-10 h-10 rounded-lg bg-purple-50 text-[#714B67] flex items-center justify-center font-bold">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* 3. Pipeline Stages Tabs with Live Counts (Matching Weddings.tsx & Enquiries.tsx) */}
       <div className="bg-white border border-slate-200 rounded p-1.5 shadow-2xs">
@@ -339,10 +396,19 @@ export const Billing: React.FC = () => {
                   <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">City & Venue</TableHead>
                   <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Budget (Base)</TableHead>
                   <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Invoiced Total</TableHead>
-                  <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Vendor Bills</TableHead>
-                  <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Vendor Balance</TableHead>
-                  <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Margin</TableHead>
-                  <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Status</TableHead>
+                  {!isClient ? (
+                    <>
+                      <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Vendor Bills</TableHead>
+                      <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Vendor Balance</TableHead>
+                      <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Margin</TableHead>
+                      <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Status</TableHead>
+                    </>
+                  ) : (
+                    <>
+                      <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3">Status</TableHead>
+                      <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider py-3 text-right">Invoices</TableHead>
+                    </>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -399,28 +465,43 @@ export const Billing: React.FC = () => {
                         )}
                       </TableCell>
 
-                      <TableCell className="py-3.5">
-                        <div className="font-mono text-xs font-medium text-slate-800">{project.vendorCommitments}</div>
-                        <div className="text-[10px] text-slate-500">{project.billsCount} vendor bills</div>
-                      </TableCell>
+                      {!isClient ? (
+                        <>
+                          <TableCell className="py-3.5">
+                            <div className="font-mono text-xs font-medium text-slate-800">{project.vendorCommitments}</div>
+                            <div className="text-[10px] text-slate-500">{project.billsCount} vendor bills</div>
+                          </TableCell>
 
-                      <TableCell className="py-3.5">
-                        <span className={`font-mono text-xs font-bold ${project.rawVendorBalanceDue === 0 ? 'text-emerald-600' : 'text-slate-800'
-                          }`}>
-                          {project.vendorBalanceDue}
-                        </span>
-                      </TableCell>
+                          <TableCell className="py-3.5">
+                            <span className={`font-mono text-xs font-bold ${project.rawVendorBalanceDue === 0 ? 'text-emerald-600' : 'text-slate-800'}`}>
+                              {project.vendorBalanceDue}
+                            </span>
+                          </TableCell>
 
-                      <TableCell className="py-3.5">
-                        <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-purple-50 text-[#714B67] border border-purple-200/50">
-                          {project.grossMargin}
-                        </span>
-                      </TableCell>
+                          <TableCell className="py-3.5">
+                            <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-purple-50 text-[#714B67] border border-purple-200/50">
+                              {project.grossMargin}
+                            </span>
+                          </TableCell>
 
-                      <TableCell className="py-3.5">
-                        {renderStatusBadge(project.status)}
-                      </TableCell>
+                          <TableCell className="py-3.5">
+                            {renderStatusBadge(project.status)}
+                          </TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell className="py-3.5">
+                            {renderStatusBadge(project.status)}
+                          </TableCell>
 
+                          <TableCell className="py-3.5 text-right">
+                            <span className="inline-flex items-center text-xs font-semibold text-[#714B67] group-hover:underline">
+                              View Invoices
+                              <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                            </span>
+                          </TableCell>
+                        </>
+                      )}
                     </TableRow>
                   ))
                 )}
@@ -469,23 +550,40 @@ export const Billing: React.FC = () => {
                   <span className="font-mono font-bold text-slate-800">{project.budget}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Client Invoiced:</span>
+                  <span className="text-slate-500">Total Invoiced:</span>
                   <span className="font-mono font-bold text-emerald-700">{project.totalInvoiced}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Vendor Commitments:</span>
-                  <span className="font-mono font-semibold text-slate-800">{project.vendorCommitments}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Outstanding Balance:</span>
-                  <span className="font-mono font-bold text-slate-900">{project.vendorBalanceDue}</span>
-                </div>
-                <div className="flex justify-between items-center pt-1 border-t border-slate-100">
-                  <span className="text-slate-500">Gross Margin:</span>
-                  <span className="font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
-                    {project.grossMargin}
-                  </span>
-                </div>
+                {!isClient ? (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">Vendor Commitments:</span>
+                      <span className="font-mono font-semibold text-slate-800">{project.vendorCommitments}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">Outstanding Balance:</span>
+                      <span className="font-mono font-bold text-slate-900">{project.vendorBalanceDue}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-1 border-t border-slate-100">
+                      <span className="text-slate-500">Gross Margin:</span>
+                      <span className="font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
+                        {project.grossMargin}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">Audited Extras:</span>
+                      <span className="font-mono font-semibold text-amber-700">{project.totalExtras || 'None'}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-1 border-t border-slate-100">
+                      <span className="text-slate-500">Milestone Invoices:</span>
+                      <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                        3 Milestone Tranches
+                      </span>
+                    </div>
+                  </>
+                )}
               </CardContent>
 
               <CardFooter className="p-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-xs">

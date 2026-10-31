@@ -131,10 +131,10 @@ export const Layout: React.FC = () => {
       badge: 'Live'
     },
     {
-      name: 'Billing & Extras',
+      name: activeRole === 'CLIENT' ? 'My Wedding Invoices' : 'Billing & Extras',
       path: '/billing',
       icon: CreditCard,
-      roles: ['SUPER_ADMIN', 'FINANCE_MANAGER', 'FOUNDER']
+      roles: ['SUPER_ADMIN', 'FINANCE_MANAGER', 'FOUNDER', 'LEAD_PLANNER', 'CLIENT']
     },
   ];
 

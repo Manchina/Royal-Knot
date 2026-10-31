@@ -6,29 +6,34 @@ import type { LiveExtraCharge } from './types';
 interface ExtraChargesTabProps {
   extraCharges: LiveExtraCharge[];
   onOpenAddExtra: () => void;
+  isClient?: boolean;
 }
 
-export const ExtraChargesTab: React.FC<ExtraChargesTabProps> = ({ extraCharges, onOpenAddExtra }) => {
+export const ExtraChargesTab: React.FC<ExtraChargesTabProps> = ({ extraCharges, onOpenAddExtra, isClient = false }) => {
   return (
     <Card className="border-slate-200 shadow-2xs overflow-hidden">
       <CardHeader className="p-4 bg-slate-50/70 border-b border-slate-200 flex flex-row items-center justify-between">
         <div>
           <CardTitle className="text-sm font-bold text-slate-900">
-            Audited Extra Charges & Change Requests
+            {isClient ? 'Audited Event Additions & Extra Plates' : 'Audited Extra Charges & Change Requests'}
           </CardTitle>
           <p className="text-xs text-slate-500 mt-0.5">
-            Overruns (e.g. 60 Banquet covers @ ₹2,100, DJ 2.5 hr overtime) audited and attached to final client billing.
+            {isClient
+              ? 'Authorized event day overruns (e.g. extra guest covers, extended hours) itemized for settlement.'
+              : 'Overruns (e.g. 60 Banquet covers @ ₹2,100, DJ 2.5 hr overtime) audited and attached to final client billing.'}
           </p>
         </div>
 
-        <Button
-          size="sm"
-          onClick={onOpenAddExtra}
-          className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-2xs cursor-pointer"
-        >
-          <Plus className="w-3.5 h-3.5 mr-1" />
-          Add Extra Charge
-        </Button>
+        {!isClient && (
+          <Button
+            size="sm"
+            onClick={onOpenAddExtra}
+            className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-2xs cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            Add Extra Charge
+          </Button>
+        )}
       </CardHeader>
 
       <div className="overflow-x-auto">
