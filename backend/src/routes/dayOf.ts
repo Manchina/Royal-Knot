@@ -7,20 +7,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 async function resolveWeddingId(weddingIdOrCode?: string): Promise<string | null> {
   if (!weddingIdOrCode || weddingIdOrCode === 'ALL') {
-    const defaultWedding = await db
-      .select({ id: weddings.id })
-      .from(weddings)
-      .where(eq(weddings.code, 'RW-2026-001'))
-      .limit(1);
-
-    if (defaultWedding.length) return defaultWedding[0].id;
-
-    const anyWedding = await db
-      .select({ id: weddings.id })
-      .from(weddings)
-      .limit(1);
-
-    return anyWedding.length ? anyWedding[0].id : null;
+    return null;
   }
 
   const trimmed = weddingIdOrCode.trim();

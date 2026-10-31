@@ -104,7 +104,7 @@ export const useWeddingStore = create<WeddingState>((set, get) => ({
     status: w.status,
     label: `${w.code}: ${w.couple} (${w.city} • ${w.guestCount} Guests)`,
   })),
-  selectedWeddingId: 'RW-2026-001',
+  selectedWeddingId: '',
   loading: false,
   isLoading: false,
   error: null,
@@ -119,7 +119,7 @@ export const useWeddingStore = create<WeddingState>((set, get) => ({
 
   getSelectedWedding: () => {
     const { weddings, selectedWeddingId } = get();
-    if (selectedWeddingId === 'ALL') return undefined;
+    if (!selectedWeddingId || selectedWeddingId === 'ALL') return undefined;
     return weddings.find((w) =>
       isUUID(selectedWeddingId)
         ? w.id === selectedWeddingId || w.uuid === selectedWeddingId
@@ -183,8 +183,8 @@ export const useWeddingStore = create<WeddingState>((set, get) => ({
             ? w.id === currentSelected || w.uuid === currentSelected
             : w.code === currentSelected || w.id === currentSelected
         );
-        if (!exists && liveWeddings.length > 0) {
-          set({ selectedWeddingId: liveWeddings[0].id });
+        if (currentSelected && !exists) {
+          set({ selectedWeddingId: '' });
         }
 
         return liveWeddings;

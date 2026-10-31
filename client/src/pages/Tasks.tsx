@@ -86,9 +86,7 @@ export const Tasks: React.FC = () => {
   // Modal State for adding Day-Of Wedding Task (accepts time instead of date)
   const [dayOfModalOpen, setDayOfModalOpen] = useState<boolean>(false);
   const [dayOfType, setDayOfType] = useState<'MINUTE_TO_MINUTE' | 'VENDOR_TELEMETRY'>('MINUTE_TO_MINUTE');
-  const [dayOfTaskWeddingId, setDayOfTaskWeddingId] = useState<string>(
-    selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'
-  );
+  const [dayOfTaskWeddingId, setDayOfTaskWeddingId] = useState<string>('');
   const [dayOfTitle, setDayOfTitle] = useState('');
   const [dayOfTime, setDayOfTime] = useState('14:30');
   const [dayOfOwner, setDayOfOwner] = useState('Karan Verma');
@@ -97,9 +95,7 @@ export const Tasks: React.FC = () => {
   const [dayOfGate, setDayOfGate] = useState('Palace North Service Gate');
   const [dayOfRemarks, setDayOfRemarks] = useState('');
   const [dayOfIsMilestone, setDayOfIsMilestone] = useState(false);
-  const [newTaskWeddingId, setNewTaskWeddingId] = useState<string>(
-    selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'
-  );
+  const [newTaskWeddingId, setNewTaskWeddingId] = useState<string>('');
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState<string>('VENUE');
   const [newOwner, setNewOwner] = useState('Devika Sharma');
@@ -349,6 +345,10 @@ export const Tasks: React.FC = () => {
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
+    if (!newTaskWeddingId) {
+      alert('Please select a wedding project.');
+      return;
+    }
 
     createMutation.mutate({
       weddingId: newTaskWeddingId,
@@ -387,7 +387,7 @@ export const Tasks: React.FC = () => {
             variant="default"
             size="sm"
             onClick={() => {
-              setNewTaskWeddingId(selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001');
+              setNewTaskWeddingId(selectedWeddingId || '');
               createMutation.reset();
               setModalOpen(true);
             }}
@@ -401,7 +401,7 @@ export const Tasks: React.FC = () => {
             variant="secondary"
             size="sm"
             onClick={() => {
-              setDayOfTaskWeddingId(selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001');
+              setDayOfTaskWeddingId(selectedWeddingId || '');
               createDayOfTaskMutation.reset();
               setDayOfModalOpen(true);
             }}
@@ -456,17 +456,15 @@ export const Tasks: React.FC = () => {
                 Project:
               </span>
               <select
-                value={selectedWeddingId}
+                value={selectedWeddingId || ''}
                 onChange={(e) => {
                   setSelectedWeddingId(e.target.value);
-                  if (e.target.value !== 'ALL') {
-                    setNewTaskWeddingId(e.target.value);
-                  }
+                  setNewTaskWeddingId(e.target.value);
                 }}
                 className="h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 hover:border-slate-400 focus:outline-none focus:ring-1 focus:ring-[#714B67] cursor-pointer max-w-[240px] truncate shadow-2xs"
                 title="Filter by Wedding Project"
               >
-                <option value="ALL">All Weddings (Agency View)</option>
+                <option value="">-- Select a Wedding Project --</option>
                 {weddings.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.code}: {w.couple}
@@ -847,6 +845,7 @@ export const Tasks: React.FC = () => {
                 onChange={(e) => setNewTaskWeddingId(e.target.value)}
                 className="w-full h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
               >
+                <option value="">-- Select a Wedding Project --</option>
                 {weddings.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.code}: {w.couple} ({w.city})
@@ -961,11 +960,15 @@ export const Tasks: React.FC = () => {
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              if (!dayOfTaskWeddingId) {
+                alert('Please select a wedding project.');
+                return;
+              }
               if (dayOfType === 'MINUTE_TO_MINUTE') {
                 if (!dayOfTitle.trim()) return;
                 createDayOfTaskMutation.mutate({
                   type: 'MINUTE_TO_MINUTE',
-                  weddingId: dayOfTaskWeddingId || (selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'),
+                  weddingId: dayOfTaskWeddingId || selectedWeddingId,
                   title: dayOfTitle.trim(),
                   time: dayOfTime,
                   ownerName: dayOfOwner.trim(),
@@ -975,7 +978,7 @@ export const Tasks: React.FC = () => {
               } else {
                 createDayOfTaskMutation.mutate({
                   type: 'VENDOR_TELEMETRY',
-                  weddingId: dayOfTaskWeddingId || (selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'),
+                  weddingId: dayOfTaskWeddingId || selectedWeddingId,
                   title: '',
                   vendorId: dayOfVendorId || (registeredVendors[0]?.id || ''),
                   time: dayOfTime,
@@ -1066,8 +1069,10 @@ export const Tasks: React.FC = () => {
                 id="dayof_wedding"
                 value={dayOfTaskWeddingId}
                 onChange={(e) => setDayOfTaskWeddingId(e.target.value)}
+                required
                 className="w-full h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
               >
+                <option value="">-- Select a Wedding Project --</option>
                 {weddings.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.code}: {w.couple} ({w.city})
