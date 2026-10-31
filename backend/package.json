@@ -15,6 +15,7 @@
     "@fastify/jwt": "^10.0.0",
     "@fastify/postgres": "^6.0.3",
     "dotenv": "^16.4.7",
+    "drizzle-orm": "^0.45.4",
     "fastify": "^5.2.1",
     "pg": "^8.13.3",
     "royal-knot-root": "file:.."

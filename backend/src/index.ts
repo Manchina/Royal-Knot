@@ -4,6 +4,7 @@ import fastifyJwt from '@fastify/jwt';
 import dotenv from 'dotenv';
 import { checkDatabaseConnection, pool } from './db';
 import { authRoutes } from './routes/auth';
+import { enquiryRoutes } from './routes/enquiries';
 
 dotenv.config();
 
@@ -75,6 +76,9 @@ async function buildServer() {
 
   // Mount Auth Routes under /api/auth
   await fastify.register(authRoutes, { prefix: '/api/auth' });
+
+  // Mount Enquiry & Lead Capture Routes under /api/enquiries
+  await fastify.register(enquiryRoutes, { prefix: '/api/enquiries' });
 
   return fastify;
 }
