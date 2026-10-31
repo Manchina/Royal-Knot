@@ -9,6 +9,7 @@ import { billingRoutes } from './routes/billing';
 import { analyticsRoutes } from './routes/analytics';
 import { tasksRoutes } from './routes/tasks';
 import { weddingsRoutes } from './routes/weddings';
+import { dayOfRoutes } from './routes/dayOf';
 
 dotenv.config();
 
@@ -108,6 +109,9 @@ async function buildServer() {
 
   // Mount Weddings Portfolio Routes under /api/weddings
   await fastify.register(weddingsRoutes, { prefix: '/api/weddings' });
+
+  // Mount Day-of Live Execution & Operations Routes under /api/day-of
+  await fastify.register(dayOfRoutes, { prefix: '/api/day-of' });
 
   // Mount Founder Analytics & Season P&L Routes under /api/analytics
   await fastify.register(analyticsRoutes, { prefix: '/api/analytics' });
