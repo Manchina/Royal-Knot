@@ -356,55 +356,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
         </div>
       </div>
 
-      {/* Operational KPI Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {metrics.length === 0 && loading ? (
-          <div className="col-span-4 p-8 text-center text-slate-500 bg-white border border-slate-200 rounded">
-            <RefreshCw className="w-5 h-5 animate-spin mx-auto text-slate-400 mb-2" />
-            Loading real financial metrics from PostgreSQL...
-          </div>
-        ) : (
-          metrics.map((m, i) => {
-            const Icon = m.icon || TrendingUp;
-            return (
-              <Card key={i} className="border border-slate-200 shadow-2xs rounded bg-white">
-                <CardContent className="p-3.5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                      {m.label}
-                    </span>
-                    <div className="p-1 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                      <Icon className="w-3.5 h-3.5" />
-                    </div>
-                  </div>
 
-                  <div className="text-2xl font-bold font-mono text-slate-900 tracking-tight">
-                    {m.value}
-                  </div>
-
-                  <div className="flex items-center gap-1.5 text-xs pt-1 border-t border-slate-100">
-                    <span
-                      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold border ${
-                        m.positive
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                          : 'bg-slate-100 text-slate-700 border-slate-300'
-                      }`}
-                    >
-                      {m.positive ? (
-                        <ArrowUpRight className="w-3 h-3 mr-0.5" />
-                      ) : (
-                        <ArrowDownRight className="w-3 h-3 mr-0.5" />
-                      )}
-                      {m.change}
-                    </span>
-                    <span className="text-slate-500 text-[11px] truncate">{m.sub}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })
-        )}
-      </div>
 
       {/* SECTION 1: Wedding-by-Wedding Profitability Matrix (Read-Only) */}
       <Card className="border border-slate-200 shadow-2xs rounded bg-white">
@@ -551,8 +503,8 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                             w.status === 'High Margin'
                               ? 'success'
                               : w.status === 'On Target'
-                              ? 'info'
-                              : 'warning'
+                                ? 'info'
+                                : 'warning'
                           }
                           className="text-[11px] font-semibold"
                         >
@@ -631,6 +583,54 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
         </CardContent>
       </Card>
 
+      {/* Operational KPI Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {metrics.length === 0 && loading ? (
+          <div className="col-span-4 p-8 text-center text-slate-500 bg-white border border-slate-200 rounded">
+            <RefreshCw className="w-5 h-5 animate-spin mx-auto text-slate-400 mb-2" />
+            Loading real financial metrics from PostgreSQL...
+          </div>
+        ) : (
+          metrics.map((m, i) => {
+            const Icon = m.icon || TrendingUp;
+            return (
+              <Card key={i} className="border border-slate-200 shadow-2xs rounded bg-white">
+                <CardContent className="p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      {m.label}
+                    </span>
+                    <div className="p-1 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                      <Icon className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+
+                  <div className="text-2xl font-bold font-mono text-slate-900 tracking-tight">
+                    {m.value}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 text-xs pt-1 border-t border-slate-100">
+                    <span
+                      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold border ${m.positive
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                        : 'bg-slate-100 text-slate-700 border-slate-300'
+                        }`}
+                    >
+                      {m.positive ? (
+                        <ArrowUpRight className="w-3 h-3 mr-0.5" />
+                      ) : (
+                        <ArrowDownRight className="w-3 h-3 mr-0.5" />
+                      )}
+                      {m.change}
+                    </span>
+                    <span className="text-slate-500 text-[11px] truncate">{m.sub}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
+      </div>
       {/* SECTION 2: Cash Flow Forecast */}
       <Card className="border border-slate-200 shadow-2xs rounded bg-white">
         <CardHeader className="p-3.5 border-b border-slate-200 bg-slate-50/70">
@@ -649,18 +649,16 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                 <button
                   onClick={() => setCashFlowViewMode('table')}
                   title="Table View"
-                  className={`p-1 rounded text-xs transition ${
-                    cashFlowViewMode === 'table' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600'
-                  }`}
+                  className={`p-1 rounded text-xs transition ${cashFlowViewMode === 'table' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600'
+                    }`}
                 >
                   <TableIcon className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={() => setCashFlowViewMode('chart')}
                   title="Chart View"
-                  className={`p-1 rounded text-xs transition ${
-                    cashFlowViewMode === 'chart' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600'
-                  }`}
+                  className={`p-1 rounded text-xs transition ${cashFlowViewMode === 'chart' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600'
+                    }`}
                 >
                   <BarChart3 className="w-3.5 h-3.5" />
                 </button>
@@ -794,22 +792,20 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
               <div className="flex items-center bg-slate-200/70 p-0.5 rounded border border-slate-300">
                 <button
                   onClick={() => setVendorViewMode('table')}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition ${
-                    vendorViewMode === 'table'
-                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition ${vendorViewMode === 'table'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   <TableIcon className="w-3.5 h-3.5 text-[#714B67]" />
                   <span>Table View</span>
                 </button>
                 <button
                   onClick={() => setVendorViewMode('chart')}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition ${
-                    vendorViewMode === 'chart'
-                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition ${vendorViewMode === 'chart'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   <BarChart3 className="w-3.5 h-3.5 text-[#714B67]" />
                   <span>Chart View</span>
@@ -900,8 +896,8 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                               v.reliability === 'High Reliability'
                                 ? 'success'
                                 : v.reliability === 'Satisfactory'
-                                ? 'info'
-                                : 'warning'
+                                  ? 'info'
+                                  : 'warning'
                             }
                             className="text-[11px] font-semibold"
                           >
