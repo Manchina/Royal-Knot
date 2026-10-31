@@ -1,12 +1,31 @@
 import { useState } from 'react';
 import { 
   Check, 
-  X, 
-  CheckCircle2
+  CheckCircle2, 
+  Star
 } from 'lucide-react';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardFooter,
+  Button,
+  Badge,
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from '../components/ui';
 
 export const Procurement: React.FC = () => {
   const [selectedWinner, setSelectedWinner] = useState<string | null>('CAT-02');
+  const [activeCategory, setActiveCategory] = useState<string>('catering');
 
   const quotes = [
     {
@@ -17,9 +36,9 @@ export const Procurement: React.FC = () => {
       pricePerPlate: '₹2,250',
       totalCost400: '₹9,00,000',
       overtimeRate: '₹15,000 / hr',
+      staffCount: '140 Banquet Staff',
       menuHighlights: 'Dal Baati Churma, Ker Sangri, Laal Maas, Live Jalebi & Rabri counters, 12 Welcome Drinks',
       inclusions: '140 uniformed banquet staff, copper royal chafing dishes, mineral water jars, waste management',
-      status: selectedWinner === 'CAT-01' ? 'AWARDED_WINNER' : selectedWinner ? 'AUTO_REJECTED' : 'PENDING',
     },
     {
       id: 'CAT-02',
@@ -29,9 +48,9 @@ export const Procurement: React.FC = () => {
       pricePerPlate: '₹2,100',
       totalCost400: '₹8,40,000',
       overtimeRate: '₹12,000 / hr',
+      staffCount: '120 Banquet Staff',
       menuHighlights: 'Royal Rajputana Thali, Smoked Chaat Island, Wood-fired Italian pizza bar, 18 Artisanal desserts',
       inclusions: 'Complete glassware, bone china crockery, dedicated bride/groom food butler, welcome detox mocktails',
-      status: selectedWinner === 'CAT-02' ? 'AWARDED_WINNER' : selectedWinner ? 'AUTO_REJECTED' : 'PENDING',
     },
     {
       id: 'CAT-03',
@@ -41,117 +60,206 @@ export const Procurement: React.FC = () => {
       pricePerPlate: '₹1,950',
       totalCost400: '₹7,80,000',
       overtimeRate: '₹18,000 / hr',
+      staffCount: '90 Banquet Staff',
       menuHighlights: 'Traditional Marwari buffet, live tandoor corner, sweet counter with 6 varieties',
       inclusions: 'Standard buffet setup, 90 staff, basic paper napkins and standard cutlery',
-      status: selectedWinner === 'CAT-03' ? 'AWARDED_WINNER' : selectedWinner ? 'AUTO_REJECTED' : 'PENDING',
     },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* Odoo Control Panel */}
+      <div className="bg-white border border-slate-200 rounded p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-[#222222]">Vendor Quote Comparison</h1>
-          <p className="text-xs md:text-sm text-neutral-500 mt-0.5">
-            Side-by-side caterer comparison by price per plate, menu, and overtime terms.
-          </p>
+          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            Vendor Sourcing & RFQ
+          </div>
+          <h1 className="text-lg font-bold text-slate-900 tracking-tight">
+            Vendor Quote Comparison & Award
+          </h1>
         </div>
 
-        <div className="px-3 py-1.5 bg-neutral-100 rounded-xl text-xs font-medium text-neutral-700">
-          RFQ: <strong>Singhania-Mehra Wedding (400 Guests)</strong>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-xs font-mono font-bold py-1 px-2.5">
+            RFQ: Singhania-Mehra (400 Guests)
+          </Badge>
         </div>
       </div>
 
-      {/* Comparison Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      {/* Odoo Category Tabs */}
+      <Tabs value={activeCategory} onValueChange={setActiveCategory} className="w-full">
+        <TabsList className="h-8 bg-slate-100 border border-slate-200">
+          <TabsTrigger value="catering" className="text-xs px-3 font-semibold">
+            Catering & Banquets (3 Quotes)
+          </TabsTrigger>
+          <TabsTrigger value="decor" className="text-xs px-3 font-semibold">
+            Decor & Mandap (Locked)
+          </TabsTrigger>
+          <TabsTrigger value="sound" className="text-xs px-3 font-semibold">
+            DJ & Truss Lights (Locked)
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {/* Side-by-Side Quote Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {quotes.map((q) => {
-          const isWinner = q.status === 'AWARDED_WINNER';
-          const isRejected = q.status === 'AUTO_REJECTED';
+          const isWinner = selectedWinner === q.id;
+          const isRejected = selectedWinner !== null && !isWinner;
 
           return (
-            <div
+            <Card
               key={q.id}
-              className={`bg-white rounded-2xl border transition-all p-5 flex flex-col justify-between relative ${
-                isWinner 
-                  ? 'border-emerald-500 shadow-md ring-2 ring-emerald-500/20' 
+              className={`relative flex flex-col justify-between border rounded bg-white shadow-2xs transition-all ${
+                isWinner
+                  ? 'border-emerald-600 ring-1 ring-emerald-600'
                   : isRejected
-                  ? 'border-neutral-200 opacity-60 bg-neutral-50/50'
-                  : 'border-neutral-200 shadow-sm hover:shadow-md'
+                  ? 'border-slate-200 opacity-60 bg-slate-50'
+                  : 'border-slate-200 hover:border-slate-300'
               }`}
             >
-              {isWinner && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-[11px] font-bold px-3 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
-                  <CheckCircle2 className="w-3 h-3" /> Awarded Vendor
-                </div>
-              )}
-
-              {isRejected && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-neutral-400 text-white text-[11px] font-bold px-3 py-0.5 rounded-full flex items-center gap-1">
-                  <X className="w-3 h-3" /> Auto-Closed
-                </div>
-              )}
-
-              <div className="space-y-4">
-                <div className="pt-2">
-                  <div className="flex items-center justify-between text-xs text-neutral-400 font-mono">
-                    <span>{q.id}</span>
-                    <span>{q.city} &bull; ★ {q.rating}</span>
-                  </div>
-                  <h3 className="font-bold text-base text-[#222222] mt-1">{q.vendor}</h3>
-                </div>
-
-                <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-100">
-                  <div className="text-xs text-neutral-500 font-medium">Price Per Plate</div>
-                  <div className="text-2xl font-bold text-[#FF385C] mt-0.5">{q.pricePerPlate}</div>
-                  <div className="text-[11px] text-neutral-500 mt-1">
-                    Total for 400 guests: <strong className="text-neutral-800">{q.totalCost400}</strong>
+              <CardHeader className="p-4 pb-2 border-b border-slate-100 bg-slate-50/50">
+                <div className="flex items-center justify-between text-xs text-slate-500 font-mono">
+                  <span className="font-bold">{q.id}</span>
+                  <div className="flex items-center gap-1 font-bold text-slate-700">
+                    <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-600" />
+                    <span>{q.rating}</span>
+                    <span className="text-slate-500 font-normal">({q.city})</span>
                   </div>
                 </div>
-
-                <div className="space-y-2.5 text-xs">
-                  <div>
-                    <span className="font-semibold text-neutral-700">Overtime Fee:</span>
-                    <span className="text-neutral-600 ml-1.5">{q.overtimeRate}</span>
-                  </div>
-
-                  <div>
-                    <span className="font-semibold text-neutral-700">Menu Highlights:</span>
-                    <p className="text-neutral-600 mt-0.5 leading-relaxed bg-neutral-50/50 p-2 rounded-lg border border-neutral-100">
-                      {q.menuHighlights}
-                    </p>
-                  </div>
-
-                  <div>
-                    <span className="font-semibold text-neutral-700">Inclusions:</span>
-                    <p className="text-neutral-600 mt-0.5 leading-relaxed">
-                      {q.inclusions}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-6 pt-4 border-t border-neutral-100">
-                {isWinner ? (
-                  <button
-                    onClick={() => setSelectedWinner(null)}
-                    className="w-full py-2.5 bg-emerald-50 text-emerald-700 font-semibold text-xs rounded-xl border border-emerald-200 hover:bg-emerald-100 transition flex items-center justify-center gap-1.5"
-                  >
-                    <Check className="w-4 h-4" /> Selected Caterer
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setSelectedWinner(q.id)}
-                    className="w-full py-2.5 bg-neutral-900 text-white font-semibold text-xs rounded-xl hover:bg-black transition"
-                  >
-                    Select as Winner
-                  </button>
+                <CardTitle className="text-sm font-bold text-slate-900 pt-1">
+                  {q.vendor}
+                </CardTitle>
+                {isWinner && (
+                  <Badge variant="success" className="text-[10px] w-fit mt-1">
+                    <CheckCircle2 className="w-3 h-3 mr-1" /> Awarded Contract
+                  </Badge>
                 )}
-              </div>
-            </div>
+                {isRejected && (
+                  <Badge variant="secondary" className="text-[10px] w-fit mt-1">
+                    Auto-Closed
+                  </Badge>
+                )}
+              </CardHeader>
+
+              <CardContent className="p-4 space-y-3">
+                {/* Financial Rates */}
+                <div className="p-3 rounded bg-slate-50 border border-slate-200 space-y-1.5 text-xs">
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-slate-500">Price per Plate:</span>
+                    <span className="text-sm font-bold font-mono text-slate-900">{q.pricePerPlate}</span>
+                  </div>
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-slate-500">Total (400 Pax):</span>
+                    <span className="font-semibold font-mono text-slate-800">{q.totalCost400}</span>
+                  </div>
+                  <div className="flex justify-between items-baseline pt-1 border-t border-slate-200 text-[11px]">
+                    <span className="text-slate-500">Overtime Rate:</span>
+                    <span className="font-mono text-slate-700 font-medium">{q.overtimeRate}</span>
+                  </div>
+                </div>
+
+                {/* Details */}
+                <div className="space-y-2 text-xs">
+                  <div>
+                    <span className="font-bold text-slate-700 text-[11px] uppercase tracking-wider block">
+                      Banquet Staffing:
+                    </span>
+                    <p className="text-slate-600">{q.staffCount}</p>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-700 text-[11px] uppercase tracking-wider block">
+                      Menu Coverage:
+                    </span>
+                    <p className="text-slate-600 text-[11px] leading-relaxed">{q.menuHighlights}</p>
+                  </div>
+                </div>
+              </CardContent>
+
+              <CardFooter className="p-3 bg-slate-50/80 border-t border-slate-200">
+                {isWinner ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs font-bold text-emerald-800 border-emerald-300 bg-emerald-50"
+                  >
+                    <Check className="w-3.5 h-3.5 mr-1" />
+                    Contract Executed
+                  </Button>
+                ) : (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setSelectedWinner(q.id)}
+                    className="w-full text-xs"
+                  >
+                    Award Contract
+                  </Button>
+                )}
+              </CardFooter>
+            </Card>
           );
         })}
       </div>
+
+      {/* Feature Comparison Table */}
+      <Card className="border border-slate-200 shadow-2xs rounded bg-white">
+        <CardHeader className="p-3.5 border-b border-slate-200 bg-slate-50/70">
+          <CardTitle className="text-sm font-bold text-slate-900">
+            RFQ Specifications Comparison
+          </CardTitle>
+          <div className="text-xs text-slate-500">
+            Head-to-head parameter analysis
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-slate-100/80 border-b border-slate-200">
+              <TableRow>
+                <TableHead className="w-1/4 font-bold text-slate-700 text-xs">Specification</TableHead>
+                {quotes.map((q) => (
+                  <TableHead key={q.id} className="w-1/4 font-bold text-slate-700 text-xs">
+                    <div>{q.vendor}</div>
+                    <div className="text-[10px] text-slate-500 font-mono font-normal">{q.id}</div>
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-slate-100">
+              <TableRow>
+                <TableCell className="font-medium text-xs text-slate-700">Base Plate Rate</TableCell>
+                {quotes.map((q) => (
+                  <TableCell key={q.id} className="font-mono font-bold text-xs text-slate-900">
+                    {q.pricePerPlate}
+                  </TableCell>
+                ))}
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium text-xs text-slate-700">Contract Total (400 Pax)</TableCell>
+                {quotes.map((q) => (
+                  <TableCell key={q.id} className="font-mono font-semibold text-xs text-slate-900">
+                    {q.totalCost400}
+                  </TableCell>
+                ))}
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium text-xs text-slate-700">Overtime Penalty Rate</TableCell>
+                {quotes.map((q) => (
+                  <TableCell key={q.id} className="font-mono text-xs text-slate-600">
+                    {q.overtimeRate}
+                  </TableCell>
+                ))}
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium text-xs text-slate-700">Dedicated Butler</TableCell>
+                <TableCell className="text-xs text-slate-500">On request (+₹5,000)</TableCell>
+                <TableCell className="text-xs text-emerald-800 font-bold">Included in Base</TableCell>
+                <TableCell className="text-xs text-slate-400">Not provided</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 };

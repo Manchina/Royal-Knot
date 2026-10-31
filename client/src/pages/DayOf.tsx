@@ -1,15 +1,71 @@
 import { useState } from 'react';
 import { 
-  AlertTriangle, 
   CheckCircle2, 
   MapPin, 
   User, 
-  PhoneCall, 
-  Flame
+  Clock
 } from 'lucide-react';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Button,
+  Badge,
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  Input,
+  Label,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '../components/ui';
+
+interface Incident {
+  id: string;
+  title: string;
+  severity: 'HIGH' | 'MEDIUM' | 'LOW';
+  assignedTo: string;
+  status: 'INVESTIGATING' | 'RESOLVED';
+  time: string;
+}
+
+interface ScheduleItem {
+  time: string;
+  event: string;
+  venue: string;
+  owner: string;
+  status: 'COMPLETED' | 'IN_PROGRESS' | 'UPCOMING';
+}
+
+interface VendorCheckin {
+  vendor: string;
+  category: string;
+  scheduled: string;
+  actual: string;
+  status: 'ARRIVED_ON_TIME' | 'RUNNING_LATE';
+  delay: number;
+}
 
 export const DayOf: React.FC = () => {
-  const [incidents] = useState([
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newSeverity, setNewSeverity] = useState<'HIGH' | 'MEDIUM'>('HIGH');
+  const [newAssignee, setNewAssignee] = useState('Karan Verma');
+
+  const [incidents, setIncidents] = useState<Incident[]>([
     {
       id: 'INC-01',
       title: 'Florist needs extra backup generator for mandap spotlights',
@@ -28,152 +84,333 @@ export const DayOf: React.FC = () => {
     },
   ]);
 
-  const schedule = [
+  const [schedule] = useState<ScheduleItem[]>([
     { time: '14:00', event: 'Groom Baraat Assembly & Royal Vintage Car Lineup', venue: 'Palace South Gate', owner: 'Karan Verma', status: 'COMPLETED' },
     { time: '15:15', event: 'Grand Varmala (Garland Exchange) over Lake Courtyard', venue: 'Lake Front Terrace', owner: 'Devika Sharma', status: 'IN_PROGRESS' },
     { time: '16:30', event: 'Royal Vedic Pheras & Mangalsutra Ritual', venue: 'Heritage Mandap Hall', owner: 'Priya Joshi', status: 'UPCOMING' },
     { time: '19:30', event: 'Banquet Reception Gala & Family Speeches', venue: 'Grand Durbar Hall', owner: 'Devika Sharma', status: 'UPCOMING' },
+  ]);
+
+  const vendorCheckins: VendorCheckin[] = [
+    { vendor: 'Royal Mewar Banquets', category: 'Catering (400 Guests)', scheduled: '12:00 PM', actual: '11:45 AM', status: 'ARRIVED_ON_TIME', delay: 0 },
+    { vendor: 'Desert Beat Sounds', category: 'DJ & Production', scheduled: '13:00 PM', actual: '13:40 PM', status: 'RUNNING_LATE', delay: 40 },
+    { vendor: 'Jaipur Floral Wonders', category: 'Mandap & Courtyard Decor', scheduled: '10:00 AM', actual: '09:50 AM', status: 'ARRIVED_ON_TIME', delay: 0 },
+    { vendor: 'Heritage Dhol Troupe', category: 'Baraat Drummers', scheduled: '13:30 PM', actual: '13:25 PM', status: 'ARRIVED_ON_TIME', delay: 0 },
   ];
 
-  const vendorCheckins = [
-    { vendor: 'Royal Mewar Banquets (Catering)', scheduled: '12:00 PM', actual: '11:45 AM', status: 'ARRIVED_ON_TIME', delay: 0 },
-    { vendor: 'Desert Beat Sounds (DJ & Lights)', scheduled: '13:00 PM', actual: '13:40 PM', status: 'RUNNING_LATE', delay: 40, phone: '+91 98290 88776' },
-    { vendor: 'Jaipur Floral Wonders (Mandap)', scheduled: '10:00 AM', actual: '09:50 AM', status: 'ARRIVED_ON_TIME', delay: 0 },
-    { vendor: 'Heritage Dhol Troupe (Baraat)', scheduled: '13:30 PM', actual: '13:25 PM', status: 'ARRIVED_ON_TIME', delay: 0 },
-  ];
+  const handleReportIncident = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle) return;
+
+    const newInc: Incident = {
+      id: `INC-0${incidents.length + 1}`,
+      title: newTitle,
+      severity: newSeverity,
+      assignedTo: newAssignee,
+      status: 'INVESTIGATING',
+      time: '14:35',
+    };
+
+    setIncidents([newInc, ...incidents]);
+    setReportModalOpen(false);
+    setNewTitle('');
+  };
+
+  const handleResolveIncident = (id: string) => {
+    setIncidents((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, status: 'RESOLVED' } : i))
+    );
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* Odoo Control Panel */}
+      <div className="bg-white border border-slate-200 rounded p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-[#222222]">Day-of Live Schedule & Operations</h1>
-          <p className="text-xs md:text-sm text-neutral-500 mt-0.5">
-            Minute-by-minute timeline, vendor arrivals, and real-time field coordination.
-          </p>
+          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            Field Operations
+          </div>
+          <h1 className="text-lg font-bold text-slate-900 tracking-tight">
+            Day-Of Live Execution & Incident Log
+          </h1>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span className="text-xs font-bold text-neutral-800">Live: Singhania & Mehra Wedding</span>
+          <Badge variant="outline" className="text-xs font-mono font-bold py-1 px-2.5">
+            Singhania & Mehra Wedding
+          </Badge>
+
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setReportModalOpen(true)}
+            className="gap-1.5"
+          >
+            <span>Log Incident</span>
+          </Button>
         </div>
       </div>
 
-      {/* Incidents Bar */}
-      <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2 text-rose-800 font-bold text-xs uppercase tracking-wide">
-            <Flame className="w-4 h-4 text-[#FF385C]" /> Active Incidents
+      {/* Incidents Command Bar */}
+      <Card className="border border-rose-200 bg-rose-50/40 shadow-2xs rounded">
+        <CardHeader className="p-3.5 pb-2 border-b border-rose-200/80 bg-rose-50">
+          <div className="flex items-center justify-between">
+            <div className="font-bold text-xs uppercase tracking-wider text-rose-900">
+              Active Operational Incidents
+            </div>
+            <Badge variant="destructive" className="text-[10px] font-mono">
+              {incidents.filter((i) => i.status === 'INVESTIGATING').length} Pending
+            </Badge>
           </div>
-          <span className="text-[11px] font-semibold text-rose-600">2 Reported</span>
-        </div>
+        </CardHeader>
 
-        <div className="space-y-2">
+        <CardContent className="p-3.5 space-y-2">
           {incidents.map((inc) => (
-            <div key={inc.id} className="bg-white p-3 rounded-xl border border-rose-100 flex items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2.5">
-                <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                  inc.severity === 'HIGH' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
-                }`}>
+            <div
+              key={inc.id}
+              className="p-3 rounded bg-white border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs"
+            >
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={inc.severity === 'HIGH' ? 'destructive' : 'warning'}
+                  className="text-[10px] font-mono uppercase"
+                >
                   {inc.severity}
-                </span>
-                <span className="font-semibold text-neutral-800">{inc.title}</span>
+                </Badge>
+                <span className="font-bold text-slate-900">{inc.title}</span>
               </div>
+
               <div className="flex items-center gap-3 shrink-0">
-                <span className="text-neutral-500">Assigned: <strong>{inc.assignedTo}</strong></span>
-                <span className={`font-semibold px-2 py-0.5 rounded-full text-[10px] ${
-                  inc.status === 'RESOLVED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                }`}>
-                  {inc.status}
+                <span className="text-slate-500 text-[11px]">
+                  Assigned: <strong className="text-slate-800">{inc.assignedTo}</strong> ({inc.time})
                 </span>
+                {inc.status === 'INVESTIGATING' ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleResolveIncident(inc.id)}
+                    className="h-6 text-xs text-emerald-800 border-emerald-300 bg-emerald-50"
+                  >
+                    Mark Resolved
+                  </Button>
+                ) : (
+                  <Badge variant="success" className="text-[10px]">
+                    Resolved
+                  </Badge>
+                )}
               </div>
             </div>
           ))}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Minute-by-Minute Schedule */}
-        <div className="bg-white rounded-2xl border border-neutral-200 p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-bold text-base text-[#222222]">Minute-by-Minute Run Sheet</h2>
-            <span className="text-xs text-neutral-400">Current Time: 15:20 IST</span>
-          </div>
-
-          <div className="space-y-3 relative before:absolute before:inset-0 before:left-3.5 before:w-0.5 before:bg-neutral-200">
-            {schedule.map((item, idx) => (
-              <div key={idx} className="relative flex items-start gap-4 pl-8 text-xs">
-                <div className={`absolute left-2 top-1 w-3.5 h-3.5 rounded-full border-2 bg-white ${
-                  item.status === 'COMPLETED' ? 'border-emerald-500 bg-emerald-500' : item.status === 'IN_PROGRESS' ? 'border-[#FF385C] bg-[#FF385C]' : 'border-neutral-300'
-                }`}></div>
-
-                <div className="flex-1 bg-neutral-50 p-3 rounded-xl border border-neutral-100">
-                  <div className="flex items-center justify-between font-mono font-bold text-neutral-700 mb-1">
-                    <span>{item.time}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-                      item.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : item.status === 'IN_PROGRESS' ? 'bg-rose-100 text-[#FF385C] font-bold animate-pulse' : 'bg-neutral-200 text-neutral-600'
-                    }`}>
-                      {item.status}
-                    </span>
-                  </div>
-                  <div className="font-bold text-sm text-neutral-900">{item.event}</div>
-                  <div className="flex items-center justify-between text-neutral-500 mt-2">
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-neutral-400" /> {item.venue}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <User className="w-3 h-3 text-neutral-400" /> {item.owner}
-                    </span>
-                  </div>
+      {/* Run Sheet & Vendor Arrivals */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Left: Minute-by-Minute Run Sheet */}
+        <Card className="border border-slate-200 shadow-2xs rounded bg-white">
+          <CardHeader className="p-3.5 border-b border-slate-200 bg-slate-50/70">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-bold text-slate-900">
+                  Minute-by-Minute Run Sheet
+                </CardTitle>
+                <div className="text-xs text-slate-500">
+                  Execution schedule for Nov 15, 2026
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
+              <Badge variant="outline" className="text-xs font-mono font-bold">
+                Live Timeline
+              </Badge>
+            </div>
+          </CardHeader>
 
-        {/* Right: Vendor Arrival Board */}
-        <div className="bg-white rounded-2xl border border-neutral-200 p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-bold text-base text-[#222222]">Vendor Arrival Board</h2>
-            <span className="text-xs text-neutral-500">18 Partners</span>
-          </div>
-
-          <div className="space-y-3">
-            {vendorCheckins.map((v, i) => (
-              <div key={i} className="p-3.5 rounded-xl border border-neutral-200 bg-neutral-50/60 flex items-center justify-between gap-3 text-xs">
-                <div>
-                  <div className="font-bold text-neutral-900">{v.vendor}</div>
-                  <div className="text-neutral-500 mt-0.5">
-                    Sched: {v.scheduled} &bull; Actual: {v.actual}
+          <CardContent className="p-4 space-y-3">
+            <div className="space-y-3">
+              {schedule.map((item, idx) => (
+                <div key={idx} className="flex gap-3 items-start relative pb-2 border-b border-slate-100 last:border-0 last:pb-0">
+                  <div
+                    className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold border shrink-0 mt-0.5 ${
+                      item.status === 'COMPLETED'
+                        ? 'bg-emerald-700 border-emerald-700 text-white'
+                        : item.status === 'IN_PROGRESS'
+                        ? 'bg-[#714B67] border-[#714B67] text-white'
+                        : 'bg-slate-100 border-slate-300 text-slate-600'
+                    }`}
+                  >
+                    {item.status === 'COMPLETED' ? (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    ) : (
+                      <Clock className="w-3 h-3" />
+                    )}
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  {v.status === 'RUNNING_LATE' ? (
-                    <div className="text-right">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-[#FF385C]">
-                        <AlertTriangle className="w-3 h-3" /> {v.delay}m Late
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs font-bold text-slate-900">
+                        {item.time}
                       </span>
-                      {v.phone && (
-                        <div className="mt-1">
-                          <a href={`tel:${v.phone}`} className="inline-flex items-center gap-1 text-[11px] font-semibold text-neutral-700 hover:text-black">
-                            <PhoneCall className="w-3 h-3" /> Call Partner
-                          </a>
-                        </div>
-                      )}
+                      <Badge
+                        variant={
+                          item.status === 'COMPLETED'
+                            ? 'success'
+                            : item.status === 'IN_PROGRESS'
+                            ? 'odoo'
+                            : 'secondary'
+                        }
+                        className="text-[10px]"
+                      >
+                        {item.status}
+                      </Badge>
                     </div>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      <CheckCircle2 className="w-3 h-3" /> Arrived & Verified
-                    </span>
-                  )}
+
+                    <div className="font-bold text-xs text-slate-900 mt-0.5">
+                      {item.event}
+                    </div>
+
+                    <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-1">
+                      <div className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-slate-400" />
+                        <span>{item.venue}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <User className="w-3 h-3 text-slate-400" />
+                        <span>{item.owner}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Right: Vendor Check-in & Telemetry */}
+        <Card className="border border-slate-200 shadow-2xs rounded bg-white">
+          <CardHeader className="p-3.5 border-b border-slate-200 bg-slate-50/70">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-bold text-slate-900">
+                  Vendor Arrival Telemetry
+                </CardTitle>
+                <div className="text-xs text-slate-500">
+                  Delivery timing and punctuality records
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
+              <Badge variant="outline" className="text-xs font-mono font-bold">
+                4 Vendors
+              </Badge>
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader className="bg-slate-100/80 border-b border-slate-200">
+                <TableRow>
+                  <TableHead className="font-bold text-slate-700 text-xs">Vendor & Service</TableHead>
+                  <TableHead className="font-bold text-slate-700 text-xs">Scheduled</TableHead>
+                  <TableHead className="font-bold text-slate-700 text-xs">Actual</TableHead>
+                  <TableHead className="font-bold text-slate-700 text-xs text-right">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-slate-100">
+                {vendorCheckins.map((v, i) => (
+                  <TableRow key={i} className="hover:bg-slate-50 transition">
+                    <TableCell className="py-2.5">
+                      <div className="font-bold text-xs text-slate-900">{v.vendor}</div>
+                      <div className="text-[11px] text-slate-500">{v.category}</div>
+                    </TableCell>
+
+                    <TableCell className="py-2.5 font-mono text-xs text-slate-600">
+                      {v.scheduled}
+                    </TableCell>
+
+                    <TableCell className="py-2.5 font-mono text-xs font-bold text-slate-800">
+                      {v.actual}
+                    </TableCell>
+
+                    <TableCell className="py-2.5 text-right">
+                      {v.status === 'ARRIVED_ON_TIME' ? (
+                        <Badge variant="success" className="text-[10px]">
+                          On Time
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive" className="text-[10px]">
+                          +{v.delay}m Late
+                        </Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Modal: Report Incident */}
+      <Dialog open={reportModalOpen} onOpenChange={setReportModalOpen}>
+        <DialogContent className="max-w-md bg-white border border-slate-200 shadow-xl rounded">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900">
+              Log Field Incident
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Broadcast critical event issue to coordinators and field staff.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleReportIncident} className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="inc_title">Incident Description</Label>
+              <Input
+                id="inc_title"
+                placeholder="e.g. Generator failure at Mandap lawn"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                required
+                className="border-slate-300"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="space-y-1">
+                <Label htmlFor="severity">Severity Level</Label>
+                <Select
+                  value={newSeverity}
+                  onValueChange={(val) => setNewSeverity(val as 'HIGH' | 'MEDIUM')}
+                >
+                  <SelectTrigger id="severity" className="h-8 text-xs border-slate-300">
+                    <SelectValue placeholder="Severity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="HIGH">HIGH (Immediate Action)</SelectItem>
+                    <SelectItem value="MEDIUM">MEDIUM (Delay Risk)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="assignee">Lead Responder</Label>
+                <Input
+                  id="assignee"
+                  value={newAssignee}
+                  onChange={(e) => setNewAssignee(e.target.value)}
+                  className="border-slate-300"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setReportModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="destructive" size="sm">
+                Log & Dispatch
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
