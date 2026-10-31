@@ -32,9 +32,11 @@ import {
   SelectContent,
   SelectItem,
 } from '../components/ui';
+import { useWeddingStore } from '../store/useWeddingStore';
 
 interface Incident {
   id: string;
+  weddingId?: string;
   title: string;
   severity: 'HIGH' | 'MEDIUM' | 'LOW';
   assignedTo: string;
@@ -60,7 +62,11 @@ interface VendorCheckin {
 }
 
 export const DayOf: React.FC = () => {
+  const { weddings, selectedWeddingId, setSelectedWeddingId } = useWeddingStore();
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [incidentWeddingId, setIncidentWeddingId] = useState<string>(
+    selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'
+  );
   const [newTitle, setNewTitle] = useState('');
   const [newSeverity, setNewSeverity] = useState<'HIGH' | 'MEDIUM'>('HIGH');
   const [newAssignee, setNewAssignee] = useState('Karan Verma');
@@ -127,8 +133,16 @@ export const DayOf: React.FC = () => {
       {/* Odoo Control Panel */}
       <div className="bg-white border border-slate-200 rounded p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div>
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-            Field Operations
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              Field Operations Command Center
+            </span>
+            <span className="text-slate-300">•</span>
+            <span className="text-[11px] font-mono font-bold text-[#714B67]">
+              {selectedWeddingId === 'ALL'
+                ? 'All Live Weddings'
+                : `${selectedWeddingId} • ${weddings.find((w) => w.id === selectedWeddingId)?.couple}`}
+            </span>
           </div>
           <h1 className="text-lg font-bold text-slate-900 tracking-tight">
             Day-Of Live Execution & Incident Log
@@ -136,9 +150,18 @@ export const DayOf: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs font-mono font-bold py-1 px-2.5">
-            Singhania & Mehra Wedding
-          </Badge>
+          <span className="text-xs text-slate-500 font-medium hidden sm:inline">Event:</span>
+          <select
+            value={selectedWeddingId !== 'ALL' ? selectedWeddingId : 'RW-2026-001'}
+            onChange={(e) => setSelectedWeddingId(e.target.value)}
+            className="h-8 text-xs font-semibold bg-white border border-slate-200 rounded px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67] cursor-pointer"
+          >
+            {weddings.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.code}: {w.couple} ({w.city})
+              </option>
+            ))}
+          </select>
 
           <Button
             variant="destructive"
@@ -360,6 +383,22 @@ export const DayOf: React.FC = () => {
           </DialogHeader>
 
           <form onSubmit={handleReportIncident} className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="inc_wedding">Related Wedding Project</Label>
+              <select
+                id="inc_wedding"
+                value={incidentWeddingId}
+                onChange={(e) => setIncidentWeddingId(e.target.value)}
+                className="w-full h-8 text-xs font-semibold bg-white border border-slate-300 rounded px-2.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67]"
+              >
+                {weddings.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.code}: {w.couple} ({w.venue}, {w.city})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="space-y-1">
               <Label htmlFor="inc_title">Incident Description</Label>
               <Input

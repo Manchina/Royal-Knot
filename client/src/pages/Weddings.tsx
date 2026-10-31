@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Plus, 
   Search, 
@@ -7,6 +8,7 @@ import {
   Building2,
   ArrowRight
 } from 'lucide-react';
+import { useWeddingStore } from '../store/useWeddingStore';
 import {
   Card,
   CardHeader,
@@ -50,6 +52,8 @@ interface Wedding {
 }
 
 export const Weddings: React.FC = () => {
+  const navigate = useNavigate();
+  const { setSelectedWeddingId } = useWeddingStore();
   const [cityFilter, setCityFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [newModalOpen, setNewModalOpen] = useState<boolean>(false);
@@ -280,10 +284,26 @@ export const Weddings: React.FC = () => {
                 Standard Operations Lifecycle
               </span>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="h-7 text-xs">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs cursor-pointer"
+                  onClick={() => {
+                    setSelectedWeddingId(w.id);
+                    navigate('/day-of');
+                  }}
+                >
                   Run Sheet
                 </Button>
-                <Button variant="default" size="sm" className="h-7 text-xs gap-1">
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="h-7 text-xs gap-1 cursor-pointer"
+                  onClick={() => {
+                    setSelectedWeddingId(w.id);
+                    navigate('/tasks');
+                  }}
+                >
                   Workspace
                   <ArrowRight className="w-3 h-3" />
                 </Button>

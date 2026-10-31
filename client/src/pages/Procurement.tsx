@@ -22,8 +22,11 @@ import {
   TabsList,
   TabsTrigger,
 } from '../components/ui';
+import { useWeddingStore } from '../store/useWeddingStore';
 
 export const Procurement: React.FC = () => {
+  const { weddings, selectedWeddingId, setSelectedWeddingId } = useWeddingStore();
+  const activeWedding = weddings.find((w) => w.id === selectedWeddingId) || weddings[0];
   const [selectedWinner, setSelectedWinner] = useState<string | null>('CAT-02');
   const [activeCategory, setActiveCategory] = useState<string>('catering');
 
@@ -71,8 +74,14 @@ export const Procurement: React.FC = () => {
       {/* Odoo Control Panel */}
       <div className="bg-white border border-slate-200 rounded p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div>
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-            Vendor Sourcing & RFQ
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              Vendor Sourcing & RFQ
+            </span>
+            <span className="text-slate-300">•</span>
+            <span className="text-[11px] font-mono font-bold text-[#714B67]">
+              {activeWedding.code}: {activeWedding.couple}
+            </span>
           </div>
           <h1 className="text-lg font-bold text-slate-900 tracking-tight">
             Vendor Quote Comparison & Award
@@ -80,9 +89,18 @@ export const Procurement: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs font-mono font-bold py-1 px-2.5">
-            RFQ: Singhania-Mehra (400 Guests)
-          </Badge>
+          <span className="text-xs text-slate-500 font-medium hidden sm:inline">Project:</span>
+          <select
+            value={activeWedding.id}
+            onChange={(e) => setSelectedWeddingId(e.target.value)}
+            className="h-8 text-xs font-semibold bg-white border border-slate-200 rounded px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#714B67] cursor-pointer"
+          >
+            {weddings.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.code}: {w.couple} ({w.guestCount} Guests, {w.city})
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
