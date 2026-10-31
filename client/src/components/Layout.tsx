@@ -345,38 +345,55 @@ export const Layout: React.FC = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                sideOffset={6}
-                className="w-72 rounded-xl border border-slate-200/90 bg-white p-1.5 shadow-xl z-50 animate-in fade-in-80 zoom-in-95"
+                sideOffset={8}
+                className="w-80 sm:w-88 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xl z-50 animate-in fade-in-80 zoom-in-95 space-y-3"
               >
                 <DropdownMenuLabel className="p-0 font-normal">
-                  <div className="flex items-center gap-2.5 p-2 text-left bg-slate-50/80 rounded-lg border border-slate-100">
-                    <Avatar className="h-9 w-9 rounded-lg shrink-0 shadow-2xs">
-                      <AvatarFallback className="rounded-lg bg-[#714B67] text-white font-bold text-xs">
+                  <div className="flex items-start gap-3.5 p-3.5 bg-gradient-to-br from-slate-50 to-slate-100/70 rounded-xl border border-slate-200/70 shadow-2xs">
+                    <Avatar className="h-12 w-12 rounded-xl shrink-0 shadow-2xs ring-2 ring-[#714B67]/20">
+                      <AvatarFallback className="rounded-xl bg-[#714B67] text-white font-bold text-sm tracking-wide">
                         {roleInitials}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="grid flex-1 text-left leading-tight min-w-0">
-                      <span className="truncate font-bold text-xs text-slate-900">
+                    <div className="grid flex-1 text-left leading-tight min-w-0 pt-0.5">
+                      <span className="truncate font-bold text-sm text-slate-900">
                         {user?.full_name || 'Staff User'}
                       </span>
-                      <span className="truncate text-[11px] text-slate-500 font-mono mt-0.5">
+                      <span className="truncate text-xs text-slate-500 font-mono mt-1">
                         {user?.email || 'admin@royalknot.com'}
                       </span>
-                      <div className="mt-1.5">
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold font-mono bg-rose-50 text-[#FF385C] border border-rose-200/60">
+                      <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-[#714B67]/10 text-[#714B67] border border-[#714B67]/20">
                           {roleLabels[activeRole]}
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <span>Active</span>
                         </span>
                       </div>
                     </div>
                   </div>
                 </DropdownMenuLabel>
-                <DropdownMenuSeparator className="my-1 bg-slate-100" />
+
+                <div className="p-3 bg-slate-50/60 rounded-xl border border-slate-100 space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between text-slate-500 text-[11px]">
+                    <span>Workspace Organization</span>
+                    <span className="font-semibold text-slate-800">The Royal Knot ERP</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-500 text-[11px]">
+                    <span>Access Tier</span>
+                    <span className="font-mono font-medium text-[#714B67]">{activeRole}</span>
+                  </div>
+                </div>
+
+                <DropdownMenuSeparator className="my-2 bg-slate-100" />
+
                 <DropdownMenuItem
                   onClick={handleLogout}
-                  className="flex items-center gap-2 px-2.5 py-2 text-xs text-rose-600 font-semibold rounded-md hover:bg-rose-50 hover:text-rose-700 cursor-pointer focus:bg-rose-50 focus:text-rose-700 transition-colors"
+                  className="w-full h-10 px-4 py-2.5 flex items-center justify-center gap-2 text-xs text-rose-700 font-bold rounded-xl bg-rose-50/80 hover:bg-rose-100/80 hover:text-rose-800 border border-rose-200/70 cursor-pointer focus:bg-rose-100 focus:text-rose-800 transition-all shadow-2xs"
                 >
-                  <LogOut className="w-4 h-4 text-rose-500" />
-                  <span>Sign Out</span>
+                  <LogOut className="w-4 h-4 text-rose-600" />
+                  <span>Sign Out of Account</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

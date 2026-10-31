@@ -163,27 +163,24 @@ export const Billing: React.FC = () => {
   return (
     <div className="space-y-5 pb-10">
       {/* 1. Header Banner matching Weddings & Enquiries */}
-      <div className="bg-white border border-slate-200 rounded-lg p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs">
-        <div>
+      <div className="bg-white border border-slate-200 rounded p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs">
+        <div className="space-y-0.5">
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               Financial Registry & Commercial Operations
             </span>
             <span className="text-slate-300">•</span>
             <span className="text-[11px] font-mono font-bold text-[#714B67]">
-              Odoo Commercial ERP
+              Billing & Extras
             </span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1 flex items-center gap-2.5">
-            <CreditCard className="w-6 h-6 text-[#714B67]" />
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
             Billing & Vendor Settlements
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-slate-500 pt-0.5">
             Contract revenue, winning RFQ vendor disbursements, audited extra charge overruns, and milestone accounts reconciliation.
           </p>
         </div>
-
-
       </div>
 
       {/* 2. Executive KPI Cards Ribbon */}

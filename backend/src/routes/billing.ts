@@ -94,7 +94,7 @@ export interface AvailableQuoteItem {
   vendorName: string;
   baseCost: string;
   pricePerPlate: string | null;
-  quoteStatus: string;
+  quoteStatus: string | null;
   isBilled: boolean;
   formattedCost: string;
 }
@@ -1133,7 +1133,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
           const [foundVendor] = await db
             .select({ id: vendors.id })
             .from(vendors)
-            .where(ilike(vendors.businessName, `%${vendor.trim()}%`))
+            .where(ilike(sql`${vendors.businessName}`, `%${vendor.trim()}%`))
             .limit(1);
           if (foundVendor) resolvedVendorId = foundVendor.id;
         }
