@@ -264,25 +264,25 @@ export const WeddingDetail: React.FC = () => {
             <TabsList className="h-9 bg-transparent border-0 p-0 space-x-2">
               <TabsTrigger
                 value="dossier"
-                className="text-xs font-bold border-b-2 border-transparent data-[state=active]:border-[#714B67] data-[state=active]:text-[#714B67] rounded-none px-3"
+                className="text-xs font-bold border-b-2 border-transparent data-[state=active]:border-[#714B67] data-[state=active]:text-white rounded-none px-3"
               >
                 Project & Client Dossier
               </TabsTrigger>
               <TabsTrigger
                 value="procurement"
-                className="text-xs font-bold border-b-2 border-transparent data-[state=active]:border-[#714B67] data-[state=active]:text-[#714B67] rounded-none px-3"
+                className="text-xs font-bold border-b-2 border-transparent data-[state=active]:border-[#714B67] data-[state=active]:text-white rounded-none px-3"
               >
                 Vendor Sourcing ({awardedCount}/3 Awarded)
               </TabsTrigger>
               <TabsTrigger
                 value="ceremonies"
-                className="text-xs font-bold border-b-2 border-transparent data-[state=active]:border-[#714B67] data-[state=active]:text-[#714B67] rounded-none px-3"
+                className="text-xs font-bold border-b-2 border-transparent data-[state=active]:border-[#714B67] data-[state=active]:text-white rounded-none px-3"
               >
                 Ceremonies & Timeline ({wedding.events?.length || 0})
               </TabsTrigger>
               <TabsTrigger
                 value="billing"
-                className="text-xs font-bold border-b-2 border-transparent data-[state=active]:border-[#714B67] data-[state=active]:text-[#714B67] rounded-none px-3"
+                className="text-xs font-bold border-b-2 border-transparent data-[state=active]:border-[#714B67] data-[state=active]:text-white rounded-none px-3"
               >
                 Financials & Settlement
               </TabsTrigger>
