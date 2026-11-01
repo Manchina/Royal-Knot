@@ -736,9 +736,6 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                 <CardTitle className="text-sm font-bold text-slate-900">
                   Season Profitability Matrix
                 </CardTitle>
-                <Badge variant="outline" className="text-[10px] font-mono py-0.5">
-                  Direct PostgreSQL
-                </Badge>
               </div>
               <div className="text-xs text-slate-500 mt-0.5">
                 Contracted billing vs approved vendor payouts with agency margin health
